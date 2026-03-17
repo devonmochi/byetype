@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri2-json-schema/refs/heads/main/schemas/2.x.x/tauri-config.schema.json",
+  "productName": "ByeType",
+  "version": "1.0.0",
+  "identifier": "com.byetype.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "settings",
+        "title": "ByeType Settings",
+        "width": 780,
+        "height": 600,
+        "resizable": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
