@@ -1,5 +1,7 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{Manager, State};
+use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
 use crate::config::types::AppConfig;
 
@@ -30,10 +32,23 @@ pub fn get_config(config_manager: State<'_, ConfigManager>) -> Result<AppConfig,
 
 #[tauri::command]
 pub fn save_config(
+    app: tauri::AppHandle,
     config_manager: State<'_, ConfigManager>,
+    recorder: State<'_, Arc<AudioRecorder>>,
     config: AppConfig,
 ) -> Result<bool, String> {
-    config_manager.update(config)?;
+    let old_shortcut = config_manager.get().general.shortcut.clone();
+    config_manager.update(config.clone())?;
+
+    if config.general.shortcut != old_shortcut {
+        let new_key = if config.general.shortcut.is_empty() {
+            "F4".to_string()
+        } else {
+            config.general.shortcut.clone()
+        };
+        crate::shortcut::register(&app, &new_key, (*recorder).clone())?;
+    }
+
     Ok(true)
 }
 
@@ -93,4 +108,9 @@ pub fn get_theme() -> Result<String, String> {
 #[tauri::command]
 pub fn open_file(path: String) -> Result<(), String> {
     open::that(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_recording_state(recorder: State<'_, Arc<AudioRecorder>>) -> Result<bool, String> {
+    Ok(recorder.is_recording())
 }
