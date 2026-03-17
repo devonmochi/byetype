@@ -1,6 +1,27 @@
+use std::path::PathBuf;
 use tauri::{Manager, State};
 use crate::config::ConfigManager;
 use crate::config::types::AppConfig;
+
+/// Resolve the builtin prompts directory.
+/// In production: resource_dir/prompts
+/// In dev: falls back to src-tauri/prompts (next to Cargo.toml)
+fn resolve_prompts_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app.path().resource_dir()
+        .map_err(|e| e.to_string())?;
+    let prompts_dir = resource_dir.join("prompts");
+    if prompts_dir.exists() {
+        return Ok(prompts_dir);
+    }
+
+    // Dev mode fallback: src-tauri/prompts relative to the manifest dir
+    let dev_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("prompts");
+    if dev_dir.exists() {
+        return Ok(dev_dir);
+    }
+
+    Ok(prompts_dir)
+}
 
 #[tauri::command]
 pub fn get_config(config_manager: State<'_, ConfigManager>) -> Result<AppConfig, String> {
@@ -18,9 +39,7 @@ pub fn save_config(
 
 #[tauri::command]
 pub fn get_prompts_dir(app: tauri::AppHandle) -> Result<String, String> {
-    let resource_dir = app.path().resource_dir()
-        .map_err(|e| e.to_string())?;
-    let prompts_dir = resource_dir.join("prompts");
+    let prompts_dir = resolve_prompts_dir(&app)?;
     Ok(prompts_dir.to_string_lossy().to_string())
 }
 
@@ -29,9 +48,8 @@ pub fn get_builtin_prompt_path(
     app: tauri::AppHandle,
     filename: String,
 ) -> Result<String, String> {
-    let resource_dir = app.path().resource_dir()
-        .map_err(|e| e.to_string())?;
-    let path = resource_dir.join("prompts").join(filename);
+    let prompts_dir = resolve_prompts_dir(&app)?;
+    let path = prompts_dir.join(filename);
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -41,9 +59,8 @@ pub fn copy_builtin_prompt(
     filename: String,
     force: bool,
 ) -> Result<String, String> {
-    let resource_dir = app.path().resource_dir()
-        .map_err(|e| e.to_string())?;
-    let src_path = resource_dir.join("prompts").join(&filename);
+    let prompts_dir = resolve_prompts_dir(&app)?;
+    let src_path = prompts_dir.join(&filename);
 
     let data_dir = app.path().app_data_dir()
         .map_err(|e| e.to_string())?;
@@ -64,10 +81,8 @@ pub fn is_builtin_prompt_path(
     app: tauri::AppHandle,
     path: String,
 ) -> Result<bool, String> {
-    let resource_dir = app.path().resource_dir()
-        .map_err(|e| e.to_string())?;
-    let builtin_dir = resource_dir.join("prompts");
-    Ok(path.starts_with(&builtin_dir.to_string_lossy().as_ref()))
+    let prompts_dir = resolve_prompts_dir(&app)?;
+    Ok(path.starts_with(&prompts_dir.to_string_lossy().as_ref()))
 }
 
 #[tauri::command]
