@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { background: transparent; overflow: hidden; }
+
+    #bubble {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .num {
+      color: white; font-size: 13px; font-weight: bold;
+      font-family: -apple-system, sans-serif;
+    }
+    .check {
+      color: white; font-size: 18px; font-weight: bold;
+      font-family: -apple-system, sans-serif;
+    }
+    .x {
+      color: white; font-size: 16px; font-weight: bold;
+      font-family: -apple-system, sans-serif;
+    }
+
+    .s-recording {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      transform: rotate(12deg);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(231,76,60,0.5);
+      animation: bounceInRotate 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
+                 recPulse 2s ease-in-out infinite 0.6s;
+    }
+    .s-recording .num { transform: rotate(-12deg); }
+
+    .s-transcribing {
+      width: 36px; height: 32px;
+      clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+      background: linear-gradient(180deg, #2980b9, #3498db);
+      filter: drop-shadow(0 4px 12px rgba(52,152,219,0.5));
+      display: flex; align-items: center; justify-content: center;
+      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    .s-transcribing .num { margin-top: 12px; }
+
+    .s-optimizing {
+      width: 34px; height: 34px;
+      border-radius: 30%;
+      background: linear-gradient(135deg, #9b59b6, #8e44ad);
+      box-shadow: 0 4px 14px rgba(155,89,182,0.5);
+      display: flex; align-items: center; justify-content: center;
+      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    .s-retrying {
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+      transform: rotate(45deg);
+      box-shadow: 0 4px 14px rgba(243,156,18,0.5);
+      display: flex; align-items: center; justify-content: center;
+      animation: bounceInDiamond 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
+                 retryPulse 1.5s ease-in-out infinite 0.6s;
+    }
+    .s-retrying .num { transform: rotate(-45deg); }
+
+    .s-completed {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      box-shadow: 0 4px 16px rgba(46,204,113,0.5);
+      display: flex; align-items: center; justify-content: center;
+      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    .s-failed {
+      width: 34px; height: 34px;
+      clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+      background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+      filter: drop-shadow(0 2px 8px rgba(149,165,166,0.4));
+      display: flex; align-items: center; justify-content: center;
+      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    @keyframes bounceIn {
+      0%   { transform: scale(0); opacity: 0; }
+      50%  { transform: scale(1.18); }
+      70%  { transform: scale(0.92); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes bounceInRotate {
+      0%   { transform: rotate(12deg) scale(0); opacity: 0; }
+      50%  { transform: rotate(12deg) scale(1.18); }
+      70%  { transform: rotate(12deg) scale(0.92); }
+      100% { transform: rotate(12deg) scale(1); opacity: 1; }
+    }
+    @keyframes bounceInDiamond {
+      0%   { transform: rotate(45deg) scale(0); opacity: 0; }
+      50%  { transform: rotate(45deg) scale(1.18); }
+      70%  { transform: rotate(45deg) scale(0.92); }
+      100% { transform: rotate(45deg) scale(1); opacity: 1; }
+    }
+    @keyframes recPulse {
+      0%, 100% { box-shadow: 0 4px 16px rgba(231,76,60,0.5); }
+      50%      { box-shadow: 0 4px 22px rgba(231,76,60,0.7), 0 0 0 7px rgba(231,76,60,0.12); }
+    }
+    @keyframes retryPulse {
+      0%, 100% { box-shadow: 0 4px 14px rgba(243,156,18,0.5); }
+      50%      { box-shadow: 0 4px 20px rgba(243,156,18,0.7), 0 0 0 6px rgba(243,156,18,0.12); }
+    }
+  </style>
+</head>
+<body>
+  <div id="bubble"></div>
+  <script type="module" src="/src/views/bubble/main.ts"></script>
+</body>
+</html>
