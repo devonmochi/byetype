@@ -69,3 +69,29 @@ export function onThemeChange(callback: (theme: string) => void): () => void {
 export async function onEvent<T>(event: string, callback: (payload: T) => void): Promise<UnlistenFn> {
   return listen<T>(event, (e) => callback(e.payload))
 }
+
+// Recording events
+export async function onRecordingStarted(callback: () => void): Promise<UnlistenFn> {
+  return listen('recording-started', () => callback())
+}
+
+export async function onRecordingComplete(
+  callback: (audio: string) => void
+): Promise<UnlistenFn> {
+  return listen<{ audio: string }>('recording-complete', (e) =>
+    callback(e.payload.audio)
+  )
+}
+
+export async function onRecordingError(
+  callback: (message: string) => void
+): Promise<UnlistenFn> {
+  return listen<{ message: string }>('recording-error', (e) =>
+    callback(e.payload.message)
+  )
+}
+
+// Recording state
+export async function getRecordingState(): Promise<boolean> {
+  return invoke<boolean>('get_recording_state')
+}
