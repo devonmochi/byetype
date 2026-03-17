@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { AppConfig } from '../../../core/types'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Compartment } from '@codemirror/state'

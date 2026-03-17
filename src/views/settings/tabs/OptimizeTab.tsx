@@ -1,4 +1,3 @@
-import React from 'react'
 import { AppConfig, ThinkingConfig } from '../../../core/types'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
