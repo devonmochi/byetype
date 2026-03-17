@@ -19,6 +19,12 @@ pub struct AudioRecorder {
     active: Mutex<Option<ActiveRecording>>,
 }
 
+// SAFETY: All fields are protected by Mutex. cpal::Stream is !Send/!Sync only
+// due to platform marker types, but we never access the stream without holding
+// the lock, so cross-thread usage is safe.
+unsafe impl Send for AudioRecorder {}
+unsafe impl Sync for AudioRecorder {}
+
 impl AudioRecorder {
     pub fn new() -> Self {
         Self {
