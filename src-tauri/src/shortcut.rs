@@ -24,6 +24,7 @@ pub fn register(
             if recorder.is_recording() {
                 match recorder.stop() {
                     Ok(base64_audio) => {
+                        update_tray_icon(&app_handle, false);
                         let _ = app_handle.emit("recording-complete", serde_json::json!({
                             "audio": base64_audio
                         }));
@@ -35,10 +36,10 @@ pub fn register(
                         }));
                     }
                 }
-                update_tray_icon(&app_handle, false);
             } else {
                 match recorder.start() {
                     Ok(()) => {
+                        update_tray_icon(&app_handle, true);
                         let _ = app_handle.emit("recording-started", ());
                     }
                     Err(e) => {
@@ -48,7 +49,6 @@ pub fn register(
                         }));
                     }
                 }
-                update_tray_icon(&app_handle, true);
             }
         })
         .map_err(|e| format!("Failed to register shortcut '{}': {}", shortcut_key, e))?;

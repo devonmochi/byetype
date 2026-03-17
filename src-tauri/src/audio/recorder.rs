@@ -59,8 +59,10 @@ impl AudioRecorder {
         let stream = device.build_input_stream(
             &desired_config,
             move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                let mut buf = samples_clone.lock().unwrap();
-                buf.extend_from_slice(data);
+                // Use try_lock to avoid blocking the real-time audio thread
+                if let Ok(mut buf) = samples_clone.try_lock() {
+                    buf.extend_from_slice(data);
+                }
             },
             |err| {
                 eprintln!("Audio stream error: {}", err);
@@ -78,28 +80,33 @@ impl AudioRecorder {
     }
 
     pub fn stop(&self) -> Result<String, String> {
-        let mut state = self.state.lock().unwrap();
-        if *state != RecordingState::Recording {
-            return Err("Not recording".to_string());
-        }
+        // Extract samples and release all locks before encoding
+        let samples_data = {
+            let mut state = self.state.lock().unwrap();
+            if *state != RecordingState::Recording {
+                return Err("Not recording".to_string());
+            }
 
-        let mut active_guard = self.active.lock().unwrap();
-        let recording = active_guard.take()
-            .ok_or_else(|| "No active recording".to_string())?;
+            let mut active_guard = self.active.lock().unwrap();
+            let recording = active_guard.take()
+                .ok_or_else(|| "No active recording".to_string())?;
 
-        drop(recording.stream);
+            // Drop the stream to stop capturing
+            drop(recording.stream);
 
-        let samples = recording.samples.lock().unwrap();
-        if samples.is_empty() {
+            let samples = recording.samples.lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             *state = RecordingState::Idle;
+            samples.clone()
+        };
+
+        if samples_data.is_empty() {
             return Err("No audio data captured".to_string());
         }
 
-        let wav_bytes = encoder::encode_wav(&samples)?;
-        let base64_audio = encoder::wav_to_base64(&wav_bytes);
-
-        *state = RecordingState::Idle;
-        Ok(base64_audio)
+        // Encode outside of any locks
+        let wav_bytes = encoder::encode_wav(&samples_data)?;
+        Ok(encoder::wav_to_base64(&wav_bytes))
     }
 }
 
