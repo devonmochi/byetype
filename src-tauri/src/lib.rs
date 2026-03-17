@@ -2,6 +2,7 @@ mod config;
 mod commands;
 mod audio;
 mod shortcut;
+mod tray;
 
 use config::ConfigManager;
 
