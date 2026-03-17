@@ -95,3 +95,21 @@ export async function onRecordingError(
 export async function getRecordingState(): Promise<boolean> {
   return invoke<boolean>('get_recording_state')
 }
+
+// Bubble commands
+export async function showBubble(taskId: number): Promise<void> {
+  await invoke('show_bubble', { taskId })
+}
+
+export async function updateBubble(taskId: number, status: string): Promise<void> {
+  await invoke('update_bubble', { taskId, status })
+}
+
+export async function hideBubble(taskId: number, delayMs: number): Promise<void> {
+  await invoke('hide_bubble', { taskId, delayMs })
+}
+
+// Paste command
+export async function pasteText(text: string): Promise<void> {
+  await invoke('paste_text', { text })
+}
