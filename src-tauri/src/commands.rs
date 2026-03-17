@@ -114,3 +114,8 @@ pub fn open_file(path: String) -> Result<(), String> {
 pub fn get_recording_state(recorder: State<'_, Arc<AudioRecorder>>) -> Result<bool, String> {
     Ok(recorder.is_recording())
 }
+
+#[tauri::command]
+pub fn paste_text(text: String) -> Result<(), String> {
+    crate::clipboard::paste_text(&text)
+}

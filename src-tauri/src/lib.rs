@@ -1,4 +1,5 @@
 mod audio;
+mod clipboard;
 mod config;
 mod commands;
 mod shortcut;
@@ -33,6 +34,7 @@ pub fn run() {
             commands::get_theme,
             commands::open_file,
             commands::get_recording_state,
+            commands::paste_text,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
