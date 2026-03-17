@@ -1,4 +1,5 @@
 mod audio;
+mod bubble;
 mod clipboard;
 mod config;
 mod commands;
@@ -35,6 +36,9 @@ pub fn run() {
             commands::open_file,
             commands::get_recording_state,
             commands::paste_text,
+            commands::show_bubble,
+            commands::update_bubble,
+            commands::hide_bubble,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

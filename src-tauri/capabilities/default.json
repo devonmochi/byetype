@@ -1,7 +1,7 @@
 {
   "identifier": "default",
   "description": "Default capabilities for ByeType",
-  "windows": ["settings"],
+  "windows": ["settings", "bubble*"],
   "permissions": [
     "core:default",
     "core:event:default",
@@ -26,6 +26,8 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
-    "global-shortcut:allow-unregister-all"
+    "global-shortcut:allow-unregister-all",
+    "core:window:allow-create",
+    "core:webview:allow-create-webview-window"
   ]
 }

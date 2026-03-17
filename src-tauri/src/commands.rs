@@ -119,3 +119,18 @@ pub fn get_recording_state(recorder: State<'_, Arc<AudioRecorder>>) -> Result<bo
 pub fn paste_text(text: String) -> Result<(), String> {
     crate::clipboard::paste_text(&text)
 }
+
+#[tauri::command]
+pub fn show_bubble(app: tauri::AppHandle, task_id: u32) -> Result<(), String> {
+    crate::bubble::show(&app, task_id)
+}
+
+#[tauri::command]
+pub fn update_bubble(app: tauri::AppHandle, task_id: u32, status: String) -> Result<(), String> {
+    crate::bubble::update(&app, task_id, &status)
+}
+
+#[tauri::command]
+pub fn hide_bubble(app: tauri::AppHandle, task_id: u32, delay_ms: u64) -> Result<(), String> {
+    crate::bubble::hide(&app, task_id, delay_ms)
+}
