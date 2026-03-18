@@ -70,48 +70,9 @@ export async function onEvent<T>(event: string, callback: (payload: T) => void):
   return listen<T>(event, (e) => callback(e.payload))
 }
 
-// Recording events
-export async function onRecordingStarted(callback: () => void): Promise<UnlistenFn> {
-  return listen('recording-started', () => callback())
-}
-
-export async function onRecordingComplete(
-  callback: (audio: string) => void
-): Promise<UnlistenFn> {
-  return listen<{ audio: string }>('recording-complete', (e) =>
-    callback(e.payload.audio)
-  )
-}
-
-export async function onRecordingError(
-  callback: (message: string) => void
-): Promise<UnlistenFn> {
-  return listen<{ message: string }>('recording-error', (e) =>
-    callback(e.payload.message)
-  )
-}
-
 // Recording state
 export async function getRecordingState(): Promise<boolean> {
   return invoke<boolean>('get_recording_state')
-}
-
-// Bubble commands
-export async function showBubble(taskId: number): Promise<void> {
-  await invoke('show_bubble', { taskId })
-}
-
-export async function updateBubble(taskId: number, status: string): Promise<void> {
-  await invoke('update_bubble', { taskId, status })
-}
-
-export async function hideBubble(taskId: number, delayMs: number): Promise<void> {
-  await invoke('hide_bubble', { taskId, delayMs })
-}
-
-// Paste command
-export async function pasteText(text: string): Promise<void> {
-  await invoke('paste_text', { text })
 }
 
 // Launch at login
@@ -128,20 +89,3 @@ export async function checkForUpdates(): Promise<string> {
   return invoke<string>('check_for_updates')
 }
 
-// Proxy
-export interface ProxyRequest {
-  url: string
-  method: string
-  headers: Record<string, string>
-  body?: string
-}
-
-export interface ProxyResponse {
-  status: number
-  headers: Record<string, string>
-  body: string
-}
-
-export async function proxyRequest(request: ProxyRequest): Promise<ProxyResponse> {
-  return invoke<ProxyResponse>('proxy_request', { request })
-}

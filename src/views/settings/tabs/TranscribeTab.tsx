@@ -10,7 +10,6 @@ interface Props {
 }
 
 const MODELS = [
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
   { value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash' },
   { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite' },
   { value: 'qwen3-omni-flash', label: 'Qwen3 Omni Flash' },
@@ -19,7 +18,6 @@ const MODELS = [
 export function TranscribeTab({ config, onSave }: Props) {
   const { transcribe } = config
   const isQwen = transcribe.model === 'qwen3-omni-flash'
-  const is25Flash = transcribe.model === 'gemini-2.5-flash'
 
   const update = (changes: Partial<AppConfig['transcribe']>) => {
     onSave({ ...config, transcribe: { ...transcribe, ...changes } })
@@ -81,18 +79,6 @@ export function TranscribeTab({ config, onSave }: Props) {
               />
             </SettingRow>
             {transcribe.thinking.enabled && (
-              is25Flash ? (
-                <SettingRow label="Thinking Budget" description="思考 token 数量">
-                  <input
-                    className="input"
-                    type="number"
-                    value={transcribe.thinking.budget}
-                    onChange={e => updateThinking({ budget: Number(e.target.value) })}
-                    min={0}
-                    style={{ width: 120 }}
-                  />
-                </SettingRow>
-              ) : (
                 <SettingRow label="Thinking Level" description="思考深度级别">
                   <select
                     className="select"
@@ -106,7 +92,6 @@ export function TranscribeTab({ config, onSave }: Props) {
                     <option value="HIGH">HIGH</option>
                   </select>
                 </SettingRow>
-              )
             )}
           </>
         )}

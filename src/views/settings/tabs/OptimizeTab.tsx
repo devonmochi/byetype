@@ -24,7 +24,6 @@ export function OptimizeTab({ config, onSave }: Props) {
     update({ thinking: { ...optimize.thinking, ...changes } })
   }
 
-  const is25Flash = optimize.geminiModel === 'gemini-2.5-flash'
 
   return (
     <div>
@@ -75,7 +74,6 @@ export function OptimizeTab({ config, onSave }: Props) {
             <SettingGroup title="Gemini 配置">
               <SettingRow label="Gemini 模型" description="复用转写设置中的 API Key">
                 <select className="select" value={optimize.geminiModel} onChange={e => update({ geminiModel: e.target.value })} style={{ width: 200 }}>
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                   <option value="gemini-3-flash-preview">Gemini 3.0 Flash</option>
                   <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
                 </select>
@@ -87,18 +85,6 @@ export function OptimizeTab({ config, onSave }: Props) {
                 />
               </SettingRow>
               {optimize.thinking.enabled && (
-                is25Flash ? (
-                  <SettingRow label="Thinking Budget" description="思考 token 数量">
-                    <input
-                      className="input"
-                      type="number"
-                      value={optimize.thinking.budget}
-                      onChange={e => updateThinking({ budget: Number(e.target.value) })}
-                      min={0}
-                      style={{ width: 120 }}
-                    />
-                  </SettingRow>
-                ) : (
                   <SettingRow label="Thinking Level" description="思考深度级别">
                     <select
                       className="select"
@@ -112,7 +98,6 @@ export function OptimizeTab({ config, onSave }: Props) {
                       <option value="HIGH">HIGH</option>
                     </select>
                   </SettingRow>
-                )
               )}
             </SettingGroup>
           )}

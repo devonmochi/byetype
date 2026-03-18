@@ -13,7 +13,7 @@ export interface ThinkingConfig {
 }
 
 export interface TranscribeConfig {
-  model: 'gemini-2.5-flash' | 'gemini-3-flash-preview' | 'gemini-3.1-flash-lite-preview' | 'qwen3-omni-flash'
+  model: 'gemini-3-flash-preview' | 'gemini-3.1-flash-lite-preview' | 'qwen3-omni-flash'
   geminiApiKey: string
   qwenApiKey: string
   thinking: ThinkingConfig
