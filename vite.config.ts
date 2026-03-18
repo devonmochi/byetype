@@ -12,7 +12,6 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         bubble: resolve(__dirname, 'bubble.html'),
-        worker: resolve(__dirname, 'worker.html'),
       }
     }
   },

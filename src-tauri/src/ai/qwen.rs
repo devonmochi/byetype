@@ -11,7 +11,7 @@ pub async fn transcribe(
     let url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 
     let request = ChatCompletionRequest {
-        model: "qwen2.5-omni-7b".to_string(),
+        model: "qwen3-omni-flash".to_string(),
         messages: vec![ChatMessage {
             role: "user".to_string(),
             content: ChatContent::Parts(vec![
