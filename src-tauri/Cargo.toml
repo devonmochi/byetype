@@ -1,12 +1,12 @@
 [package]
-name = "byetype-tauri"
+name = "byetype"
 version = "1.0.0"
 description = "ByeType - Markdown driven voice input"
 authors = ["devonmochi"]
 edition = "2021"
 
 [lib]
-name = "byetype_tauri_lib"
+name = "byetype_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

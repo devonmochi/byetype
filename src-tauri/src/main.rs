@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    byetype_tauri_lib::run()
+    byetype_lib::run()
 }
