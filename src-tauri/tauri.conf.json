@@ -49,7 +49,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": "v1Compatible"
+    "createUpdaterArtifacts": "v1Compatible",
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "frameworks": [],
+      "exceptionDomain": ""
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "both",
+        "languages": ["SimpChinese", "English"]
+      }
+    },
+    "publisher": "ByeType",
+    "category": "Utility",
+    "shortDescription": "Markdown-driven voice input powered by AI"
   },
   "plugins": {
     "updater": {
