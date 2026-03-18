@@ -1,4 +1,5 @@
 mod ai;
+mod task;
 mod audio;
 mod bubble;
 mod clipboard;
