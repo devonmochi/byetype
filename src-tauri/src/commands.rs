@@ -140,3 +140,20 @@ pub fn update_bubble(app: tauri::AppHandle, task_id: u32, status: String) -> Res
 pub fn hide_bubble(app: tauri::AppHandle, task_id: u32, delay_ms: u64) -> Result<(), String> {
     crate::bubble::hide(&app, task_id, delay_ms)
 }
+
+#[tauri::command]
+pub fn set_launch_at_login(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let autostart = app.autolaunch();
+    if enabled {
+        autostart.enable().map_err(|e| e.to_string())
+    } else {
+        autostart.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub fn get_launch_at_login(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}

@@ -27,6 +27,7 @@ hound = "3.5"
 base64 = "0.22"
 tauri-plugin-global-shortcut = "2"
 arboard = "3"
+tauri-plugin-autostart = "2.5.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"

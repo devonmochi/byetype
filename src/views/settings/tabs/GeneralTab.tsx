@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { AppConfig, ThemeMode } from '../../../core/types'
+import { getLaunchAtLogin, setLaunchAtLogin } from '../../../lib/tauri-api'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
@@ -11,6 +12,14 @@ interface Props {
 
 export function GeneralTab({ config, onSave }: Props) {
   const [recording, setRecording] = useState(false)
+
+  useEffect(() => {
+    getLaunchAtLogin().then(enabled => {
+      if (enabled !== config.general.launchAtLogin) {
+        onSave({ ...config, general: { ...config.general, launchAtLogin: enabled } })
+      }
+    }).catch(e => console.error('Failed to get launch at login:', e))
+  }, [])
 
   const update = (changes: Partial<AppConfig['general']>) => {
     onSave({ ...config, general: { ...config.general, ...changes } })
@@ -73,7 +82,14 @@ export function GeneralTab({ config, onSave }: Props) {
         <SettingRow label="开机自启" description="登录后自动启动 ByeType">
           <Toggle
             checked={config.general.launchAtLogin}
-            onChange={checked => update({ launchAtLogin: checked })}
+            onChange={async checked => {
+              try {
+                await setLaunchAtLogin(checked)
+                update({ launchAtLogin: checked })
+              } catch (e) {
+                console.error('Failed to set launch at login:', e)
+              }
+            }}
           />
         </SettingRow>
       </SettingGroup>

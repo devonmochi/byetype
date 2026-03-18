@@ -113,3 +113,12 @@ export async function hideBubble(taskId: number, delayMs: number): Promise<void>
 export async function pasteText(text: string): Promise<void> {
   await invoke('paste_text', { text })
 }
+
+// Launch at login
+export async function setLaunchAtLogin(enabled: boolean): Promise<void> {
+  await invoke('set_launch_at_login', { enabled })
+}
+
+export async function getLaunchAtLogin(): Promise<boolean> {
+  return invoke<boolean>('get_launch_at_login')
+}

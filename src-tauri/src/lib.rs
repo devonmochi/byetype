@@ -25,6 +25,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .manage(config_manager)
         .manage(recorder.clone())
         .manage(FrontAppState(Mutex::new(None)))
@@ -42,6 +43,8 @@ pub fn run() {
             commands::show_bubble,
             commands::update_bubble,
             commands::hide_bubble,
+            commands::set_launch_at_login,
+            commands::get_launch_at_login,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
