@@ -9,7 +9,7 @@ mod proxy;
 mod shortcut;
 mod tray;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use config::ConfigManager;
 use audio::recorder::AudioRecorder;
@@ -40,10 +40,6 @@ pub fn run() {
             commands::get_theme,
             commands::open_file,
             commands::get_recording_state,
-            commands::paste_text,
-            commands::show_bubble,
-            commands::update_bubble,
-            commands::hide_bubble,
             commands::set_launch_at_login,
             commands::get_launch_at_login,
             commands::check_for_updates,
@@ -57,6 +53,15 @@ pub fn run() {
             tray::create(&app_handle)
                 .expect("Failed to create system tray");
 
+            // Initialize TaskManager
+            let data_dir = app.path().app_data_dir()
+                .expect("Failed to resolve app_data_dir");
+            let prompts_dir = commands::resolve_prompts_dir_pub(&app_handle)
+                .expect("Failed to resolve prompts_dir");
+            let task_manager: task::SharedTaskManager =
+                Arc::new(Mutex::new(task::TaskManager::new(&data_dir, prompts_dir)));
+            app.manage(task_manager);
+
             let shortcut_key = if initial_shortcut.is_empty() {
                 "F4".to_string()
             } else {
@@ -68,15 +73,6 @@ pub fn run() {
             // Settings window: hidden on startup
             if let Some(win) = app.get_webview_window("settings") {
                 let _ = win.hide();
-            }
-
-            // Worker window: keep on-screen at (0,0) as 1x1 transparent pixel.
-            // WKWebView suspends JS for off-screen windows after idle time,
-            // so the window MUST be within a valid display area.
-            // Combined with a JS keepalive timer to prevent idle suspension.
-            if let Some(win) = app.get_webview_window("worker") {
-                let _ = win.set_position(tauri::PhysicalPosition::new(0i32, 0i32));
-                let _ = win.show();
             }
 
             Ok(())

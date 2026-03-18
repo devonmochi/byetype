@@ -25,9 +25,7 @@ pub fn register(
                 match recorder.stop() {
                     Ok(base64_audio) => {
                         update_tray_icon(&app_handle, false);
-                        let _ = app_handle.emit("recording-complete", serde_json::json!({
-                            "audio": base64_audio
-                        }));
+                        crate::task::process_recording(&app_handle, base64_audio);
                     }
                     Err(e) => {
                         eprintln!("Stop recording error: {}", e);
@@ -40,7 +38,7 @@ pub fn register(
                 match recorder.start() {
                     Ok(()) => {
                         update_tray_icon(&app_handle, true);
-                        let _ = app_handle.emit("recording-started", ());
+                        // recording-started no longer emitted (was for JS Worker)
                     }
                     Err(e) => {
                         eprintln!("Start recording error: {}", e);

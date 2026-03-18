@@ -5,6 +5,11 @@ use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
 use crate::config::types::AppConfig;
 
+/// Public wrapper so lib.rs can call resolve_prompts_dir at setup time.
+pub fn resolve_prompts_dir_pub(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    resolve_prompts_dir(app)
+}
+
 /// Resolve the builtin prompts directory.
 /// In production: resource_dir/prompts
 /// In dev: falls back to src-tauri/prompts (next to Cargo.toml)
@@ -116,26 +121,6 @@ pub fn get_recording_state(recorder: State<'_, Arc<AudioRecorder>>) -> Result<bo
 }
 
 #[tauri::command]
-pub fn paste_text(text: String) -> Result<(), String> {
-    crate::clipboard::paste_text(&text)
-}
-
-#[tauri::command]
-pub fn show_bubble(app: tauri::AppHandle, task_id: u32) -> Result<(), String> {
-    crate::bubble::show(&app, task_id)
-}
-
-#[tauri::command]
-pub fn update_bubble(app: tauri::AppHandle, task_id: u32, status: String) -> Result<(), String> {
-    crate::bubble::update(&app, task_id, &status)
-}
-
-#[tauri::command]
-pub fn hide_bubble(app: tauri::AppHandle, task_id: u32, delay_ms: u64) -> Result<(), String> {
-    crate::bubble::hide(&app, task_id, delay_ms)
-}
-
-#[tauri::command]
 pub fn set_launch_at_login(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let autostart = app.autolaunch();
@@ -172,23 +157,19 @@ pub async fn proxy_request(
 }
 
 #[tauri::command]
-pub fn get_history(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    let data_dir = app.path().app_data_dir()
-        .map_err(|e| e.to_string())?;
-    let history_path = data_dir.join("history").join("history.json");
-    if !history_path.exists() {
-        return Ok(serde_json::json!([]));
-    }
-    let content = std::fs::read_to_string(&history_path)
-        .map_err(|e| format!("Failed to read history: {}", e))?;
-    let records: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse history: {}", e))?;
-    Ok(records)
+pub fn get_history(
+    state: State<'_, crate::task::SharedTaskManager>,
+) -> Result<serde_json::Value, String> {
+    let mgr = state.lock().unwrap();
+    serde_json::to_value(mgr.get_records())
+        .map_err(|e| format!("Failed to serialize history: {}", e))
 }
 
 #[tauri::command]
-pub fn retry_record(app: tauri::AppHandle, record_id: u64) -> Result<(), String> {
-    use tauri::Emitter;
-    app.emit("retry-request", serde_json::json!({ "recordId": record_id }))
-        .map_err(|e| format!("Failed to emit retry request: {}", e))
+pub fn retry_record(
+    app: tauri::AppHandle,
+    record_id: u64,
+) -> Result<(), String> {
+    crate::task::retry_record(&app, record_id);
+    Ok(())
 }
