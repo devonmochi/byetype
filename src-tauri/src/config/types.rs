@@ -83,7 +83,7 @@ impl Default for AppConfig {
                 theme: "system".to_string(),
             },
             transcribe: TranscribeConfig {
-                model: "gemini-2.5-flash".to_string(),
+                model: "gemini-3-flash-preview".to_string(),
                 gemini_api_key: String::new(),
                 qwen_api_key: String::new(),
                 thinking: ThinkingConfig {
@@ -106,7 +106,7 @@ impl Default for AppConfig {
                     model: String::new(),
                     api_key: String::new(),
                 },
-                gemini_model: "gemini-2.5-flash".to_string(),
+                gemini_model: "gemini-3-flash-preview".to_string(),
                 thinking: ThinkingConfig {
                     enabled: false,
                     budget: 1024,
