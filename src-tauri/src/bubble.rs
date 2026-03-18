@@ -19,26 +19,6 @@ fn cursor_position() -> (f64, f64) {
     (100.0, 100.0)
 }
 
-/// Re-activate the saved frontmost app to prevent ByeType from stealing focus.
-#[cfg(target_os = "macos")]
-fn restore_front_app(app: &AppHandle) {
-    use crate::FrontAppState;
-    if let Some(state) = app.try_state::<FrontAppState>() {
-        if let Ok(guard) = state.0.lock() {
-            if let Some(ref app_name) = *guard {
-                let name = app_name.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    let _ = std::process::Command::new("osascript")
-                        .arg("-e")
-                        .arg(format!("tell application \"{}\" to activate", name))
-                        .output();
-                });
-            }
-        }
-    }
-}
-
 pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     let label = format!("bubble-{}", task_id);
 
@@ -71,10 +51,6 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     .shadow(false)
     .build()
     .map_err(|e| format!("Failed to create bubble window: {}", e))?;
-
-    // Re-activate the user's app to prevent focus stealing
-    #[cfg(target_os = "macos")]
-    restore_front_app(app);
 
     Ok(())
 }

@@ -7,12 +7,10 @@ mod proxy;
 mod shortcut;
 mod tray;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::Manager;
 use config::ConfigManager;
 use audio::recorder::AudioRecorder;
-
-pub struct FrontAppState(pub Mutex<Option<String>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,7 +28,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(config_manager)
         .manage(recorder.clone())
-        .manage(FrontAppState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,

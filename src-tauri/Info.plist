@@ -4,5 +4,7 @@
 <dict>
     <key>NSMicrophoneUsageDescription</key>
     <string>ByeType needs microphone access to record voice input for transcription.</string>
+    <key>LSUIElement</key>
+    <true/>
 </dict>
 </plist>

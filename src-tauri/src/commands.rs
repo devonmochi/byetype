@@ -116,14 +116,8 @@ pub fn get_recording_state(recorder: State<'_, Arc<AudioRecorder>>) -> Result<bo
 }
 
 #[tauri::command]
-pub fn paste_text(
-    text: String,
-    front_app_state: State<'_, crate::FrontAppState>,
-) -> Result<(), String> {
-    let front_app = front_app_state.0.lock()
-        .ok()
-        .and_then(|guard| guard.clone());
-    crate::clipboard::paste_text(&text, front_app)
+pub fn paste_text(text: String) -> Result<(), String> {
+    crate::clipboard::paste_text(&text)
 }
 
 #[tauri::command]
