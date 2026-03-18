@@ -170,3 +170,25 @@ pub async fn proxy_request(
     let proxy_url = config_manager.get().advanced.proxy_url.clone();
     crate::proxy::forward_request(&proxy_url, request).await
 }
+
+#[tauri::command]
+pub fn get_history(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?;
+    let history_path = data_dir.join("history").join("history.json");
+    if !history_path.exists() {
+        return Ok(serde_json::json!([]));
+    }
+    let content = std::fs::read_to_string(&history_path)
+        .map_err(|e| format!("Failed to read history: {}", e))?;
+    let records: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse history: {}", e))?;
+    Ok(records)
+}
+
+#[tauri::command]
+pub fn retry_record(app: tauri::AppHandle, record_id: u64) -> Result<(), String> {
+    use tauri::Emitter;
+    app.emit("retry-request", serde_json::json!({ "recordId": record_id }))
+        .map_err(|e| format!("Failed to emit retry request: {}", e))
+}

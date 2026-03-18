@@ -46,6 +46,8 @@ pub fn run() {
             commands::get_launch_at_login,
             commands::check_for_updates,
             commands::proxy_request,
+            commands::get_history,
+            commands::retry_record,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -66,10 +68,12 @@ pub fn run() {
                 let _ = win.hide();
             }
 
-            // Worker window: move off-screen but keep "visible" so WKWebView
-            // does not suspend JS execution. This window runs the AI pipeline.
+            // Worker window: keep on-screen at (0,0) as 1x1 transparent pixel.
+            // WKWebView suspends JS for off-screen windows after idle time,
+            // so the window MUST be within a valid display area.
+            // Combined with a JS keepalive timer to prevent idle suspension.
             if let Some(win) = app.get_webview_window("worker") {
-                let _ = win.set_position(tauri::PhysicalPosition::new(-10000i32, -10000i32));
+                let _ = win.set_position(tauri::PhysicalPosition::new(0i32, 0i32));
                 let _ = win.show();
             }
 

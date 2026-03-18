@@ -19,12 +19,50 @@ fn cursor_position() -> (f64, f64) {
     (100.0, 100.0)
 }
 
+/// Save the frontmost application so we can restore focus after creating a window.
+#[cfg(target_os = "macos")]
+fn save_frontmost_app() -> Option<*mut objc::runtime::Object> {
+    use objc::runtime::{Class, Object};
+    use objc::msg_send;
+    use objc::sel;
+    use objc::sel_impl;
+    unsafe {
+        let ws_cls = Class::get("NSWorkspace")?;
+        let ws: *mut Object = msg_send![ws_cls, sharedWorkspace];
+        let front_app: *mut Object = msg_send![ws, frontmostApplication];
+        if front_app.is_null() {
+            None
+        } else {
+            // Retain so it stays alive
+            let _: *mut Object = msg_send![front_app, retain];
+            Some(front_app)
+        }
+    }
+}
+
+/// Reactivate a previously saved application.
+#[cfg(target_os = "macos")]
+fn restore_frontmost_app(app_obj: *mut objc::runtime::Object) {
+    use objc::msg_send;
+    use objc::sel;
+    use objc::sel_impl;
+    unsafe {
+        // NSApplicationActivateIgnoringOtherApps = 1 << 1 = 2
+        let _: objc::runtime::BOOL = msg_send![app_obj, activateWithOptions: 2usize];
+        let _: () = msg_send![app_obj, release];
+    }
+}
+
 pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     let label = format!("bubble-{}", task_id);
 
     if let Some(win) = app.get_webview_window(&label) {
         let _ = win.close();
     }
+
+    // Save current foreground app before creating the window
+    #[cfg(target_os = "macos")]
+    let prev_app = save_frontmost_app();
 
     let (cx, cy) = cursor_position();
     let x = cx + OFFSET_X;
@@ -51,6 +89,12 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     .shadow(false)
     .build()
     .map_err(|e| format!("Failed to create bubble window: {}", e))?;
+
+    // Restore focus to the previously active app
+    #[cfg(target_os = "macos")]
+    if let Some(prev) = prev_app {
+        restore_frontmost_app(prev);
+    }
 
     Ok(())
 }

@@ -7,7 +7,12 @@ let taskManager: TaskManager | null = null
 let currentTaskId: number | null = null
 
 async function init() {
-  const historyManager = new HistoryManager()
+  const { emit } = await import('@tauri-apps/api/event')
+
+  const historyManager = new HistoryManager((records) => {
+    // Broadcast history changes to all windows (settings listens)
+    emit('history-updated', records).catch(console.error)
+  })
   await historyManager.init()
   taskManager = new TaskManager(historyManager)
 
@@ -32,6 +37,23 @@ async function init() {
     console.error(`[Worker] Recording error:`, event.payload.message)
     currentTaskId = null
   })
+
+  // Listen for retry requests from settings window (via Rust command bridge)
+  listen<{ recordId: number }>('retry-request', async (event) => {
+    if (!taskManager) return
+    const { recordId } = event.payload
+    console.log(`[Worker] Retry request for record #${recordId}`)
+    const result = await taskManager.retryFromHistory(recordId)
+    if (!result.accepted) {
+      console.warn(`[Worker] Retry rejected: ${result.reason}`)
+    }
+  })
+
+  // Keepalive: prevent macOS from suspending WKWebView JS after idle
+  setInterval(() => {
+    // Minimal work to keep the JS event loop alive
+    void 0
+  }, 5000)
 
   console.log('[Worker] Pipeline ready')
 }
