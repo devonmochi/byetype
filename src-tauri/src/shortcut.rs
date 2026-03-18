@@ -1,8 +1,25 @@
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use crate::audio::recorder::AudioRecorder;
+use crate::FrontAppState;
+
+/// Get the frontmost application name on macOS via osascript.
+fn get_frontmost_app() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg("tell application \"System Events\" to get name of first application process whose frontmost is true")
+            .output()
+            .ok()?;
+        let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if name.is_empty() { None } else { Some(name) }
+    }
+    #[cfg(not(target_os = "macos"))]
+    { None }
+}
 
 /// Register the global shortcut that toggles recording.
 pub fn register(
@@ -37,6 +54,13 @@ pub fn register(
                     }
                 }
             } else {
+                // Save the frontmost app before recording starts
+                if let Some(front_app_state) = app_handle.try_state::<FrontAppState>() {
+                    let front_app = get_frontmost_app();
+                    if let Ok(mut state) = front_app_state.0.lock() {
+                        *state = front_app;
+                    }
+                }
                 match recorder.start() {
                     Ok(()) => {
                         update_tray_icon(&app_handle, true);

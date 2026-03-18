@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "settings",
@@ -18,6 +19,17 @@
         "height": 600,
         "resizable": true,
         "visible": false
+      },
+      {
+        "label": "worker",
+        "url": "worker.html",
+        "width": 1,
+        "height": 1,
+        "resizable": false,
+        "decorations": false,
+        "skipTaskbar": true,
+        "visible": false,
+        "transparent": true
       }
     ],
     "security": {

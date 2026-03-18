@@ -4,6 +4,16 @@ use tauri::{
     menu::{Menu, MenuItem},
 };
 
+/// Show the settings window by moving it back on-screen and focusing it.
+fn show_settings(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        // Center the window on screen
+        let _ = win.center();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
 pub fn create(app: &AppHandle) -> Result<(), String> {
     let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)
         .map_err(|e| e.to_string())?;
@@ -23,15 +33,8 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
         .menu(&menu)
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
-                "settings" => {
-                    if let Some(win) = app.get_webview_window("settings") {
-                        let _ = win.show();
-                        let _ = win.set_focus();
-                    }
-                }
-                "quit" => {
-                    app.exit(0);
-                }
+                "settings" => show_settings(app),
+                "quit" => app.exit(0),
                 _ => {}
             }
         })
@@ -41,11 +44,7 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
                 button_state: MouseButtonState::Up,
                 ..
             } = event {
-                let app = tray.app_handle();
-                if let Some(win) = app.get_webview_window("settings") {
-                    let _ = win.show();
-                    let _ = win.set_focus();
-                }
+                show_settings(tray.app_handle());
             }
         })
         .build(app)

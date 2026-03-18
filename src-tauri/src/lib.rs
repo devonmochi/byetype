@@ -6,10 +6,12 @@ mod commands;
 mod shortcut;
 mod tray;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use config::ConfigManager;
 use audio::recorder::AudioRecorder;
+
+pub struct FrontAppState(pub Mutex<Option<String>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(config_manager)
         .manage(recorder.clone())
+        .manage(FrontAppState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
@@ -54,8 +57,16 @@ pub fn run() {
             shortcut::register(&app_handle, &shortcut_key, recorder.clone())
                 .expect("Failed to register shortcut");
 
+            // Settings window: hidden on startup
             if let Some(win) = app.get_webview_window("settings") {
                 let _ = win.hide();
+            }
+
+            // Worker window: move off-screen but keep "visible" so WKWebView
+            // does not suspend JS execution. This window runs the AI pipeline.
+            if let Some(win) = app.get_webview_window("worker") {
+                let _ = win.set_position(tauri::PhysicalPosition::new(-10000i32, -10000i32));
+                let _ = win.show();
             }
 
             Ok(())

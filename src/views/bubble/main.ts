@@ -17,6 +17,15 @@ const shapeMap: Record<string, (n: number) => string> = {
     `<div class="s-failed"><span class="x">\u2715</span></div>`,
 }
 
+// Render initial state from URL params (available immediately, no event needed)
+const params = new URLSearchParams(window.location.search)
+const initialTask = parseInt(params.get('task') || '0')
+const initialStatus = params.get('status') || ''
+if (initialStatus && shapeMap[initialStatus]) {
+  bubble.innerHTML = shapeMap[initialStatus](initialTask)
+}
+
+// Listen for subsequent status updates
 listen<{ taskNumber: number; status: string }>('update-bubble', (event) => {
   const { taskNumber, status } = event.payload
   if (shapeMap[status]) {
