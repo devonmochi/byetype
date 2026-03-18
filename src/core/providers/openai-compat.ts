@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { proxyAwareFetch } from '../proxy-fetch'
 import type { OptimizeProvider } from './types'
 
 export class OpenAICompatProvider implements OptimizeProvider {
@@ -12,7 +13,8 @@ export class OpenAICompatProvider implements OptimizeProvider {
     this.client = new OpenAI({
       apiKey,
       baseURL: baseUrl,
-      dangerouslyAllowBrowser: true
+      dangerouslyAllowBrowser: true,
+      fetch: proxyAwareFetch
     })
   }
 

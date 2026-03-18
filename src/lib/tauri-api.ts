@@ -122,3 +122,26 @@ export async function setLaunchAtLogin(enabled: boolean): Promise<void> {
 export async function getLaunchAtLogin(): Promise<boolean> {
   return invoke<boolean>('get_launch_at_login')
 }
+
+// Auto update
+export async function checkForUpdates(): Promise<string> {
+  return invoke<string>('check_for_updates')
+}
+
+// Proxy
+export interface ProxyRequest {
+  url: string
+  method: string
+  headers: Record<string, string>
+  body?: string
+}
+
+export interface ProxyResponse {
+  status: number
+  headers: Record<string, string>
+  body: string
+}
+
+export async function proxyRequest(request: ProxyRequest): Promise<ProxyResponse> {
+  return invoke<ProxyResponse>('proxy_request', { request })
+}

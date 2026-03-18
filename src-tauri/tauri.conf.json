@@ -48,6 +48,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": "v1Compatible"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE3REI2REU4RDJDMjk3RDgKUldUWWw4TFM2RzNicDhlR3luOWI1c3d3TUsyK2tOZk1QcFZ6V2JBWS85UnJpdU9sVlJYRjlNVFcK",
+      "endpoints": [
+        "https://github.com/devonmochi/byetype/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

@@ -157,3 +157,22 @@ pub fn get_launch_at_login(app: tauri::AppHandle) -> Result<bool, String> {
     use tauri_plugin_autostart::ManagerExt;
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    match app.updater().map_err(|e| e.to_string())?.check().await {
+        Ok(Some(update)) => Ok(format!("v{}", update.version)),
+        Ok(None) => Ok(String::new()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn proxy_request(
+    config_manager: State<'_, ConfigManager>,
+    request: crate::proxy::ProxyRequest,
+) -> Result<crate::proxy::ProxyResponse, String> {
+    let proxy_url = config_manager.get().advanced.proxy_url.clone();
+    crate::proxy::forward_request(&proxy_url, request).await
+}

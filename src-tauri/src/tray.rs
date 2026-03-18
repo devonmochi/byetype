@@ -17,10 +17,12 @@ fn show_settings(app: &AppHandle) {
 pub fn create(app: &AppHandle) -> Result<(), String> {
     let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)
         .map_err(|e| e.to_string())?;
+    let check_update_item = MenuItem::with_id(app, "check_update", "检查更新", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
     let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)
         .map_err(|e| e.to_string())?;
 
-    let menu = Menu::with_items(app, &[&settings_item, &quit_item])
+    let menu = Menu::with_items(app, &[&settings_item, &check_update_item, &quit_item])
         .map_err(|e| e.to_string())?;
 
     let icon_bytes = include_bytes!("../icons/tray-default.png");
@@ -34,6 +36,22 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
                 "settings" => show_settings(app),
+                "check_update" => {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        use tauri_plugin_updater::UpdaterExt;
+                        match app.updater() {
+                            Ok(updater) => match updater.check().await {
+                                Ok(Some(update)) => {
+                                    println!("Update available: v{}", update.version);
+                                }
+                                Ok(None) => println!("Already up to date"),
+                                Err(e) => eprintln!("Update check failed: {}", e),
+                            },
+                            Err(e) => eprintln!("Updater init failed: {}", e),
+                        }
+                    });
+                }
                 "quit" => app.exit(0),
                 _ => {}
             }

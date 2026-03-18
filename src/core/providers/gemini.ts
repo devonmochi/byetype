@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { proxyAwareFetch } from '../proxy-fetch'
 import type { TranscribeProvider, OptimizeProvider } from './types'
 
 interface GeminiConfig {
@@ -16,7 +17,7 @@ export class GeminiProvider implements TranscribeProvider, OptimizeProvider {
 
   constructor(config: GeminiConfig) {
     this.config = config
-    this.client = new GoogleGenAI({ apiKey: config.apiKey })
+    this.client = new GoogleGenAI({ apiKey: config.apiKey, httpOptions: { fetch: proxyAwareFetch } as any })
   }
 
   private buildThinkingConfig(): Record<string, unknown> {

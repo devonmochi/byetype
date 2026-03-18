@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { proxyAwareFetch } from '../proxy-fetch'
 import type { TranscribeProvider } from './types'
 
 export class QwenOmniProvider implements TranscribeProvider {
@@ -9,7 +10,8 @@ export class QwenOmniProvider implements TranscribeProvider {
     this.client = new OpenAI({
       apiKey,
       baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      dangerouslyAllowBrowser: true
+      dangerouslyAllowBrowser: true,
+      fetch: proxyAwareFetch
     })
   }
 
