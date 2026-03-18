@@ -21,7 +21,7 @@ pub async fn transcribe(
                 ChatContentPart::InputAudio {
                     input_audio: AudioData {
                         data: format!("data:;base64,{}", audio_base64),
-                        format: "wav".to_string(),
+                        format: "flac".to_string(),
                     },
                 },
             ]),

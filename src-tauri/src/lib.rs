@@ -67,6 +67,9 @@ pub fn run() {
             } else {
                 initial_shortcut
             };
+            bubble::init(&app_handle)
+                .expect("Failed to pre-create bubble window");
+
             shortcut::register(&app_handle, &shortcut_key, recorder.clone())
                 .expect("Failed to register shortcut");
 

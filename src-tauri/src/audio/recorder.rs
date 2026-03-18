@@ -137,8 +137,8 @@ impl AudioRecorder {
             (s.clamp(-1.0, 1.0) * 32767.0) as i16
         }).collect();
 
-        let wav_bytes = encoder::encode_wav(&pcm)?;
-        Ok(encoder::wav_to_base64(&wav_bytes))
+        let flac_bytes = encoder::encode_flac(&pcm)?;
+        Ok(encoder::audio_to_base64(&flac_bytes))
     }
 }
 

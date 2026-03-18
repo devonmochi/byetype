@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
@@ -11,6 +11,8 @@ pub fn register(
     recorder: Arc<AudioRecorder>,
 ) -> Result<(), String> {
     let app_handle = app.clone();
+    // Track the current recording's task_id between start and stop
+    let current_task_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
 
     app.global_shortcut().unregister_all()
         .map_err(|e| format!("Failed to unregister shortcuts: {}", e))?;
@@ -22,13 +24,21 @@ pub fn register(
             }
 
             if recorder.is_recording() {
+                // Take the task_id that was allocated when recording started
+                let task_id = current_task_id.lock().unwrap().take();
                 match recorder.stop() {
                     Ok(base64_audio) => {
                         update_tray_icon(&app_handle, false);
-                        crate::task::process_recording(&app_handle, base64_audio);
+                        if let Some(tid) = task_id {
+                            crate::task::process_recording(&app_handle, tid, base64_audio);
+                        }
                     }
                     Err(e) => {
                         eprintln!("Stop recording error: {}", e);
+                        if let Some(tid) = task_id {
+                            crate::task::cancel_recording(&app_handle, tid);
+                        }
+                        update_tray_icon(&app_handle, false);
                         let _ = app_handle.emit("recording-error", serde_json::json!({
                             "message": e
                         }));
@@ -38,7 +48,9 @@ pub fn register(
                 match recorder.start() {
                     Ok(()) => {
                         update_tray_icon(&app_handle, true);
-                        // recording-started no longer emitted (was for JS Worker)
+                        // Show bubble immediately when recording starts
+                        let tid = crate::task::start_recording(&app_handle);
+                        *current_task_id.lock().unwrap() = tid;
                     }
                     Err(e) => {
                         eprintln!("Start recording error: {}", e);

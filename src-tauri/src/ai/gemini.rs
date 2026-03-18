@@ -11,7 +11,8 @@ pub fn build_thinking_config(
         return None;
     }
     Some(GeminiGenerationConfig {
-        thinking: Some(GeminiThinkingConfig::Level {
+        thinking_config: Some(GeminiThinkingConfig {
+            include_thoughts: false,
             thinking_level: thinking.level.clone(),
         }),
     })
@@ -47,7 +48,7 @@ pub async fn transcribe(
             role: Some("user".to_string()),
             parts: vec![GeminiPart::InlineData {
                 inline_data: GeminiInlineData {
-                    mime_type: "audio/wav".to_string(),
+                    mime_type: "audio/flac".to_string(),
                     data: audio_base64.to_string(),
                 },
             }],

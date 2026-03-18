@@ -1,6 +1,7 @@
-import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const bubble = document.getElementById('bubble')!
+const currentWindow = getCurrentWindow()
 
 const shapeMap: Record<string, (n: number) => string> = {
   recording: (n) =>
@@ -17,18 +18,19 @@ const shapeMap: Record<string, (n: number) => string> = {
     `<div class="s-failed"><span class="x">\u2715</span></div>`,
 }
 
-// Render initial state from URL params (available immediately, no event needed)
-const params = new URLSearchParams(window.location.search)
-const initialTask = parseInt(params.get('task') || '0')
-const initialStatus = params.get('status') || ''
-if (initialStatus && shapeMap[initialStatus]) {
-  bubble.innerHTML = shapeMap[initialStatus](initialTask)
-}
-
-// Listen for subsequent status updates
-listen<{ taskNumber: number; status: string }>('update-bubble', (event) => {
-  const { taskNumber, status } = event.payload
+function render(status: string, taskNumber: number) {
   if (shapeMap[status]) {
     bubble.innerHTML = shapeMap[status](taskNumber)
   }
+}
+
+// Window-scoped listeners — each bubble only receives events targeted to it
+currentWindow.listen<{ taskNumber: number; status: string }>('show-bubble', (event) => {
+  const { taskNumber, status } = event.payload
+  render(status, taskNumber)
+})
+
+currentWindow.listen<{ taskNumber: number; status: string }>('update-bubble', (event) => {
+  const { taskNumber, status } = event.payload
+  render(status, taskNumber)
 })

@@ -38,19 +38,19 @@ impl TaskManager {
 
 pub type SharedTaskManager = Arc<Mutex<TaskManager>>;
 
-/// Called from shortcut.rs when recording stops.
-pub fn process_recording(app: &AppHandle, audio_base64: String) {
+/// Called from shortcut.rs when recording STARTS.
+/// Allocates a task_id, shows bubble with "recording" status, returns the task_id.
+pub fn start_recording(app: &AppHandle) -> Option<u32> {
     let config = app.state::<ConfigManager>().get();
-
     let task_id = {
         let state = app.state::<SharedTaskManager>();
         let mut mgr = state.lock().unwrap();
         if mgr.active_count >= config.advanced.max_parallel {
             eprintln!(
-                "[TaskManager] Max parallel tasks reached ({}), dropping recording",
+                "[TaskManager] Max parallel tasks reached ({}), cannot start",
                 config.advanced.max_parallel
             );
-            return;
+            return None;
         }
         if mgr.active_count == 0 {
             mgr.task_counter = 0;
@@ -63,11 +63,24 @@ pub fn process_recording(app: &AppHandle, audio_base64: String) {
     if let Err(e) = crate::bubble::show(app, task_id) {
         eprintln!("[TaskManager] Failed to show bubble: {}", e);
     }
+    Some(task_id)
+}
 
+/// Called from shortcut.rs when recording STOPS successfully.
+pub fn process_recording(app: &AppHandle, task_id: u32, audio_base64: String) {
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         run_pipeline(&app_handle, task_id, audio_base64, None).await;
     });
+}
+
+/// Called when recording fails or is cancelled. Cleans up the pre-allocated task.
+pub fn cancel_recording(app: &AppHandle, task_id: u32) {
+    let _ = crate::bubble::update(app, task_id, "failed");
+    let _ = crate::bubble::hide(app, task_id, 2000);
+    let state = app.state::<SharedTaskManager>();
+    let mut mgr = state.lock().unwrap();
+    mgr.active_count = mgr.active_count.saturating_sub(1);
 }
 
 /// Retry a previously failed record.

@@ -37,17 +37,15 @@ pub struct GeminiInlineData {
 
 #[derive(Serialize)]
 pub struct GeminiGenerationConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<GeminiThinkingConfig>,
+    #[serde(rename = "thinkingConfig", skip_serializing_if = "Option::is_none")]
+    pub thinking_config: Option<GeminiThinkingConfig>,
 }
 
 #[derive(Serialize)]
-#[serde(untagged)]
-pub enum GeminiThinkingConfig {
-    Level {
-        #[serde(rename = "thinkingLevel")]
-        thinking_level: String,
-    },
+pub struct GeminiThinkingConfig {
+    pub include_thoughts: bool,
+    #[serde(rename = "thinkingLevel")]
+    pub thinking_level: String,
 }
 
 #[derive(Deserialize)]
