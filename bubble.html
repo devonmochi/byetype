@@ -74,19 +74,23 @@
     /* === 终态：完成 === */
     .s-completed {
       width: 34px; height: 34px; border-radius: 50%;
-      background: linear-gradient(135deg, #2ecc71, #27ae60);
-      box-shadow: 0 4px 16px rgba(46,204,113,0.5);
+      background: linear-gradient(270deg, #2ecc71, #55efc4, #00b894, #2ecc71);
+      background-size: 400% 100%;
+      box-shadow: 0 4px 14px rgba(46,204,113,0.4);
       display: flex; align-items: center; justify-content: center;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
+                 wave 4s ease infinite 0.6s;
     }
 
     /* === 终态：失败 === */
     .s-failed {
       width: 34px; height: 34px; border-radius: 50%;
-      background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+      background: linear-gradient(270deg, #95a5a6, #b2bec3, #636e72, #95a5a6);
+      background-size: 400% 100%;
       box-shadow: 0 2px 8px rgba(149,165,166,0.4);
       display: flex; align-items: center; justify-content: center;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
+                 wave 4s ease infinite 0.6s;
     }
 
     /* === 动画 === */
