@@ -2,7 +2,7 @@ use tauri::{AppHandle, Manager, Emitter, WebviewUrl, WebviewWindowBuilder};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 const BUBBLE_WIDTH: f64 = 140.0;
-const BUBBLE_HEIGHT: f64 = 44.0;
+const BUBBLE_HEIGHT: f64 = 64.0;
 const OFFSET_X: f64 = 10.0;
 const OFFSET_Y: f64 = 10.0;
 const MAX_BUBBLES: u32 = 3;
