@@ -1,21 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { GeneralTab } from './tabs/GeneralTab'
 import { TranscribeTab } from './tabs/TranscribeTab'
-import { OptimizeTab } from './tabs/OptimizeTab'
-import { AdvancedTab } from './tabs/AdvancedTab'
 import { HistoryTab } from './tabs/HistoryTab'
-import { PromptsTab } from './tabs/PromptsTab'
 import type { AppConfig } from '../../core/types'
 import { getConfig, saveConfig, getTheme, onThemeChange } from '../../lib/tauri-api'
 import './theme.css'
 
 const TABS = [
   { id: 'history', label: '历史记录' },
+  { id: 'transcribe', label: '语音转写' },
   { id: 'general', label: '通用设置' },
-  { id: 'transcribe', label: '转写设置' },
-  { id: 'optimize', label: '文本优化' },
-  { id: 'prompts', label: '提示词' },
-  { id: 'advanced', label: '高级设置' },
 ]
 
 export function App() {
@@ -73,9 +67,6 @@ export function App() {
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
-        {activeTab === 'optimize' && <OptimizeTab config={config} onSave={handleSave} />}
-        {activeTab === 'prompts' && <PromptsTab config={config} onSave={handleSave} />}
-        {activeTab === 'advanced' && <AdvancedTab config={config} onSave={handleSave} />}
       </div>
     </div>
   )
