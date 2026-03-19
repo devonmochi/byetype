@@ -4,6 +4,7 @@ export interface GeneralConfig {
   shortcut: string
   launchAtLogin: boolean
   theme: ThemeMode
+  maxRecordingSeconds: number
 }
 
 export interface ThinkingConfig {
