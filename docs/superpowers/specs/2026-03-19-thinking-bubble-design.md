@@ -167,7 +167,7 @@ byetype 当前的气泡窗口为每个任务状态使用不同的几何形状（
 - 新增 `.s-recording` 圆形、药丸类的完整 CSS
 - 新增 `wave` 动画
 - `#bubble` 容器改为 `width: 100%; height: 100%`
-- `.check` 和 `.x` 文字样式保留，`.num` 移除
+- `.check` 和 `.x` 文字样式保留，`.num` 及其子选择器全部移除（`.num`、`.s-recording .num`、`.s-transcribing .num`、`.s-retrying .num`）
 
 ### src/views/bubble/main.ts
 
@@ -178,7 +178,8 @@ byetype 当前的气泡窗口为每个任务状态使用不同的几何形状（
   - `retrying` → `<div class="s-retrying">Thinking...</div>`
   - `completed` → `<div class="s-completed"><span class="check">✓</span></div>`
   - `failed` → `<div class="s-failed"><span class="x">✕</span></div>`
-- `render` 函数签名中 `taskNumber` 参数保留但不再使用（保持接口兼容）
+- `shapeMap` 类型改为 `Record<string, () => string>`，所有条目改为无参箭头函数
+- `render` 函数不再传 `taskNumber` 给 shapeMap 条目（事件监听中的 `taskNumber` 参数保留，仅不使用）
 
 ### src-tauri/src/bubble.rs
 
