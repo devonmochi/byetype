@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Manager, Emitter, WebviewUrl, WebviewWindowBuilder};
 
-const BUBBLE_SIZE: f64 = 40.0;
+const BUBBLE_WIDTH: f64 = 140.0;
+const BUBBLE_HEIGHT: f64 = 44.0;
 const OFFSET_X: f64 = 10.0;
 const OFFSET_Y: f64 = 10.0;
 const MAX_BUBBLES: u32 = 3;
@@ -34,7 +35,7 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
             WebviewUrl::App("bubble.html".into()),
         )
         .title("")
-        .inner_size(BUBBLE_SIZE, BUBBLE_SIZE)
+        .inner_size(BUBBLE_WIDTH, BUBBLE_HEIGHT)
         .position(-200.0, -200.0)
         .decorations(false)
         .always_on_top(true)
