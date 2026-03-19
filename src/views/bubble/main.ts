@@ -25,6 +25,10 @@ function render(status: string) {
 }
 
 // Window-scoped listeners — each bubble only receives events targeted to it
+currentWindow.listen('clear-bubble', () => {
+  bubble.innerHTML = ''
+})
+
 currentWindow.listen<{ taskNumber: number; status: string }>('show-bubble', (event) => {
   const { status } = event.payload
   render(status)

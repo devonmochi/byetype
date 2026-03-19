@@ -1,10 +1,22 @@
 use tauri::{AppHandle, Manager, Emitter, WebviewUrl, WebviewWindowBuilder};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const BUBBLE_WIDTH: f64 = 140.0;
 const BUBBLE_HEIGHT: f64 = 44.0;
 const OFFSET_X: f64 = 10.0;
 const OFFSET_Y: f64 = 10.0;
 const MAX_BUBBLES: u32 = 3;
+
+/// Generation counter per bubble slot — prevents stale delayed hides
+static SHOW_GEN: [AtomicU32; 3] = [
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+];
+
+fn gen_index(task_id: u32) -> usize {
+    (task_id as usize).saturating_sub(1).min(2)
+}
 
 fn cursor_position() -> (f64, f64) {
     #[cfg(target_os = "macos")]
@@ -54,11 +66,21 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
 pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     let label = label_for(task_id);
 
+    // Bump generation so any pending hide for this slot is invalidated
+    let idx = gen_index(task_id);
+    SHOW_GEN[idx].fetch_add(1, Ordering::SeqCst);
+
     let (cx, cy) = cursor_position();
     let x = cx + OFFSET_X;
     let y = cy + OFFSET_Y;
 
     if let Some(win) = app.get_webview_window(&label) {
+        // Clear old content first to prevent flash of stale state
+        let _ = app.emit_to(
+            &label,
+            "clear-bubble",
+            serde_json::json!({}),
+        );
         let _ = win.set_position(tauri::Position::Logical(
             tauri::LogicalPosition::new(x, y),
         ));
@@ -88,9 +110,22 @@ pub fn update(app: &AppHandle, task_id: u32, status: &str) -> Result<(), String>
 pub fn hide(app: &AppHandle, task_id: u32, delay_ms: u64) -> Result<(), String> {
     let label = label_for(task_id);
     let app_handle = app.clone();
+
+    // Capture current generation — if show() bumps it before we wake, skip hide
+    let idx = gen_index(task_id);
+    let gen_at_schedule = SHOW_GEN[idx].load(Ordering::SeqCst);
+
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+
+        // Abort if a new show() happened while we were sleeping
+        if SHOW_GEN[idx].load(Ordering::SeqCst) != gen_at_schedule {
+            return;
+        }
+
         if let Some(win) = app_handle.get_webview_window(&label) {
+            // Clear content so next show won't flash stale state
+            let _ = app_handle.emit_to(&label, "clear-bubble", serde_json::json!({}));
             let _ = win.hide();
             let _ = win.set_position(tauri::Position::Logical(
                 tauri::LogicalPosition::new(-200.0, -200.0),
