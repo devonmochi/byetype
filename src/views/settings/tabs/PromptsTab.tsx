@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { AppConfig } from '../../../core/types'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Compartment } from '@codemirror/state'
@@ -46,7 +46,7 @@ interface Props {
   onSave: (config: AppConfig) => void
 }
 
-export function PromptsTab({ config, onSave }: Props) {
+function PromptsTabInner({ config, onSave }: Props) {
   const [activeFile, setActiveFile] = useState(PROMPT_FILES[0].key)
   const [content, setContent] = useState('')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
@@ -221,9 +221,7 @@ export function PromptsTab({ config, onSave }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <h2 className="content-title">提示词编辑</h2>
-
+    <div>
       <div className="prompt-tabs">
         {PROMPT_FILES.map(f => (
           <button
@@ -245,7 +243,7 @@ export function PromptsTab({ config, onSave }: Props) {
       </div>
 
       <div className="prompt-editor-container" ref={editorRef}
-        style={{ opacity: loading ? 0.5 : 1 }} />
+        style={{ opacity: loading ? 0.5 : 1, height: 400 }} />
 
       <div className={`prompt-save-status ${saveStatus}`}>
         {saveStatus === 'saving' && '保存中...'}
@@ -255,3 +253,13 @@ export function PromptsTab({ config, onSave }: Props) {
     </div>
   )
 }
+
+export const PromptsTab = memo(PromptsTabInner, (prev, next) => {
+  return (
+    prev.config.transcribe.prompts.agent === next.config.transcribe.prompts.agent &&
+    prev.config.transcribe.prompts.rules === next.config.transcribe.prompts.rules &&
+    prev.config.transcribe.prompts.vocabulary === next.config.transcribe.prompts.vocabulary &&
+    prev.config.optimize.prompt === next.config.optimize.prompt &&
+    prev.onSave === next.onSave
+  )
+})

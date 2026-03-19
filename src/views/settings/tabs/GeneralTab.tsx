@@ -25,6 +25,10 @@ export function GeneralTab({ config, onSave }: Props) {
     onSave({ ...config, general: { ...config.general, ...changes } })
   }
 
+  const updateAdvanced = (changes: Partial<AppConfig['advanced']>) => {
+    onSave({ ...config, advanced: { ...config.advanced, ...changes } })
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!recording) return
     e.preventDefault()
@@ -105,6 +109,57 @@ export function GeneralTab({ config, onSave }: Props) {
                 console.error('Failed to set launch at login:', e)
               }
             }}
+          />
+        </SettingRow>
+      </SettingGroup>
+
+      <SettingGroup title="网络与性能">
+        <SettingRow label="转写超时时间" description="单位：秒">
+          <input
+            className="input"
+            type="number"
+            value={config.advanced.transcribeTimeout}
+            onChange={e => updateAdvanced({ transcribeTimeout: Number(e.target.value) })}
+            min={1}
+            style={{ width: 100 }}
+          />
+        </SettingRow>
+        <SettingRow label="文本优化超时时间" description="单位：秒">
+          <input
+            className="input"
+            type="number"
+            value={config.advanced.optimizeTimeout}
+            onChange={e => updateAdvanced({ optimizeTimeout: Number(e.target.value) })}
+            min={1}
+            style={{ width: 100 }}
+          />
+        </SettingRow>
+        <SettingRow label="最大重试次数">
+          <input
+            className="input"
+            type="number"
+            value={config.advanced.maxRetries}
+            onChange={e => updateAdvanced({ maxRetries: Number(e.target.value) })}
+            min={0}
+            style={{ width: 100 }}
+          />
+        </SettingRow>
+        <SettingRow label="最大并行任务数">
+          <input
+            className="input"
+            type="number"
+            value={config.advanced.maxParallel}
+            onChange={e => updateAdvanced({ maxParallel: Number(e.target.value) })}
+            min={1}
+            style={{ width: 100 }}
+          />
+        </SettingRow>
+        <SettingRow label="HTTP 代理地址" description="用于 Gemini 等需要代理的服务，留空不使用">
+          <input
+            className="input input-wide"
+            value={config.advanced.proxyUrl}
+            onChange={e => updateAdvanced({ proxyUrl: e.target.value })}
+            placeholder="http://127.0.0.1:10809"
           />
         </SettingRow>
       </SettingGroup>

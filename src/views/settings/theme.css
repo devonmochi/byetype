@@ -271,6 +271,15 @@
   margin: 0 0 20px;
 }
 
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 24px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
 .section-label {
   font-size: 13px;
   color: var(--text-secondary);
@@ -492,11 +501,10 @@
 }
 
 .prompt-editor-container {
-  flex: 1;
+  height: 400px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   overflow: hidden;
-  min-height: 0;
 }
 
 .prompt-editor-container .cm-editor {
