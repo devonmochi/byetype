@@ -9,12 +9,18 @@ pub struct AppConfig {
     pub advanced: AdvancedConfig,
 }
 
+fn default_max_recording_seconds() -> u32 {
+    180
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralConfig {
     pub shortcut: String,
     pub launch_at_login: bool,
     pub theme: String,
+    #[serde(default = "default_max_recording_seconds")]
+    pub max_recording_seconds: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +87,7 @@ impl Default for AppConfig {
                 shortcut: "F4".to_string(),
                 launch_at_login: false,
                 theme: "system".to_string(),
+                max_recording_seconds: 180,
             },
             transcribe: TranscribeConfig {
                 model: "gemini-3-flash-preview".to_string(),

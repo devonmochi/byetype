@@ -1,8 +1,10 @@
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use std::sync::atomic::{AtomicU32, Ordering};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use crate::audio::recorder::AudioRecorder;
+use crate::config::ConfigManager;
 
 /// Register the global shortcut that toggles recording.
 pub fn register(
@@ -13,6 +15,7 @@ pub fn register(
     let app_handle = app.clone();
     // Track the current recording's task_id between start and stop
     let current_task_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+    let recording_gen: Arc<AtomicU32> = Arc::new(AtomicU32::new(0));
 
     app.global_shortcut().unregister_all()
         .map_err(|e| format!("Failed to unregister shortcuts: {}", e))?;
@@ -24,7 +27,12 @@ pub fn register(
             }
 
             if recorder.is_recording() {
-                // Take the task_id that was allocated when recording started
+                // CAS: claim the right to stop — advance gen to invalidate timer
+                let gen = recording_gen.load(Ordering::SeqCst);
+                if recording_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+                    return; // Timer already stopped it
+                }
+
                 let task_id = current_task_id.lock().unwrap().take();
                 match recorder.stop() {
                     Ok(base64_audio) => {
@@ -47,10 +55,48 @@ pub fn register(
             } else {
                 match recorder.start() {
                     Ok(()) => {
+                        // Bump generation to mark a new recording session
+                        let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;
+
                         update_tray_icon(&app_handle, true);
-                        // Show bubble immediately when recording starts
                         let tid = crate::task::start_recording(&app_handle);
                         *current_task_id.lock().unwrap() = tid;
+
+                        // Read config for max recording duration
+                        let max_secs = app_handle.state::<ConfigManager>().get()
+                            .general.max_recording_seconds;
+
+                        if max_secs > 0 {
+                            let t_recorder = recorder.clone();
+                            let t_app = app_handle.clone();
+                            let t_task_id = current_task_id.clone();
+                            let t_gen = recording_gen.clone();
+                            std::thread::spawn(move || {
+                                std::thread::sleep(std::time::Duration::from_secs(max_secs as u64));
+                                // CAS: claim the right to stop — advance gen; fails if manually stopped or new recording started
+                                if t_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+                                    let task_id = t_task_id.lock().unwrap().take();
+                                    match t_recorder.stop() {
+                                        Ok(base64_audio) => {
+                                            update_tray_icon(&t_app, false);
+                                            if let Some(tid) = task_id {
+                                                crate::task::process_recording(&t_app, tid, base64_audio);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Auto-stop recording error: {}", e);
+                                            if let Some(tid) = task_id {
+                                                crate::task::cancel_recording(&t_app, tid);
+                                            }
+                                            update_tray_icon(&t_app, false);
+                                            let _ = t_app.emit("recording-error", serde_json::json!({
+                                                "message": e
+                                            }));
+                                        }
+                                    }
+                                }
+                            });
+                        }
                     }
                     Err(e) => {
                         eprintln!("Start recording error: {}", e);
