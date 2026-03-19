@@ -101,7 +101,7 @@ ByeType 设置界面当前有 6 个侧边栏标签页：历史记录、通用设
 ## 涉及的文件变更
 
 ### 修改
-- `src/views/settings/App.tsx` — TABS 数组从 6 项改为 3 项（保留 id 不变），移除 OptimizeTab 和 AdvancedTab 的 import 和渲染
+- `src/views/settings/App.tsx` — TABS 数组从 6 项改为 3 项（保留 id 不变），移除 OptimizeTab、AdvancedTab、PromptsTab 的 import 和顶级渲染（PromptsTab 改为 TranscribeTab 的子组件）
 - `src/views/settings/tabs/TranscribeTab.tsx` — 整合 OptimizeTab 的配置 UI，嵌入 PromptsTab 作为子组件
 - `src/views/settings/tabs/GeneralTab.tsx` — 整合 AdvancedTab 的配置项（超时、重试、并行、代理）
 - `src/views/settings/tabs/PromptsTab.tsx` — 改造为可嵌入的子组件，用 `React.memo` 包裹，设置固定编辑器高度 400px
