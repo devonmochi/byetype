@@ -79,6 +79,21 @@ export function GeneralTab({ config, onSave }: Props) {
             style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
           />
         </SettingRow>
+        <SettingRow label="最大录音时长" description="超时自动停止并处理，单位为秒">
+          <input
+            type="number"
+            className="input"
+            value={config.general.maxRecordingSeconds}
+            min={10}
+            max={600}
+            step={10}
+            onChange={e => {
+              const v = parseInt(e.target.value, 10)
+              if (!isNaN(v) && v >= 10) update({ maxRecordingSeconds: v })
+            }}
+            style={{ width: 80, textAlign: 'center' }}
+          />
+        </SettingRow>
         <SettingRow label="开机自启" description="登录后自动启动 ByeType">
           <Toggle
             checked={config.general.launchAtLogin}
