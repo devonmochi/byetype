@@ -18,3 +18,17 @@ Thumbs.db
 # Logs
 *.log
 .worktrees
+
+# Tauri updater keys
+.tauri-updater-key
+.tauri-updater-key.pub
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Claude Code / Superpowers
+.claude/
+.superpowers/
+docs/superpowers/

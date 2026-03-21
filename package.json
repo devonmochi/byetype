@@ -1,7 +1,14 @@
 {
   "name": "byetype",
-  "private": true,
   "version": "1.0.0",
+  "description": "AI-powered voice input tool with Markdown editing",
+  "license": "MIT",
+  "author": "devonmochi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devonmochi/byetype.git"
+  },
+  "homepage": "https://github.com/devonmochi/byetype",
   "type": "module",
   "scripts": {
     "dev": "vite",

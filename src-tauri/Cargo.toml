@@ -4,6 +4,9 @@ version = "1.0.0"
 description = "ByeType - Markdown driven voice input"
 authors = ["devonmochi"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/devonmochi/byetype"
+homepage = "https://github.com/devonmochi/byetype"
 
 [lib]
 name = "byetype_lib"
