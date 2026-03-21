@@ -5,7 +5,6 @@ mod bubble;
 mod clipboard;
 mod config;
 mod commands;
-mod proxy;
 mod shortcut;
 mod tray;
 
@@ -37,18 +36,20 @@ pub fn run() {
             commands::get_builtin_prompt_path,
             commands::copy_builtin_prompt,
             commands::is_builtin_prompt_path,
-            commands::get_theme,
             commands::open_file,
             commands::get_recording_state,
             commands::set_launch_at_login,
             commands::get_launch_at_login,
             commands::check_for_updates,
-            commands::proxy_request,
             commands::get_history,
             commands::retry_record,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
+
+            // Keep app as menu bar accessory (no Dock icon)
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             tray::create(&app_handle)
                 .expect("Failed to create system tray");
@@ -79,6 +80,17 @@ pub fn run() {
             }
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Intercept settings window close: hide instead of destroy, revert to Accessory
+            if window.label() == "settings" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    #[cfg(target_os = "macos")]
+                    let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
+                }
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

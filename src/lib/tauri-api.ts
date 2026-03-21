@@ -84,8 +84,4 @@ export async function getLaunchAtLogin(): Promise<boolean> {
   return invoke<boolean>('get_launch_at_login')
 }
 
-// Auto update
-export async function checkForUpdates(): Promise<string> {
-  return invoke<string>('check_for_updates')
-}
 

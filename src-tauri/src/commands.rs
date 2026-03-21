@@ -106,11 +106,6 @@ pub fn is_builtin_prompt_path(
 }
 
 #[tauri::command]
-pub fn get_theme() -> Result<String, String> {
-    Ok("system".to_string())
-}
-
-#[tauri::command]
 pub fn open_file(path: String) -> Result<(), String> {
     open::that(&path).map_err(|e| e.to_string())
 }
@@ -145,15 +140,6 @@ pub async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> 
         Ok(None) => Ok(String::new()),
         Err(e) => Err(e.to_string()),
     }
-}
-
-#[tauri::command]
-pub async fn proxy_request(
-    config_manager: State<'_, ConfigManager>,
-    request: crate::proxy::ProxyRequest,
-) -> Result<crate::proxy::ProxyResponse, String> {
-    let proxy_url = config_manager.get().advanced.proxy_url.clone();
-    crate::proxy::forward_request(&proxy_url, request).await
 }
 
 #[tauri::command]

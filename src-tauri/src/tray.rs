@@ -7,7 +7,10 @@ use tauri::{
 /// Show the settings window by moving it back on-screen and focusing it.
 fn show_settings(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("settings") {
-        // Center the window on screen
+        // Temporarily become a Regular app so macOS activates the window
+        #[cfg(target_os = "macos")]
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+
         let _ = win.center();
         let _ = win.show();
         let _ = win.set_focus();
