@@ -7,6 +7,7 @@ mod config;
 mod commands;
 mod shortcut;
 mod tray;
+mod updater;
 
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -78,6 +79,13 @@ pub fn run() {
             if let Some(win) = app.get_webview_window("settings") {
                 let _ = win.hide();
             }
+
+            // Auto-check for updates after a short delay
+            let update_handle = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                updater::check_and_prompt_update(update_handle, true).await;
+            });
 
             Ok(())
         })

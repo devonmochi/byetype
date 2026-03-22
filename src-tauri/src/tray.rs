@@ -42,17 +42,7 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
                 "check_update" => {
                     let app = app.clone();
                     tauri::async_runtime::spawn(async move {
-                        use tauri_plugin_updater::UpdaterExt;
-                        match app.updater() {
-                            Ok(updater) => match updater.check().await {
-                                Ok(Some(update)) => {
-                                    println!("Update available: v{}", update.version);
-                                }
-                                Ok(None) => println!("Already up to date"),
-                                Err(e) => eprintln!("Update check failed: {}", e),
-                            },
-                            Err(e) => eprintln!("Updater init failed: {}", e),
-                        }
+                        crate::updater::check_and_prompt_update(app, false).await;
                     });
                 }
                 "quit" => app.exit(0),

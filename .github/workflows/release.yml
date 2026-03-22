@@ -48,6 +48,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'ByeType ${{ github.ref_name }}'
           releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
