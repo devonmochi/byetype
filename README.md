@@ -15,7 +15,7 @@ ByeType 是一个轻量级桌面应用，通过全局快捷键触发录音，利
 
 > 不知道怎么用？把这份文档发给你的 AI 助手（Claude、ChatGPT、Gemini 等），让它一步步教你。
 
-## 演示
+## 🎬 演示
 
 <!-- TODO: 替换为真实素材 -->
 
@@ -23,7 +23,7 @@ ByeType 是一个轻量级桌面应用，通过全局快捷键触发录音，利
 
 ![设置界面](docs/images/settings.png)
 
-## 安装
+## 📦 安装
 
 从 [GitHub Releases](https://github.com/devonmochi/byetype/releases) 下载最新版本：
 
@@ -43,7 +43,7 @@ ByeType 是一个轻量级桌面应用，通过全局快捷键触发录音，利
 1. **麦克风权限**：前往「设置 → 隐私和安全性 → 麦克风」，允许 ByeType 访问麦克风
 2. **防火墙提示**：首次运行时 Windows Defender 可能弹出网络访问提示，选择「允许访问」
 
-## 快速上手
+## 🚀 快速上手
 
 从安装完成到第一次成功转录：
 
@@ -61,7 +61,7 @@ ByeType 是一个轻量级桌面应用，通过全局快捷键触发录音，利
 
 > 自动粘贴依赖辅助功能权限。如果文本没有自动粘贴，文本仍在剪贴板中，可手动按 Cmd+V（macOS）或 Ctrl+V（Windows）粘贴。
 
-## AI 模型配置
+## 🤖 AI 模型配置
 
 ### 转写模型
 
@@ -98,7 +98,7 @@ ByeType 支持以下转写模型，使用前需要获取对应的 API Key：
 
 填写位置：设置 → 语音转写 → 文本优化
 
-## 功能详解
+## ✨ 功能详解
 
 ### 全局快捷键
 
@@ -173,7 +173,7 @@ ByeType 支持以下转写模型，使用前需要获取对应的 API Key：
   - 最大并行任务数
   - HTTP 代理地址
 
-## 提示词系统
+## 📝 提示词系统
 
 ByeType 的转写行为由 4 个 Markdown 格式的提示词文件控制，这是实现高度自定义的核心机制。
 
@@ -213,7 +213,7 @@ ByeType 的转写行为由 4 个 Markdown 格式的提示词文件控制，这�
 
 保存后，AI 转写时会自动使用正确的写法。
 
-## 常见问题
+## ❓ 常见问题
 
 ### macOS 提示"无法验证开发者"
 
@@ -249,7 +249,7 @@ ByeType 的转写行为由 4 个 Markdown 格式的提示词文件控制，这�
 
 自动粘贴依赖辅助功能权限。检查「系统设置 → 隐私与安全性 → 辅助功能」是否已授权 ByeType。文本仍会复制到剪贴板，可手动 Cmd+V 粘贴。
 
-## 从源码构建
+## 🔨 从源码构建
 
 ### 环境要求
 
@@ -274,7 +274,7 @@ npm run tauri dev
 npm run tauri build
 ```
 
-## 技术栈
+## 🛠 技术栈
 
 - **框架**：[Tauri](https://v2.tauri.app/) v2
 - **前端**：[React](https://react.dev/) 19 + TypeScript + [Vite](https://vite.dev/)
@@ -282,6 +282,6 @@ npm run tauri build
 - **编辑器**：[CodeMirror](https://codemirror.net/) 6
 - **AI**：Google Gemini API、阿里云 Qwen API、OpenAI 兼容 API
 
-## 许可证
+## 📄 许可证
 
 [MIT](LICENSE)
