@@ -99,6 +99,63 @@ pub fn cancel_recording(app: &AppHandle, task_id: u32) {
     mgr.active_count = mgr.active_count.saturating_sub(1);
 }
 
+/// Cancel an in-progress transcription/optimization task.
+pub fn cancel_task(app: &AppHandle, task_id: u32) {
+    let state = app.state::<SharedTaskManager>();
+    let mut mgr = state.lock().unwrap();
+
+    // Take token — whoever removes it first owns cleanup
+    let (token, retry_record_id) = match mgr.cancel_tokens.remove(&task_id) {
+        Some(entry) => entry,
+        None => return, // Task already finished, nothing to do
+    };
+
+    // Signal cancellation to run_pipeline
+    token.cancel();
+
+    // Immediately hide bubble
+    let _ = crate::bubble::update(app, task_id, "failed");
+    let _ = crate::bubble::hide(app, task_id, 0);
+
+    // Write history record
+    if let Some(rid) = retry_record_id {
+        // Retry task: update the original record
+        if let Err(e) = mgr.history.update_record(
+            rid,
+            None,
+            None,
+            "cancelled",
+            Some("用户取消".to_string()),
+        ) {
+            eprintln!("[TaskManager] Failed to update cancelled record: {}", e);
+        }
+        // Notify frontend about retry status
+        let _ = app.emit("retry-status", serde_json::json!({
+            "recordId": rid,
+            "status": "cancelled"
+        }));
+    } else {
+        // New task: create a new cancelled record
+        if let Err(e) = mgr.history.add_record(
+            None,
+            None,
+            None,
+            "cancelled",
+            Some("用户取消".to_string()),
+        ) {
+            eprintln!("[TaskManager] Failed to add cancelled record: {}", e);
+        }
+    }
+
+    // Emit updated history
+    let records = mgr.history.get_records();
+    let json_records = serde_json::to_value(records).unwrap_or(serde_json::json!([]));
+    let _ = app.emit("history-updated", json_records);
+
+    // Decrement active count
+    mgr.active_count = mgr.active_count.saturating_sub(1);
+}
+
 /// Retry a previously failed record.
 pub fn retry_record(app: &AppHandle, record_id: u64) {
     let config = app.state::<ConfigManager>().get();
