@@ -1,4 +1,4 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::SampleFormat;
 use std::sync::{Arc, Mutex};
 
@@ -40,14 +40,13 @@ impl AudioRecorder {
         *self.state.lock().unwrap() == RecordingState::Recording
     }
 
-    pub fn start(&self) -> Result<(), String> {
+    pub fn start(&self, device_name: &str) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
         if *state == RecordingState::Recording {
             return Err("Already recording".to_string());
         }
 
-        let host = cpal::default_host();
-        let device = host.default_input_device()
+        let device = crate::audio::find_input_device(device_name)
             .ok_or_else(|| "No input device available".to_string())?;
 
         let default_config = device.default_input_config()

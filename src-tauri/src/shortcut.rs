@@ -53,7 +53,9 @@ pub fn register(
                     }
                 }
             } else {
-                match recorder.start() {
+                let mic = app_handle.state::<ConfigManager>().get()
+                    .general.microphone.clone();
+                match recorder.start(&mic) {
                     Ok(()) => {
                         // Bump generation to mark a new recording session
                         let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;

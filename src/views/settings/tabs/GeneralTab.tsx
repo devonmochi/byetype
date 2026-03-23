@@ -59,14 +59,47 @@ export function GeneralTab({ config, onSave }: Props) {
 
   // Listen for volume-level events
   useEffect(() => {
+    let cancelled = false
     let unlisten: (() => void) | undefined
 
     onEvent<number>('volume-level', (level) => {
       setVolumeLevel(level)
-    }).then(fn => { unlisten = fn })
+    }).then(fn => {
+      if (cancelled) {
+        fn()
+      } else {
+        unlisten = fn
+      }
+    })
 
-    return () => { unlisten?.() }
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
   }, [])
+
+  // Stop volume monitor when settings window is hidden, restart when shown
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (monitorActiveRef.current) {
+          stopVolumeMonitor().catch(e =>
+            console.error('Failed to stop volume monitor:', e)
+          )
+          monitorActiveRef.current = false
+          setVolumeLevel(0)
+        }
+      } else {
+        startVolumeMonitor(config.general.microphone).then(() => {
+          monitorActiveRef.current = true
+        }).catch(e =>
+          console.error('Failed to restart volume monitor:', e)
+        )
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [config.general.microphone])
 
   const refreshDevices = async () => {
     try {
