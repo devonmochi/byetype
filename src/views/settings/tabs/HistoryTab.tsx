@@ -42,6 +42,16 @@ function getStageInfo(record: HistoryRecord, retryStage?: string): StageInfo {
     }
   }
 
+  if (record.status === 'cancelled') {
+    return {
+      audio: record.audioPath ? 'success' : 'pending',
+      transcribe: record.transcribeText
+        ? { status: 'success', text: record.transcribeText }
+        : { status: 'pending', text: '已取消' },
+      optimize: { status: 'pending', text: '已取消' }
+    }
+  }
+
   const audio: StageStatus = record.audioPath ? 'success' : (record.status === 'failed' ? 'error' : 'success')
 
   let transcribe: StageInfo['transcribe']
@@ -130,7 +140,7 @@ function RecordRow({ record, retryStage, onRetry }: RecordRowProps) {
           <span className="history-stage-dot"><StageIndicator status={info.optimize.status} /> 优化</span>
         </div>
         <button
-          className={`history-retry-btn${record.status === 'failed' && !isRetrying ? ' highlight' : ''}`}
+          className={`history-retry-btn${(record.status === 'failed' || record.status === 'cancelled') && !isRetrying && !audioMissing ? ' highlight' : ''}`}
           disabled={isRetrying || audioMissing}
           title={audioMissing ? '音频文件已丢失' : isRetrying ? '重试中' : '重试'}
           onClick={() => onRetry(record.id)}
@@ -186,7 +196,7 @@ export function HistoryTab() {
         const next = new Map(prev)
         for (const id of prev.keys()) {
           const rec = newRecords.find(r => r.id === id)
-          if (rec && (rec.status === 'completed' || rec.status === 'failed')) {
+          if (rec && (rec.status === 'completed' || rec.status === 'failed' || rec.status === 'cancelled')) {
             next.delete(id)
           }
         }
@@ -226,7 +236,7 @@ export function HistoryTab() {
         <div className="history-empty">暂无录音记录</div>
       ) : (
         <div className="history-list">
-          {records.map(record => (
+          {[...records].reverse().map(record => (
             <RecordRow
               key={record.id}
               record={record}
