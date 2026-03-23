@@ -307,51 +307,56 @@ fn finish_pipeline(
     status: &str,
     error_message: Option<String>,
 ) {
-    // Update bubble
+    let state = app.state::<SharedTaskManager>();
+    let mut mgr = state.lock().unwrap();
+
+    // Atomic guard: whoever removes the token first owns cleanup
+    match mgr.cancel_tokens.remove(&task_id) {
+        Some((token, _)) if token.is_cancelled() => return,
+        Some(_) => { /* normal completion, proceed */ }
+        None => return,
+    }
+
+    // Update bubble (after guard)
     let bubble_delay = if status == "completed" { 1500 } else { 3000 };
     let _ = crate::bubble::update(app, task_id, status);
     let _ = crate::bubble::hide(app, task_id, bubble_delay);
 
-    // Update history and emit events - single lock scope
-    {
-        let state = app.state::<SharedTaskManager>();
-        let mut mgr = state.lock().unwrap();
-
-        if let Some(rid) = retry_record_id {
-            if let Err(e) = mgr.history.update_record(
-                rid,
-                transcribe_text,
-                optimize_text,
-                status,
-                error_message,
-            ) {
-                eprintln!("[TaskManager] Failed to update history record: {}", e);
-            }
-        } else {
-            if let Err(e) = mgr.history.add_record(
-                Some(audio_base64),
-                transcribe_text,
-                optimize_text,
-                status,
-                error_message,
-            ) {
-                eprintln!("[TaskManager] Failed to add history record: {}", e);
-            }
+    // Update history
+    if let Some(rid) = retry_record_id {
+        if let Err(e) = mgr.history.update_record(
+            rid,
+            transcribe_text,
+            optimize_text,
+            status,
+            error_message,
+        ) {
+            eprintln!("[TaskManager] Failed to update history record: {}", e);
         }
-
-        // Emit updated records
-        let records = mgr.history.get_records();
-        let json_records = serde_json::to_value(records).unwrap_or(serde_json::json!([]));
-        let _ = app.emit("history-updated", json_records);
-
-        if let Some(rid) = retry_record_id {
-            let _ = app.emit("retry-status", serde_json::json!({
-                "recordId": rid,
-                "status": status
-            }));
+    } else {
+        if let Err(e) = mgr.history.add_record(
+            Some(audio_base64),
+            transcribe_text,
+            optimize_text,
+            status,
+            error_message,
+        ) {
+            eprintln!("[TaskManager] Failed to add history record: {}", e);
         }
-
-        // Decrement active count
-        mgr.active_count = mgr.active_count.saturating_sub(1);
     }
+
+    // Emit updated records
+    let records = mgr.history.get_records();
+    let json_records = serde_json::to_value(records).unwrap_or(serde_json::json!([]));
+    let _ = app.emit("history-updated", json_records);
+
+    if let Some(rid) = retry_record_id {
+        let _ = app.emit("retry-status", serde_json::json!({
+            "recordId": rid,
+            "status": status
+        }));
+    }
+
+    // Decrement active count
+    mgr.active_count = mgr.active_count.saturating_sub(1);
 }
