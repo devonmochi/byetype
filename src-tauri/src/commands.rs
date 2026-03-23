@@ -159,3 +159,12 @@ pub fn retry_record(
     crate::task::retry_record(&app, record_id);
     Ok(())
 }
+
+#[tauri::command]
+pub fn cancel_task(
+    app: tauri::AppHandle,
+    task_id: u32,
+) -> Result<(), String> {
+    crate::task::cancel_task(&app, task_id);
+    Ok(())
+}

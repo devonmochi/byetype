@@ -44,6 +44,7 @@ pub fn run() {
             commands::check_for_updates,
             commands::get_history,
             commands::retry_record,
+            commands::cancel_task,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
