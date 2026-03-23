@@ -13,6 +13,10 @@ fn default_max_recording_seconds() -> u32 {
     180
 }
 
+fn default_microphone() -> String {
+    "system-default".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralConfig {
@@ -21,6 +25,8 @@ pub struct GeneralConfig {
     pub theme: String,
     #[serde(default = "default_max_recording_seconds")]
     pub max_recording_seconds: u32,
+    #[serde(default = "default_microphone")]
+    pub microphone: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +94,7 @@ impl Default for AppConfig {
                 launch_at_login: false,
                 theme: "system".to_string(),
                 max_recording_seconds: 180,
+                microphone: "system-default".to_string(),
             },
             transcribe: TranscribeConfig {
                 model: "gemini-3-flash-preview".to_string(),
