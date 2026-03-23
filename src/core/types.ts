@@ -56,7 +56,7 @@ export interface AppConfig {
   advanced: AdvancedConfig
 }
 
-export type TaskStatus = 'recording' | 'transcribing' | 'optimizing' | 'retrying' | 'completed' | 'failed'
+export type TaskStatus = 'recording' | 'transcribing' | 'optimizing' | 'retrying' | 'completed' | 'failed' | 'cancelled'
 
 export interface HistoryRecord {
   id: number
@@ -64,11 +64,11 @@ export interface HistoryRecord {
   audioPath: string | null
   transcribeText: string | null
   optimizeText: string | null
-  status: 'completed' | 'failed'
+  status: 'completed' | 'failed' | 'cancelled'
   errorMessage?: string
 }
 
 export interface RetryStatusUpdate {
   recordId: number
-  stage: 'transcribing' | 'optimizing' | 'retrying'
+  stage: 'transcribing' | 'optimizing' | 'retrying' | 'cancelled'
 }
