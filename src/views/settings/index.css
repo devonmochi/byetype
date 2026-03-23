@@ -9,3 +9,21 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* === Volume Bar === */
+.volume-bar-container {
+  width: 120px;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.volume-bar-fill {
+  height: 100%;
+  background: var(--success-color);
+  border-radius: 3px;
+  transition: width 0.1s ease-out;
+  min-width: 0;
+}
