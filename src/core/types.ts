@@ -1,10 +1,16 @@
 export type ThemeMode = 'light' | 'dark' | 'system'
 
+export interface AudioDevice {
+  name: string
+  isDefault: boolean
+}
+
 export interface GeneralConfig {
   shortcut: string
   launchAtLogin: boolean
   theme: ThemeMode
   maxRecordingSeconds: number
+  microphone: string
 }
 
 export interface ThinkingConfig {

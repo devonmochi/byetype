@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import type { AppConfig } from '../core/types'
+import type { AppConfig, AudioDevice } from '../core/types'
 
 // Config commands
 export async function getConfig(): Promise<AppConfig> {
@@ -84,4 +84,16 @@ export async function getLaunchAtLogin(): Promise<boolean> {
   return invoke<boolean>('get_launch_at_login')
 }
 
+// Microphone
+export async function listInputDevices(): Promise<AudioDevice[]> {
+  return invoke<AudioDevice[]>('list_input_devices')
+}
+
+export async function startVolumeMonitor(deviceName: string): Promise<void> {
+  await invoke('start_volume_monitor', { deviceName })
+}
+
+export async function stopVolumeMonitor(): Promise<void> {
+  await invoke('stop_volume_monitor')
+}
 
