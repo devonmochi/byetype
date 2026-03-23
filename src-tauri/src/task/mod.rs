@@ -60,7 +60,10 @@ pub fn start_recording(app: &AppHandle) -> Option<u32> {
         }
         mgr.task_counter += 1;
         mgr.active_count += 1;
-        mgr.task_counter
+        let token = CancellationToken::new();
+        let id = mgr.task_counter;
+        mgr.cancel_tokens.insert(id, (token, None));
+        id
     };
 
     if let Err(e) = crate::bubble::show(app, task_id) {
@@ -71,9 +74,18 @@ pub fn start_recording(app: &AppHandle) -> Option<u32> {
 
 /// Called from shortcut.rs when recording STOPS successfully.
 pub fn process_recording(app: &AppHandle, task_id: u32, audio_base64: String) {
+    let token = {
+        let state = app.state::<SharedTaskManager>();
+        let mgr = state.lock().unwrap();
+        mgr.cancel_tokens.get(&task_id).map(|(t, _)| t.clone())
+    };
+    let token = match token {
+        Some(t) => t,
+        None => return,
+    };
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        run_pipeline(&app_handle, task_id, audio_base64, None).await;
+        run_pipeline(&app_handle, task_id, audio_base64, None, token).await;
     });
 }
 
@@ -83,6 +95,7 @@ pub fn cancel_recording(app: &AppHandle, task_id: u32) {
     let _ = crate::bubble::hide(app, task_id, 2000);
     let state = app.state::<SharedTaskManager>();
     let mut mgr = state.lock().unwrap();
+    mgr.cancel_tokens.remove(&task_id);
     mgr.active_count = mgr.active_count.saturating_sub(1);
 }
 
@@ -90,7 +103,7 @@ pub fn cancel_recording(app: &AppHandle, task_id: u32) {
 pub fn retry_record(app: &AppHandle, record_id: u64) {
     let config = app.state::<ConfigManager>().get();
 
-    let (task_id, audio_base64) = {
+    let (task_id, audio_base64, token) = {
         let state = app.state::<SharedTaskManager>();
         let mut mgr = state.lock().unwrap();
 
@@ -111,7 +124,10 @@ pub fn retry_record(app: &AppHandle, record_id: u64) {
         }
         mgr.task_counter += 1;
         mgr.active_count += 1;
-        (mgr.task_counter, audio)
+        let token = CancellationToken::new();
+        let id = mgr.task_counter;
+        mgr.cancel_tokens.insert(id, (token.clone(), Some(record_id)));
+        (id, audio, token)
     };
 
     if let Err(e) = crate::bubble::show(app, task_id) {
@@ -120,7 +136,7 @@ pub fn retry_record(app: &AppHandle, record_id: u64) {
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        run_pipeline(&app_handle, task_id, audio_base64, Some(record_id)).await;
+        run_pipeline(&app_handle, task_id, audio_base64, Some(record_id), token).await;
     });
 }
 
@@ -144,6 +160,7 @@ async fn run_pipeline(
     task_id: u32,
     audio_base64: String,
     retry_record_id: Option<u64>,
+    token: CancellationToken,
 ) {
     // Get config snapshot and prompts_dir - release lock before any .await
     let (config, prompts_dir) = {
@@ -180,23 +197,28 @@ async fn run_pipeline(
         let audio = audio_base64.clone();
         let cfg = config.clone();
         let pd = prompts_dir.clone();
-        ai::retry::with_retry(
-            || {
-                let client = client.clone();
-                let audio = audio.clone();
-                let cfg = cfg.clone();
-                let pd = pd.clone();
-                async move {
-                    ai::transcribe(&client, &audio, &cfg, &pd).await
-                }
-            },
-            max_retries,
-            transcribe_timeout,
-        )
-        .await
+        tokio::select! {
+            result = ai::retry::with_retry(
+                || {
+                    let client = client.clone();
+                    let audio = audio.clone();
+                    let cfg = cfg.clone();
+                    let pd = pd.clone();
+                    async move {
+                        ai::transcribe(&client, &audio, &cfg, &pd).await
+                    }
+                },
+                max_retries,
+                transcribe_timeout,
+            ) => result,
+            _ = token.cancelled() => {
+                eprintln!("[TaskManager] Task {} cancelled during transcription", task_id);
+                return;
+            }
+        }
     };
 
-    let transcribe_text = match transcribe_result {
+    let transcribe_text: String = match transcribe_result {
         Ok(text) => text,
         Err(e) => {
             eprintln!("[TaskManager] Transcription failed: {}", e);
@@ -209,8 +231,8 @@ async fn run_pipeline(
     };
 
     // Phase 2: Optimize (if enabled)
-    let final_text;
-    let optimize_text;
+    let final_text: String;
+    let optimize_text: Option<String>;
 
     if config.optimize.enabled {
         let _ = crate::bubble::update(app, task_id, "optimizing");
@@ -223,20 +245,25 @@ async fn run_pipeline(
             let txt = transcribe_text.clone();
             let cfg = config.clone();
             let pd = prompts_dir.clone();
-            ai::retry::with_retry(
-                || {
-                    let client = client.clone();
-                    let txt = txt.clone();
-                    let cfg = cfg.clone();
-                    let pd = pd.clone();
-                    async move {
-                        ai::optimize(&client, &txt, &cfg, &pd).await
-                    }
-                },
-                max_retries,
-                optimize_timeout,
-            )
-            .await
+            tokio::select! {
+                result = ai::retry::with_retry(
+                    || {
+                        let client = client.clone();
+                        let txt = txt.clone();
+                        let cfg = cfg.clone();
+                        let pd = pd.clone();
+                        async move {
+                            ai::optimize(&client, &txt, &cfg, &pd).await
+                        }
+                    },
+                    max_retries,
+                    optimize_timeout,
+                ) => result,
+                _ = token.cancelled() => {
+                    eprintln!("[TaskManager] Task {} cancelled during optimization", task_id);
+                    return;
+                }
+            }
         };
 
         match optimize_result {
