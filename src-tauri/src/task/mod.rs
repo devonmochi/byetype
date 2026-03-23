@@ -1,7 +1,9 @@
 pub mod history;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio_util::sync::CancellationToken;
 use tauri::{AppHandle, Emitter, Manager};
 use crate::config::ConfigManager;
 use crate::ai;
@@ -12,6 +14,7 @@ pub struct TaskManager {
     active_count: u32,
     history: HistoryManager,
     prompts_dir: PathBuf,
+    cancel_tokens: HashMap<u32, (CancellationToken, Option<u64>)>,
 }
 
 impl TaskManager {
@@ -20,7 +23,7 @@ impl TaskManager {
         if let Err(e) = history.init() {
             eprintln!("[TaskManager] History init error: {}", e);
         }
-        Self { task_counter: 0, active_count: 0, history, prompts_dir }
+        Self { task_counter: 0, active_count: 0, history, prompts_dir, cancel_tokens: HashMap::new() }
     }
 
     pub fn get_records(&self) -> &[HistoryRecord] {
