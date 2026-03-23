@@ -1,6 +1,13 @@
-import React, { useEffect, useState } from 'react'
-import { AppConfig, ThemeMode } from '../../../core/types'
-import { getLaunchAtLogin, setLaunchAtLogin } from '../../../lib/tauri-api'
+import React, { useEffect, useRef, useState } from 'react'
+import { AppConfig, AudioDevice, ThemeMode } from '../../../core/types'
+import {
+  getLaunchAtLogin,
+  setLaunchAtLogin,
+  listInputDevices,
+  startVolumeMonitor,
+  stopVolumeMonitor,
+  onEvent,
+} from '../../../lib/tauri-api'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
@@ -12,6 +19,79 @@ interface Props {
 
 export function GeneralTab({ config, onSave }: Props) {
   const [recording, setRecording] = useState(false)
+  const [devices, setDevices] = useState<AudioDevice[]>([])
+  const [volumeLevel, setVolumeLevel] = useState(0)
+  const monitorActiveRef = useRef(false)
+  const initialMicRef = useRef(config.general.microphone)
+
+  // Load device list and start volume monitor
+  useEffect(() => {
+    let cancelled = false
+
+    const init = async () => {
+      try {
+        const deviceList = await listInputDevices()
+        if (!cancelled) setDevices(deviceList)
+      } catch (e) {
+        console.error('Failed to list input devices:', e)
+      }
+
+      try {
+        await startVolumeMonitor(initialMicRef.current)
+        monitorActiveRef.current = true
+      } catch (e) {
+        console.error('Failed to start volume monitor:', e)
+      }
+    }
+
+    init()
+
+    return () => {
+      cancelled = true
+      if (monitorActiveRef.current) {
+        stopVolumeMonitor().catch(e =>
+          console.error('Failed to stop volume monitor:', e)
+        )
+        monitorActiveRef.current = false
+      }
+    }
+  }, [])
+
+  // Listen for volume-level events
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+
+    onEvent<number>('volume-level', (level) => {
+      setVolumeLevel(level)
+    }).then(fn => { unlisten = fn })
+
+    return () => { unlisten?.() }
+  }, [])
+
+  const refreshDevices = async () => {
+    try {
+      const deviceList = await listInputDevices()
+      setDevices(deviceList)
+      // If current device is gone, switch to system-default
+      const currentMic = config.general.microphone
+      if (currentMic !== 'system-default' && !deviceList.some(d => d.name === currentMic)) {
+        update({ microphone: 'system-default' })
+        await startVolumeMonitor('system-default')
+      }
+    } catch (e) {
+      console.error('Failed to refresh devices:', e)
+    }
+  }
+
+  const handleMicChange = async (deviceName: string) => {
+    update({ microphone: deviceName })
+    try {
+      await startVolumeMonitor(deviceName)
+      monitorActiveRef.current = true
+    } catch (e) {
+      console.error('Failed to switch volume monitor:', e)
+    }
+  }
 
   useEffect(() => {
     getLaunchAtLogin().then(enabled => {
@@ -110,6 +190,42 @@ export function GeneralTab({ config, onSave }: Props) {
               }
             }}
           />
+        </SettingRow>
+      </SettingGroup>
+
+      <SettingGroup title="麦克风">
+        <SettingRow label="输入设备" description="选择用于语音输入的麦克风">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <select
+              className="select"
+              value={config.general.microphone}
+              onChange={e => handleMicChange(e.target.value)}
+              style={{ maxWidth: 200 }}
+            >
+              {devices.map(d => (
+                <option key={d.name} value={d.name}>
+                  {d.name === 'system-default'
+                    ? '系统默认'
+                    : `${d.name}${d.isDefault ? ' (默认)' : ''}`}
+                </option>
+              ))}
+            </select>
+            <button
+              className="file-picker-btn"
+              onClick={refreshDevices}
+              title="刷新设备列表"
+            >
+              刷新
+            </button>
+          </div>
+        </SettingRow>
+        <SettingRow label="音量预览" description="检查麦克风是否正常收音">
+          <div className="volume-bar-container">
+            <div
+              className="volume-bar-fill"
+              style={{ width: `${Math.round(volumeLevel * 100)}%` }}
+            />
+          </div>
         </SettingRow>
       </SettingGroup>
 
