@@ -551,3 +551,198 @@
 .prompt-save-status.error {
   color: #ff453a;
 }
+
+/* === About Tab / Update === */
+.sidebar-dot {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff453a;
+}
+
+.about-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0 20px;
+  gap: 8px;
+}
+
+.about-app-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent) 0%, #5e5ce6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+  font-weight: 700;
+}
+
+.about-app-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.about-app-version {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.update-card {
+  background: var(--group-bg);
+  border: 1px solid rgba(10, 132, 255, 0.3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.update-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.update-card-version {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.update-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(48, 209, 88, 0.15);
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+.update-changelog {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.update-changelog li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 3px 0;
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.update-changelog li::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: var(--text-tertiary);
+}
+
+.update-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.update-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.update-btn:hover {
+  opacity: 0.85;
+}
+
+.update-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.update-btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.update-btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.update-progress-area {
+  margin-top: 12px;
+}
+
+.update-progress-bar {
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.update-progress-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.update-error {
+  color: #ff453a;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.update-collapsed {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--group-bg);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.update-collapsed-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.about-check-area {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.about-status {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.about-status.success {
+  color: var(--success-color);
+}

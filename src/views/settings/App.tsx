@@ -2,21 +2,39 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { GeneralTab } from './tabs/GeneralTab'
 import { TranscribeTab } from './tabs/TranscribeTab'
 import { HistoryTab } from './tabs/HistoryTab'
-import type { AppConfig } from '../../core/types'
-import { getConfig, saveConfig, getTheme, onThemeChange } from '../../lib/tauri-api'
+import { AboutTab } from './tabs/AboutTab'
+import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
+import { getConfig, saveConfig, getTheme, onThemeChange, onEvent, checkUpdate } from '../../lib/tauri-api'
 import './theme.css'
 
 const TABS = [
   { id: 'history', label: '历史记录' },
   { id: 'transcribe', label: '语音转写' },
   { id: 'general', label: '通用设置' },
+  { id: 'about', label: '关于' },
 ]
+
+const APP_VERSION = '1.1.2'
+
+const INITIAL_UPDATE_STATE: UpdateState = {
+  phase: 'idle',
+  info: null,
+  progress: 0,
+  error: null,
+  dismissed: false,
+  checkedOnce: false,
+}
 
 export function App() {
   const [activeTab, setActiveTab] = useState('history')
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [saved, setSaved] = useState(false)
+  const [updateState, setUpdateState] = useState<UpdateState>(INITIAL_UPDATE_STATE)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleUpdateState = useCallback((partial: Partial<UpdateState>) => {
+    setUpdateState(prev => ({ ...prev, ...partial }))
+  }, [])
 
   useEffect(() => {
     getConfig().then((c) => setConfig(c))
@@ -29,8 +47,56 @@ export function App() {
       document.documentElement.dataset.theme = theme
     })
 
+    let unsubUpdateAvailable: (() => void) | null = null
+    onEvent<UpdateInfo>('update-available', (payload) => {
+      setUpdateState(prev => ({
+        ...prev,
+        phase: 'available',
+        info: payload,
+        dismissed: false,
+      }))
+    }).then(unsub => { unsubUpdateAvailable = unsub })
+
+    let unsubProgress: (() => void) | null = null
+    onEvent<{ percent: number }>('update-progress', (payload) => {
+      setUpdateState(prev => ({ ...prev, progress: payload.percent }))
+    }).then(unsub => { unsubProgress = unsub })
+
+    let unsubComplete: (() => void) | null = null
+    onEvent<Record<string, never>>('update-complete', () => {
+      setUpdateState(prev => ({ ...prev, phase: 'downloaded' }))
+    }).then(unsub => { unsubComplete = unsub })
+
+    let unsubError: (() => void) | null = null
+    onEvent<{ message: string }>('update-error', (payload) => {
+      setUpdateState(prev => ({ ...prev, phase: 'error', error: payload.message }))
+    }).then(unsub => { unsubError = unsub })
+
+    let unsubNavigate: (() => void) | null = null
+    onEvent<{ tab: string }>('navigate-to-tab', (payload) => {
+      setActiveTab(payload.tab)
+      if (payload.tab === 'about') {
+        setUpdateState(prev => {
+          if (prev.phase === 'idle') {
+            checkUpdate().then(result => {
+              if (result) {
+                setUpdateState(p => ({ ...p, phase: 'available', info: result, dismissed: false, checkedOnce: true }))
+              }
+            }).catch(() => {})
+            return { ...prev, phase: 'checking' }
+          }
+          return prev
+        })
+      }
+    }).then(unsub => { unsubNavigate = unsub })
+
     return () => {
       unsubTheme()
+      unsubUpdateAvailable?.()
+      unsubProgress?.()
+      unsubComplete?.()
+      unsubError?.()
+      unsubNavigate?.()
     }
   }, [])
 
@@ -44,6 +110,8 @@ export function App() {
     }, 300)
   }, [])
 
+  const showDot = updateState.phase === 'available' && !updateState.dismissed
+
   if (!config) return <div style={{ padding: 20, color: 'var(--text-primary)' }}>Loading...</div>
 
   return (
@@ -54,8 +122,10 @@ export function App() {
             key={tab.id}
             className={`sidebar-item${activeTab === tab.id ? ' active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
+            style={{ position: 'relative' }}
           >
             {tab.label}
+            {tab.id === 'about' && showDot && <span className="sidebar-dot" />}
           </button>
         ))}
       </div>
@@ -67,6 +137,13 @@ export function App() {
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
+        {activeTab === 'about' && (
+          <AboutTab
+            updateState={updateState}
+            onUpdateState={handleUpdateState}
+            appVersion={APP_VERSION}
+          />
+        )}
       </div>
     </div>
   )

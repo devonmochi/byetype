@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import type { AppConfig, AudioDevice } from '../core/types'
+import type { AppConfig, AudioDevice, UpdateInfo } from '../core/types'
 
 // Config commands
 export async function getConfig(): Promise<AppConfig> {
@@ -89,4 +89,16 @@ export async function listInputDevices(): Promise<AudioDevice[]> {
   return invoke<AudioDevice[]>('list_input_devices')
 }
 
+// Update
+export async function checkUpdate(): Promise<UpdateInfo | null> {
+  return invoke<UpdateInfo | null>('check_update')
+}
+
+export async function downloadUpdate(): Promise<void> {
+  return invoke<void>('download_update')
+}
+
+export async function installAndRestart(): Promise<void> {
+  return invoke<void>('install_and_restart')
+}
 

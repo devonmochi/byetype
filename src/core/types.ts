@@ -78,3 +78,19 @@ export interface RetryStatusUpdate {
   recordId: number
   stage: 'transcribing' | 'optimizing' | 'retrying' | 'cancelled'
 }
+
+export interface UpdateInfo {
+  version: string
+  body: string | null
+}
+
+export type UpdatePhase = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
+
+export interface UpdateState {
+  phase: UpdatePhase
+  info: UpdateInfo | null
+  progress: number
+  error: string | null
+  dismissed: boolean
+  checkedOnce: boolean
+}
