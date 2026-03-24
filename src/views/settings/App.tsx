@@ -14,7 +14,7 @@ const TABS = [
   { id: 'about', label: '关于' },
 ]
 
-const APP_VERSION = '1.1.2'
+const APP_VERSION = '1.2.0'
 
 const INITIAL_UPDATE_STATE: UpdateState = {
   phase: 'idle',
