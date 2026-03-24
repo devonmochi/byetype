@@ -89,11 +89,4 @@ export async function listInputDevices(): Promise<AudioDevice[]> {
   return invoke<AudioDevice[]>('list_input_devices')
 }
 
-export async function startVolumeMonitor(deviceName: string): Promise<void> {
-  await invoke('start_volume_monitor', { deviceName })
-}
-
-export async function stopVolumeMonitor(): Promise<void> {
-  await invoke('stop_volume_monitor')
-}
 

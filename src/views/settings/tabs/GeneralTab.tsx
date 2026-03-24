@@ -1,12 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { AppConfig, AudioDevice, ThemeMode } from '../../../core/types'
 import {
   getLaunchAtLogin,
   setLaunchAtLogin,
   listInputDevices,
-  startVolumeMonitor,
-  stopVolumeMonitor,
-  onEvent,
 } from '../../../lib/tauri-api'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
@@ -20,86 +17,13 @@ interface Props {
 export function GeneralTab({ config, onSave }: Props) {
   const [recording, setRecording] = useState(false)
   const [devices, setDevices] = useState<AudioDevice[]>([])
-  const [volumeLevel, setVolumeLevel] = useState(0)
-  const monitorActiveRef = useRef(false)
-  const initialMicRef = useRef(config.general.microphone)
 
-  // Load device list and start volume monitor
+  // Load device list
   useEffect(() => {
-    let cancelled = false
-
-    const init = async () => {
-      try {
-        const deviceList = await listInputDevices()
-        if (!cancelled) setDevices(deviceList)
-      } catch (e) {
-        console.error('Failed to list input devices:', e)
-      }
-
-      try {
-        await startVolumeMonitor(initialMicRef.current)
-        monitorActiveRef.current = true
-      } catch (e) {
-        console.error('Failed to start volume monitor:', e)
-      }
-    }
-
-    init()
-
-    return () => {
-      cancelled = true
-      if (monitorActiveRef.current) {
-        stopVolumeMonitor().catch(e =>
-          console.error('Failed to stop volume monitor:', e)
-        )
-        monitorActiveRef.current = false
-      }
-    }
+    listInputDevices()
+      .then(setDevices)
+      .catch(e => console.error('Failed to list input devices:', e))
   }, [])
-
-  // Listen for volume-level events
-  useEffect(() => {
-    let cancelled = false
-    let unlisten: (() => void) | undefined
-
-    onEvent<number>('volume-level', (level) => {
-      setVolumeLevel(level)
-    }).then(fn => {
-      if (cancelled) {
-        fn()
-      } else {
-        unlisten = fn
-      }
-    })
-
-    return () => {
-      cancelled = true
-      unlisten?.()
-    }
-  }, [])
-
-  // Stop volume monitor when settings window is hidden, restart when shown
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.hidden) {
-        if (monitorActiveRef.current) {
-          stopVolumeMonitor().catch(e =>
-            console.error('Failed to stop volume monitor:', e)
-          )
-          monitorActiveRef.current = false
-          setVolumeLevel(0)
-        }
-      } else {
-        startVolumeMonitor(config.general.microphone).then(() => {
-          monitorActiveRef.current = true
-        }).catch(e =>
-          console.error('Failed to restart volume monitor:', e)
-        )
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [config.general.microphone])
 
   const refreshDevices = async () => {
     try {
@@ -109,20 +33,9 @@ export function GeneralTab({ config, onSave }: Props) {
       const currentMic = config.general.microphone
       if (currentMic !== 'system-default' && !deviceList.some(d => d.name === currentMic)) {
         update({ microphone: 'system-default' })
-        await startVolumeMonitor('system-default')
       }
     } catch (e) {
       console.error('Failed to refresh devices:', e)
-    }
-  }
-
-  const handleMicChange = async (deviceName: string) => {
-    update({ microphone: deviceName })
-    try {
-      await startVolumeMonitor(deviceName)
-      monitorActiveRef.current = true
-    } catch (e) {
-      console.error('Failed to switch volume monitor:', e)
     }
   }
 
@@ -232,7 +145,7 @@ export function GeneralTab({ config, onSave }: Props) {
             <select
               className="select"
               value={config.general.microphone}
-              onChange={e => handleMicChange(e.target.value)}
+              onChange={e => update({ microphone: e.target.value })}
               style={{ maxWidth: 200 }}
             >
               {devices.map(d => (
@@ -250,14 +163,6 @@ export function GeneralTab({ config, onSave }: Props) {
             >
               刷新
             </button>
-          </div>
-        </SettingRow>
-        <SettingRow label="音量预览" description="检查麦克风是否正常收音">
-          <div className="volume-bar-container">
-            <div
-              className="volume-bar-fill"
-              style={{ width: `${Math.round(volumeLevel * 100)}%` }}
-            />
           </div>
         </SettingRow>
       </SettingGroup>

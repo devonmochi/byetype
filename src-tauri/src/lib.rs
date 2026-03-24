@@ -19,7 +19,6 @@ pub fn run() {
     let config_manager = ConfigManager::new(None);
     let initial_shortcut = config_manager.get().general.shortcut.clone();
     let recorder = Arc::new(AudioRecorder::new());
-    let volume_monitor = commands::VolumeMonitor::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -31,7 +30,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(config_manager)
         .manage(recorder.clone())
-        .manage(volume_monitor)
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
@@ -48,8 +46,6 @@ pub fn run() {
             commands::retry_record,
             commands::cancel_task,
             commands::list_input_devices,
-            commands::start_volume_monitor,
-            commands::stop_volume_monitor,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

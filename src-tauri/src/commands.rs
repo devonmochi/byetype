@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::traits::{DeviceTrait, HostTrait};
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager, State};
+use tauri::{Manager, State};
 use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
 use crate::config::types::AppConfig;
@@ -13,18 +12,6 @@ use crate::config::types::AppConfig;
 pub struct AudioDevice {
     pub name: String,
     pub is_default: bool,
-}
-
-pub struct VolumeMonitor {
-    pub generation: Arc<AtomicU64>,
-}
-
-impl VolumeMonitor {
-    pub fn new() -> Self {
-        Self {
-            generation: Arc::new(AtomicU64::new(0)),
-        }
-    }
 }
 
 /// Public wrapper so lib.rs can call resolve_prompts_dir at setup time.
@@ -217,118 +204,3 @@ pub fn list_input_devices() -> Result<Vec<AudioDevice>, String> {
     Ok(devices)
 }
 
-#[tauri::command]
-pub fn start_volume_monitor(
-    device_name: String,
-    app: tauri::AppHandle,
-    monitor: State<'_, VolumeMonitor>,
-) -> Result<(), String> {
-    // Bump generation to invalidate any previous monitor thread
-    let gen = monitor.generation.fetch_add(1, Ordering::SeqCst) + 1;
-
-    let device = crate::audio::find_input_device(&device_name)
-        .ok_or_else(|| "No input device available".to_string())?;
-
-    let config = device.default_input_config()
-        .map_err(|e| format!("Failed to get input config: {}", e))?;
-
-    let sample_format = config.sample_format();
-    let stream_config: cpal::StreamConfig = config.into();
-    let channels = stream_config.channels as usize;
-
-    let generation = monitor.generation.clone();
-    let app_clone = app.clone();
-
-    std::thread::spawn(move || {
-        let rms_samples: Arc<std::sync::Mutex<Vec<f32>>> =
-            Arc::new(std::sync::Mutex::new(Vec::new()));
-
-        let rms_clone = rms_samples.clone();
-        let stream = match sample_format {
-            cpal::SampleFormat::F32 => device.build_input_stream(
-                &stream_config,
-                move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                    if let Ok(mut buf) = rms_clone.try_lock() {
-                        buf.extend_from_slice(data);
-                    }
-                },
-                |err| eprintln!("Volume monitor stream error: {}", err),
-                None,
-            ),
-            cpal::SampleFormat::I16 => {
-                let rms_i16 = rms_samples.clone();
-                device.build_input_stream(
-                    &stream_config,
-                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                        if let Ok(mut buf) = rms_i16.try_lock() {
-                            buf.extend(data.iter().map(|&s| s as f32 / 32768.0));
-                        }
-                    },
-                    |err| eprintln!("Volume monitor stream error: {}", err),
-                    None,
-                )
-            }
-            _ => {
-                eprintln!("Unsupported sample format for volume monitor");
-                return;
-            }
-        };
-
-        let stream = match stream {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Failed to build volume monitor stream: {}", e);
-                return;
-            }
-        };
-
-        if let Err(e) = stream.play() {
-            eprintln!("Failed to play volume monitor stream: {}", e);
-            return;
-        }
-
-        // ~10Hz polling; exit if generation changes (new monitor started or stopped)
-        while generation.load(Ordering::SeqCst) == gen {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-
-            let samples: Vec<f32> = {
-                let mut buf = rms_samples.lock().unwrap();
-                buf.drain(..).collect()
-            };
-
-            if samples.is_empty() {
-                let _ = app_clone.emit("volume-level", 0.0_f64);
-                continue;
-            }
-
-            // Calculate RMS, mix to mono if multi-channel
-            let mono: Vec<f32> = if channels > 1 {
-                samples.chunks(channels)
-                    .map(|frame| frame.iter().sum::<f32>() / channels as f32)
-                    .collect()
-            } else {
-                samples
-            };
-
-            let sum_sq: f64 = mono.iter().map(|&s| (s as f64) * (s as f64)).sum();
-            let rms = (sum_sq / mono.len() as f64).sqrt();
-            // Normalize to 0.0-1.0 range (clamp, RMS of full-scale sine is ~0.707)
-            let level = (rms * 1.414).min(1.0);
-
-            let _ = app_clone.emit("volume-level", level);
-        }
-
-        drop(stream);
-    });
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn stop_volume_monitor(
-    monitor: State<'_, VolumeMonitor>,
-) -> Result<(), String> {
-    // Bump generation to invalidate current monitor thread
-    monitor.generation.fetch_add(1, Ordering::SeqCst);
-    Ok(())
-}
