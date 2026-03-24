@@ -41,7 +41,9 @@ pub fn run() {
             commands::get_recording_state,
             commands::set_launch_at_login,
             commands::get_launch_at_login,
-            commands::check_for_updates,
+            updater::check_update,
+            updater::download_update,
+            updater::install_and_restart,
             commands::get_history,
             commands::retry_record,
             commands::cancel_task,
@@ -65,6 +67,7 @@ pub fn run() {
             let task_manager: task::SharedTaskManager =
                 Arc::new(Mutex::new(task::TaskManager::new(&data_dir, prompts_dir)));
             app.manage(task_manager);
+            app.manage(updater::UpdateState::new(None));
 
             let shortcut_key = if initial_shortcut.is_empty() {
                 "F4".to_string()
@@ -86,7 +89,7 @@ pub fn run() {
             let update_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                updater::check_and_prompt_update(update_handle, true).await;
+                updater::silent_check(update_handle).await;
             });
 
             Ok(())

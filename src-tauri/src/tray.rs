@@ -1,5 +1,5 @@
 use tauri::{
-    AppHandle, Manager,
+    AppHandle, Emitter, Manager,
     tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent},
     menu::{Menu, MenuItem},
 };
@@ -40,9 +40,9 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
             match event.id().as_ref() {
                 "settings" => show_settings(app),
                 "check_update" => {
-                    let app = app.clone();
-                    tauri::async_runtime::spawn(async move {
-                        crate::updater::check_and_prompt_update(app, false).await;
+                    show_settings(app);
+                    let _ = app.emit("navigate-to-tab", crate::updater::NavigatePayload {
+                        tab: "about".to_string(),
                     });
                 }
                 "quit" => app.exit(0),
