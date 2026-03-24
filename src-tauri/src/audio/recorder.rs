@@ -109,6 +109,9 @@ impl AudioRecorder {
             let recording = active_guard.take()
                 .ok_or_else(|| "No active recording".to_string())?;
 
+            // Explicitly pause before drop so CoreAudio calls AudioOutputUnitStop,
+            // which releases the microphone and clears the macOS orange indicator.
+            let _ = recording.stream.pause();
             drop(recording.stream);
 
             let samples = recording.samples.lock()
