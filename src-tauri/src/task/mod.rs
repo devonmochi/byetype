@@ -267,6 +267,14 @@ async fn run_pipeline(
                 },
                 max_retries,
                 transcribe_timeout,
+                |_attempt| {
+                    let _ = crate::bubble::update(app, task_id, "retrying");
+                    if let Some(rid) = retry_record_id {
+                        let _ = app.emit("retry-status", serde_json::json!({
+                            "recordId": rid, "status": "retrying"
+                        }));
+                    }
+                },
             ) => result,
             _ = token.cancelled() => {
                 eprintln!("[TaskManager] Task {} cancelled during transcription", task_id);
@@ -315,6 +323,14 @@ async fn run_pipeline(
                     },
                     max_retries,
                     optimize_timeout,
+                    |_attempt| {
+                        let _ = crate::bubble::update(app, task_id, "retrying");
+                        if let Some(rid) = retry_record_id {
+                            let _ = app.emit("retry-status", serde_json::json!({
+                                "recordId": rid, "status": "retrying"
+                            }));
+                        }
+                    },
                 ) => result,
                 _ = token.cancelled() => {
                     eprintln!("[TaskManager] Task {} cancelled during optimization", task_id);
