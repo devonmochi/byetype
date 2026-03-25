@@ -56,7 +56,15 @@ export function AboutTab({ updateState, onUpdateState, appVersion }: Props) {
       <h2 className="content-title">关于</h2>
 
       <div className="about-header">
-        <div className="about-app-icon">B</div>
+        <div className="about-app-icon">
+          <svg width="36" height="38" viewBox="0 0 92 94">
+            <rect x="1" y="30" width="16" height="34" rx="8" fill="white"/>
+            <rect x="19.5" y="12" width="16" height="70" rx="8" fill="white"/>
+            <rect x="38" y="2" width="16" height="90" rx="8" fill="white"/>
+            <rect x="56.5" y="12" width="16" height="70" rx="8" fill="white"/>
+            <rect x="75" y="30" width="16" height="34" rx="8" fill="white"/>
+          </svg>
+        </div>
         <div className="about-app-name">ByeType</div>
         <div className="about-app-version">版本 {appVersion}</div>
       </div>
