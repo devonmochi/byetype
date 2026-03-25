@@ -24,11 +24,14 @@ def lerp_color(c1, c2, t):
     return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
 
 
-def create_gradient_image(size):
-    """Create an image with 135-degree gradient from #FF8C42 to #FF5E1A."""
+def create_gradient_image(size, gradient=None):
+    """Create an image with 135-degree gradient."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    c1 = (0xFF, 0x8C, 0x42)  # top-left
-    c2 = (0xFF, 0x5E, 0x1A)  # bottom-right
+    if gradient:
+        c1, c2 = gradient
+    else:
+        c1 = (0xFF, 0x8C, 0x42)  # top-left
+        c2 = (0xFF, 0x5E, 0x1A)  # bottom-right
     for y in range(size):
         for x in range(size):
             # 135 degree: top-left to bottom-right
@@ -50,10 +53,10 @@ def draw_rounded_rect(draw, bbox, radius, fill):
     draw.rounded_rectangle([x0, y0, x1, y1], radius=r, fill=fill)
 
 
-def create_app_icon(size):
-    """Create app icon at given size with orange gradient bg and white bars."""
+def create_app_icon(size, gradient=None):
+    """Create app icon at given size with gradient bg and white bars."""
     # Create gradient background
-    img = create_gradient_image(size)
+    img = create_gradient_image(size, gradient=gradient)
 
     # Apply rounded corner mask
     corner_radius = size * 0.22  # macOS-style rounded corners
@@ -170,18 +173,16 @@ def main():
     print(f"  Created {path} (512x512)")
 
     print("\nGenerating tray icons...")
-    # Tray default: black bars on transparent (macOS template image)
-    tray_color = (0, 0, 0, 255)
+    # Tray default: same as app icon (orange gradient + white bars)
     for size, name in [(16, "tray-default.png"), (32, "tray-default@2x.png")]:
-        icon = create_tray_icon(size, tray_color)
+        icon = create_app_icon(size)
         path = os.path.join(ICON_DIR, name)
         icon.save(path, "PNG")
         print(f"  Created {path} ({size}x{size})")
 
-    # Tray recording: red bars on transparent
-    rec_color = (255, 59, 48, 255)  # system red
+    # Tray recording: red gradient + white bars
     for size, name in [(16, "tray-recording.png"), (32, "tray-recording@2x.png")]:
-        icon = create_tray_icon(size, rec_color)
+        icon = create_app_icon(size, gradient=((255, 59, 48), (200, 20, 20)))
         path = os.path.join(ICON_DIR, name)
         icon.save(path, "PNG")
         print(f"  Created {path} ({size}x{size})")
