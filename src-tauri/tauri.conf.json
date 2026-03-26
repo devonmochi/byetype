@@ -17,6 +17,8 @@
         "title": "ByeType Settings",
         "width": 780,
         "height": 600,
+        "minWidth": 600,
+        "minHeight": 450,
         "resizable": true,
         "visible": false
       }
