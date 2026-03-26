@@ -10,7 +10,7 @@ interface Props {
 }
 
 const MODELS = [
-  { value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash' },
+  { value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash', recommended: true },
   { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite' },
   { value: 'qwen3-omni-flash', label: 'Qwen3 Omni Flash' },
 ]
@@ -52,7 +52,7 @@ export function TranscribeTab({ config, onSave }: Props) {
             onChange={e => updateTranscribe({ model: e.target.value as typeof transcribe.model })}
             style={{ width: 200 }}
           >
-            {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}{m.recommended ? ' (推荐)' : ''}</option>)}
           </select>
         </SettingRow>
       </SettingGroup>
@@ -158,7 +158,7 @@ export function TranscribeTab({ config, onSave }: Props) {
             <SettingGroup title="Gemini 配置">
               <SettingRow label="Gemini 模型" description="复用转写设置中的 API Key">
                 <select className="select" value={optimize.geminiModel} onChange={e => updateOptimize({ geminiModel: e.target.value })} style={{ width: 200 }}>
-                  <option value="gemini-3-flash-preview">Gemini 3.0 Flash</option>
+                  <option value="gemini-3-flash-preview">Gemini 3.0 Flash (推荐)</option>
                   <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
                 </select>
               </SettingRow>

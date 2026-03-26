@@ -64,7 +64,8 @@ export function GeneralTab({ config, onSave }: Props) {
     if (e.altKey) parts.push('Alt')
     if (e.shiftKey) parts.push('Shift')
     if (e.metaKey) parts.push('Command')
-    if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) parts.push(key)
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
+    parts.push(key)
     const combo = parts.join('+')
     update({ shortcut: combo })
     setRecording(false)
