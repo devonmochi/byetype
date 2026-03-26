@@ -216,8 +216,9 @@ function PromptsTabInner({ config, onSave }: Props) {
   const handleResetToBuiltin = async () => {
     if (!window.confirm('确定要重置为内置提示词吗？当前的修改将被覆盖。')) return
     await flushSave()
-    await copyBuiltinPrompt(activePrompt.builtinFilename, true)
-    await loadFile(activePrompt)
+    const builtinPath = await copyBuiltinPrompt(activePrompt.builtinFilename, true)
+    const newConfig = setConfigValue(config, activePrompt.configPath, builtinPath)
+    onSave(newConfig)
   }
 
   return (
