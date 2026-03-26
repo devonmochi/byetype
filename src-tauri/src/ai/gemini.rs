@@ -92,10 +92,21 @@ pub async fn optimize(
         model, api_key
     );
 
-    let user_content = format!("<voice-input>\n{}\n</voice-input>\n\n{}", text, system_prompt);
+    let system_instruction = if system_prompt.is_empty() {
+        None
+    } else {
+        Some(GeminiContent {
+            role: None,
+            parts: vec![GeminiPart::Text {
+                text: system_prompt.to_string(),
+            }],
+        })
+    };
+
+    let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
 
     let request = GeminiRequest {
-        system_instruction: None,
+        system_instruction,
         contents: vec![GeminiContent {
             role: Some("user".to_string()),
             parts: vec![GeminiPart::Text {

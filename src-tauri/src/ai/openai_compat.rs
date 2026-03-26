@@ -11,14 +11,20 @@ pub async fn optimize(
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", compat_config.base_url.trim_end_matches('/'));
 
-    let user_content = format!("<voice-input>\n{}\n</voice-input>\n\n{}", text, system_prompt);
+    let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
 
     let request = ChatCompletionRequest {
         model: compat_config.model.clone(),
-        messages: vec![ChatMessage {
-            role: "user".to_string(),
-            content: ChatContent::Text(user_content),
-        }],
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(system_prompt.to_string()),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Text(user_content),
+            },
+        ],
         modalities: None,
     };
 
