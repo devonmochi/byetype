@@ -32,3 +32,8 @@ Thumbs.db
 .claude/
 .superpowers/
 docs/superpowers/
+
+# Dev artifacts
+generate_icons.py
+DESIGN-*.md
+src-tauri/gen/schemas/
