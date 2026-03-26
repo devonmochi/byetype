@@ -4,6 +4,7 @@ import { TranscribeTab } from './tabs/TranscribeTab'
 import { HistoryTab } from './tabs/HistoryTab'
 import { AboutTab } from './tabs/AboutTab'
 import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
+import { getVersion } from '@tauri-apps/api/app'
 import { getConfig, saveConfig, getTheme, onThemeChange, onEvent, checkUpdate } from '../../lib/tauri-api'
 import './theme.css'
 
@@ -13,8 +14,6 @@ const TABS = [
   { id: 'general', label: '通用设置' },
   { id: 'about', label: '关于' },
 ]
-
-const APP_VERSION = '1.2.0'
 
 const INITIAL_UPDATE_STATE: UpdateState = {
   phase: 'idle',
@@ -30,6 +29,7 @@ export function App() {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [saved, setSaved] = useState(false)
   const [updateState, setUpdateState] = useState<UpdateState>(INITIAL_UPDATE_STATE)
+  const [appVersion, setAppVersion] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleUpdateState = useCallback((partial: Partial<UpdateState>) => {
@@ -38,6 +38,7 @@ export function App() {
 
   useEffect(() => {
     getConfig().then((c) => setConfig(c))
+    getVersion().then((v) => setAppVersion(v))
 
     getTheme().then((theme) => {
       document.documentElement.dataset.theme = theme
@@ -141,7 +142,7 @@ export function App() {
           <AboutTab
             updateState={updateState}
             onUpdateState={handleUpdateState}
-            appVersion={APP_VERSION}
+            appVersion={appVersion}
           />
         )}
       </div>
