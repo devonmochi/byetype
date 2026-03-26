@@ -9,12 +9,13 @@ ICON_DIR = "src-tauri/icons"
 
 # F3 design parameters (viewBox 0 0 92 94)
 # 5 bars: symmetric pattern (short-tall-tallest-tall-short)
+# bar width 14, gap 5 (was: width 16, gap 2.5) — wider gaps stay visible at small sizes
 BARS = [
-    {"x": 1,    "y": 30, "w": 16, "h": 34},
-    {"x": 19.5, "y": 12, "w": 16, "h": 70},
-    {"x": 38,   "y": 2,  "w": 16, "h": 90},
-    {"x": 56.5, "y": 12, "w": 16, "h": 70},
-    {"x": 75,   "y": 30, "w": 16, "h": 34},
+    {"x": 1,  "y": 30, "w": 14, "h": 34},
+    {"x": 20, "y": 12, "w": 14, "h": 70},
+    {"x": 39, "y": 2,  "w": 14, "h": 90},
+    {"x": 58, "y": 12, "w": 14, "h": 70},
+    {"x": 77, "y": 30, "w": 14, "h": 34},
 ]
 VB_W, VB_H = 92, 94  # viewBox dimensions
 
@@ -53,17 +54,28 @@ def draw_rounded_rect(draw, bbox, radius, fill):
     draw.rounded_rectangle([x0, y0, x1, y1], radius=r, fill=fill)
 
 
+# For icons <= this size, render at higher resolution then downscale
+_SUPERSAMPLE_THRESHOLD = 64
+_SUPERSAMPLE_FACTOR = 4
+
+
 def create_app_icon(size, gradient=None):
-    """Create app icon at given size with gradient bg and white bars."""
+    """Create app icon, with supersampling for small sizes."""
+    if size <= _SUPERSAMPLE_THRESHOLD:
+        big = _render_app_icon(size * _SUPERSAMPLE_FACTOR, gradient=gradient)
+        return big.resize((size, size), Image.LANCZOS)
+    return _render_app_icon(size, gradient=gradient)
+
+
+def _render_app_icon(size, gradient=None):
+    """Render app icon at exact pixel size with gradient bg and white bars.
+
+    No rounded-corner mask — macOS automatically applies rounded corners
+    to .icns app icons. Keeping the image as a full square avoids
+    transparent regions that Finder/Quick Look render as black.
+    """
     # Create gradient background
     img = create_gradient_image(size, gradient=gradient)
-
-    # Apply rounded corner mask
-    corner_radius = size * 0.22  # macOS-style rounded corners
-    mask = Image.new("L", (size, size), 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.rounded_rectangle([0, 0, size - 1, size - 1], radius=int(corner_radius), fill=255)
-    img.putalpha(mask)
 
     draw = ImageDraw.Draw(img)
 
@@ -88,7 +100,15 @@ def create_app_icon(size, gradient=None):
 
 
 def create_tray_icon(size, color=(0, 0, 0, 255)):
-    """Create tray icon (bars only, on transparent background)."""
+    """Create tray icon, with supersampling for small sizes."""
+    if size <= _SUPERSAMPLE_THRESHOLD:
+        big = _render_tray_icon(size * _SUPERSAMPLE_FACTOR, color=color)
+        return big.resize((size, size), Image.LANCZOS)
+    return _render_tray_icon(size, color=color)
+
+
+def _render_tray_icon(size, color=(0, 0, 0, 255)):
+    """Render tray icon (bars only, on transparent background)."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
