@@ -743,3 +743,35 @@
 .about-status.success {
   color: var(--success-color);
 }
+
+/* === Models Tab === */
+.models-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.models-section-title { font-size: 12px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; margin-top: 16px; }
+.model-card { background: var(--group-bg); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; }
+.model-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.model-card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.model-card-actions { display: flex; gap: 8px; align-items: center; }
+.model-card-subtitle { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; }
+.model-card-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.model-card-row label { font-size: 12px; color: var(--text-secondary); white-space: nowrap; min-width: 60px; }
+.model-test-btn { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: none; color: var(--text-primary); cursor: pointer; font-size: 11px; font-family: inherit; transition: border-color 0.15s, color 0.15s; }
+.model-test-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.model-test-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.model-test-result { font-size: 11px; font-weight: 500; }
+.model-test-result.success { color: #34c759; }
+.model-test-result.error { color: #ff453a; }
+.model-action-btn { padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: none; color: var(--text-secondary); cursor: pointer; font-size: 11px; font-family: inherit; }
+.model-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.model-action-btn.danger:hover { border-color: #ff453a; color: #ff453a; }
+.model-form { background: var(--group-bg); border-radius: 10px; padding: 16px; margin-bottom: 8px; }
+.model-form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.model-form-row label { font-size: 12px; color: var(--text-secondary); min-width: 70px; white-space: nowrap; }
+.model-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.model-form-btn { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-family: inherit; cursor: pointer; border: 1px solid var(--border-color); background: none; color: var(--text-primary); }
+.model-form-btn.primary { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+.model-form-btn:hover { opacity: 0.85; }
+.add-model-btn { width: 100%; padding: 10px; border-radius: 10px; border: 1px dashed var(--border-color); background: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; font-family: inherit; transition: border-color 0.15s, color 0.15s; }
+.add-model-btn:hover { border-color: var(--accent); color: var(--accent); }
+.test-all-btn { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-family: inherit; cursor: pointer; border: 1px solid var(--border-color); background: none; color: var(--text-primary); transition: border-color 0.15s, color 0.15s; }
+.test-all-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.test-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
