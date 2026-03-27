@@ -227,6 +227,9 @@ pub async fn test_model_connectivity(
         "gemini" => {
             ai::gemini::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
         }
+        "longcat" => {
+            ai::openai_compat::longcat_test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
+        }
         _ => {
             ai::openai_compat::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
         }

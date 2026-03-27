@@ -247,3 +247,43 @@ pub async fn test_connectivity(
 
     Ok(())
 }
+
+pub async fn longcat_test_connectivity(
+    client: &Client,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<(), String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: ChatContent::Text("hi".to_string()),
+        }],
+        modalities: None,
+        output_modalities: Some(vec!["text".to_string()]),
+        stream: Some(false),
+        max_tokens: Some(32),
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("LongCat connectivity test failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read LongCat response: {}", e))?;
+        return Err(format!("LongCat API error ({}): {}", status, body));
+    }
+
+    Ok(())
+}
