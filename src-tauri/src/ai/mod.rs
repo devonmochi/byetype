@@ -31,6 +31,17 @@ pub async fn transcribe(
             )
             .await
         }
+        "longcat" => {
+            openai_compat::longcat_transcribe(
+                client,
+                audio_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
         _ => {
             openai_compat::transcribe(
                 client,

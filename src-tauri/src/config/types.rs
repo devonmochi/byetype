@@ -43,6 +43,8 @@ pub struct ModelsConfig {
 pub struct BuiltinApiKeys {
     pub gemini: String,
     pub qwen: String,
+    #[serde(default)]
+    pub longcat: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,6 +117,7 @@ impl Default for AppConfig {
                 builtin_api_keys: BuiltinApiKeys {
                     gemini: String::new(),
                     qwen: String::new(),
+                    longcat: String::new(),
                 },
                 custom: Vec::new(),
             },

@@ -4,7 +4,7 @@ export interface ModelEntry {
   id: string
   provider: string
   model: string
-  protocol: 'gemini' | 'openai-compat'
+  protocol: 'gemini' | 'openai-compat' | 'longcat'
   baseUrl: string
   apiKey: string
   builtin: boolean
@@ -43,12 +43,23 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsAudio: true,
     supportsText: false,
   },
+  {
+    id: 'builtin-longcat-flash-omni',
+    provider: 'LongCat',
+    model: 'LongCat-Flash-Omni-2603',
+    protocol: 'longcat',
+    baseUrl: 'https://api.longcat.chat/openai/v1',
+    builtin: true,
+    supportsAudio: true,
+    supportsText: false,
+  },
 ]
 
 export function getAllModels(config: AppConfig): ModelEntry[] {
   const builtins: ModelEntry[] = BUILTIN_MODELS.map(b => {
     let apiKey = ''
     if (b.protocol === 'gemini') apiKey = config.models.builtinApiKeys.gemini
+    else if (b.protocol === 'longcat') apiKey = config.models.builtinApiKeys.longcat
     else if (b.id === 'builtin-qwen3-omni-flash') apiKey = config.models.builtinApiKeys.qwen
     return { ...b, apiKey }
   })

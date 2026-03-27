@@ -38,6 +38,15 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_audio: true,
         supports_text: false,
     },
+    BuiltinModel {
+        id: "builtin-longcat-flash-omni",
+        provider: "LongCat",
+        model: "LongCat-Flash-Omni-2603",
+        protocol: "longcat",
+        base_url: "https://api.longcat.chat/openai/v1",
+        supports_audio: true,
+        supports_text: false,
+    },
 ];
 
 pub struct ResolvedModel {
@@ -52,6 +61,7 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
         let api_key = match builtin.protocol {
             "gemini" => &config.models.builtin_api_keys.gemini,
             "openai-compat" => &config.models.builtin_api_keys.qwen,
+            "longcat" => &config.models.builtin_api_keys.longcat,
             _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
         };
         return Ok(ResolvedModel {

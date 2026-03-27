@@ -22,7 +22,7 @@ export function ModelsTab({ config, onSave }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
 
-  const updateBuiltinKey = (key: 'gemini' | 'qwen', value: string) => {
+  const updateBuiltinKey = (key: 'gemini' | 'qwen' | 'longcat', value: string) => {
     onSave({ ...config, models: { ...config.models, builtinApiKeys: { ...config.models.builtinApiKeys, [key]: value } } })
   }
 
@@ -74,14 +74,13 @@ export function ModelsTab({ config, onSave }: Props) {
 
   const geminiKey = config.models.builtinApiKeys.gemini
   const qwenKey = config.models.builtinApiKeys.qwen
+  const longcatKey = config.models.builtinApiKeys.longcat
 
-  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'qwen'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
+  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'qwen' | 'longcat'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
     if (!acc[m.provider]) {
-      acc[m.provider] = {
-        keyField: m.protocol === 'gemini' ? 'gemini' : 'qwen',
-        placeholder: m.protocol === 'gemini' ? 'AIzaSy...' : 'sk-...',
-        models: [],
-      }
+      const keyField = m.protocol === 'gemini' ? 'gemini' : m.protocol === 'longcat' ? 'longcat' : 'qwen'
+      const placeholder = m.protocol === 'gemini' ? 'AIzaSy...' : 'ak_...'
+      acc[m.provider] = { keyField, placeholder, models: [] }
     }
     acc[m.provider].models.push(m)
     return acc
@@ -96,7 +95,7 @@ export function ModelsTab({ config, onSave }: Props) {
 
       <div className="models-section-title">预置模型</div>
       {Object.entries(builtinByProvider).map(([provider, group]) => {
-        const keyValue = group.keyField === 'gemini' ? geminiKey : qwenKey
+        const keyValue = group.keyField === 'gemini' ? geminiKey : group.keyField === 'longcat' ? longcatKey : qwenKey
         return (
           <div key={provider} className="model-card">
             <div className="model-card-header">

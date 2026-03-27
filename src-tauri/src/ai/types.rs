@@ -76,6 +76,12 @@ pub struct ChatCompletionRequest {
     pub messages: Vec<ChatMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_modalities: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -102,6 +108,8 @@ pub enum ChatContentPart {
 
 #[derive(Serialize)]
 pub struct AudioData {
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub audio_type: Option<String>,
     pub data: String,
     pub format: String,
 }

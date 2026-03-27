@@ -22,6 +22,7 @@ pub async fn transcribe(
                 },
                 ChatContentPart::InputAudio {
                     input_audio: AudioData {
+                        audio_type: None,
                         data: format!("data:;base64,{}", audio_base64),
                         format: "flac".to_string(),
                     },
@@ -29,6 +30,9 @@ pub async fn transcribe(
             ]),
         }],
         modalities: Some(vec!["text".to_string()]),
+        output_modalities: None,
+        stream: None,
+        max_tokens: None,
     };
 
     let resp = client
@@ -88,6 +92,9 @@ pub async fn optimize(
             },
         ],
         modalities: None,
+        output_modalities: None,
+        stream: None,
+        max_tokens: None,
     };
 
     let resp = client
@@ -128,6 +135,79 @@ pub async fn optimize(
     Ok(result)
 }
 
+pub async fn longcat_transcribe(
+    client: &Client,
+    audio_base64: &str,
+    system_prompt: &str,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<String, String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Parts(vec![ChatContentPart::Text {
+                    text: system_prompt.to_string(),
+                }]),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Parts(vec![
+                    ChatContentPart::InputAudio {
+                        input_audio: AudioData {
+                            audio_type: Some("base64".to_string()),
+                            data: audio_base64.to_string(),
+                            format: "flac".to_string(),
+                        },
+                    },
+                    ChatContentPart::Text {
+                        text: "请识别这段音频".to_string(),
+                    },
+                ]),
+            },
+        ],
+        modalities: None,
+        output_modalities: Some(vec!["text".to_string()]),
+        stream: Some(false),
+        max_tokens: Some(2048),
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("LongCat transcribe request failed: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read LongCat response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("LongCat API error ({}): {}", status, body));
+    }
+
+    let chat_resp: ChatCompletionResponse =
+        serde_json::from_str(&body).map_err(|e| format!("Failed to parse LongCat response: {}", e))?;
+
+    let text = chat_resp
+        .choices
+        .as_ref()
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.message.as_ref())
+        .and_then(|msg| msg.content.as_ref())
+        .ok_or_else(|| "No text in LongCat response".to_string())?;
+
+    Ok(text.trim().to_string())
+}
+
 pub async fn test_connectivity(
     client: &Client,
     api_key: &str,
@@ -143,6 +223,9 @@ pub async fn test_connectivity(
             content: ChatContent::Text("hi".to_string()),
         }],
         modalities: None,
+        output_modalities: None,
+        stream: None,
+        max_tokens: None,
     };
 
     let resp = client
