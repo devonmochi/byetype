@@ -1,0 +1,167 @@
+import { useState } from 'react'
+import type { AppConfig, CustomModelEntry } from '../../../core/types'
+import { BUILTIN_MODELS, getAllModels } from '../../../core/models'
+import { testModelConnectivity, type ConnectivityResult } from '../../../lib/tauri-api'
+
+interface Props {
+  config: AppConfig
+  onSave: (config: AppConfig) => void
+}
+
+interface TestResults {
+  [modelId: string]: { loading: boolean; result?: ConnectivityResult }
+}
+
+const EMPTY_FORM: Omit<CustomModelEntry, 'id'> = {
+  provider: '', model: '', protocol: 'gemini', baseUrl: '', apiKey: '', supportsAudio: true, supportsText: true,
+}
+
+export function ModelsTab({ config, onSave }: Props) {
+  const [testResults, setTestResults] = useState<TestResults>({})
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+
+  const updateBuiltinKey = (key: 'gemini' | 'qwen', value: string) => {
+    onSave({ ...config, models: { ...config.models, builtinApiKeys: { ...config.models.builtinApiKeys, [key]: value } } })
+  }
+
+  const testModel = async (modelId: string) => {
+    setTestResults(prev => ({ ...prev, [modelId]: { loading: true } }))
+    try {
+      const result = await testModelConnectivity(modelId)
+      setTestResults(prev => ({ ...prev, [modelId]: { loading: false, result } }))
+    } catch (e) {
+      setTestResults(prev => ({ ...prev, [modelId]: { loading: false, result: { success: false, latencyMs: 0, error: String(e) } } }))
+    }
+  }
+
+  const testAll = async () => {
+    const models = getAllModels(config)
+    for (const m of models) { testModel(m.id) }
+  }
+
+  const saveCustomModel = () => {
+    const id = editingId || crypto.randomUUID()
+    const entry: CustomModelEntry = { ...form, id }
+    const custom = editingId
+      ? config.models.custom.map(m => (m.id === editingId ? entry : m))
+      : [...config.models.custom, entry]
+    onSave({ ...config, models: { ...config.models, custom } })
+    setShowForm(false); setEditingId(null); setForm(EMPTY_FORM)
+  }
+
+  const deleteCustomModel = (id: string) => {
+    const custom = config.models.custom.filter(m => m.id !== id)
+    onSave({ ...config, models: { ...config.models, custom } })
+  }
+
+  const startEdit = (entry: CustomModelEntry) => {
+    setEditingId(entry.id)
+    setForm({ provider: entry.provider, model: entry.model, protocol: entry.protocol, baseUrl: entry.baseUrl, apiKey: entry.apiKey, supportsAudio: entry.supportsAudio, supportsText: entry.supportsText })
+    setShowForm(true)
+  }
+
+  const cancelForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM) }
+
+  const renderTestResult = (modelId: string) => {
+    const t = testResults[modelId]
+    if (!t) return null
+    if (t.loading) return <span className="model-test-result" style={{ color: 'var(--text-tertiary)' }}>...</span>
+    if (t.result?.success) return <span className="model-test-result success">{t.result.latencyMs}ms</span>
+    return <span className="model-test-result error" title={t.result?.error || ''}>{t.result?.error?.slice(0, 30) || '失败'}</span>
+  }
+
+  const geminiKey = config.models.builtinApiKeys.gemini
+  const qwenKey = config.models.builtinApiKeys.qwen
+
+  return (
+    <div>
+      <div className="models-header">
+        <h2 className="content-title" style={{ margin: 0 }}>模型管理</h2>
+        <button className="test-all-btn" onClick={testAll}>测试全部连通性</button>
+      </div>
+
+      <div className="models-section-title">预置模型</div>
+      {BUILTIN_MODELS.map(b => {
+        const isGemini = b.protocol === 'gemini'
+        const keyValue = isGemini ? geminiKey : qwenKey
+        const keyField = isGemini ? 'gemini' as const : 'qwen' as const
+        const isSharedKey = isGemini && b.id !== 'builtin-gemini-3-flash'
+        return (
+          <div key={b.id} className="model-card">
+            <div className="model-card-header">
+              <span className="model-card-title">{b.provider} - {b.model}</span>
+              <div className="model-card-actions">
+                {renderTestResult(b.id)}
+                <button className="model-test-btn" onClick={() => testModel(b.id)}>测试</button>
+              </div>
+            </div>
+            {isSharedKey ? (
+              <div className="model-card-subtitle">共享上方 Gemini API Key</div>
+            ) : (
+              <div className="model-card-row">
+                <label>API Key</label>
+                <input className="input" type="password" value={keyValue} onChange={e => updateBuiltinKey(keyField, e.target.value)} placeholder={isGemini ? 'AIzaSy...' : 'sk-...'} style={{ flex: 1, maxWidth: 350 }} />
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      <div className="models-section-title">自定义模型</div>
+      {config.models.custom.map(entry => (
+        <div key={entry.id} className="model-card">
+          <div className="model-card-header">
+            <span className="model-card-title">{entry.provider} - {entry.model}</span>
+            <div className="model-card-actions">
+              {renderTestResult(entry.id)}
+              <button className="model-test-btn" onClick={() => testModel(entry.id)}>测试</button>
+              <button className="model-action-btn" onClick={() => startEdit(entry)}>编辑</button>
+              <button className="model-action-btn danger" onClick={() => deleteCustomModel(entry.id)}>删除</button>
+            </div>
+          </div>
+          <div className="model-card-subtitle">{entry.protocol} · {entry.baseUrl}</div>
+        </div>
+      ))}
+
+      {showForm ? (
+        <div className="model-form">
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: 'var(--text-primary)' }}>{editingId ? '编辑模型' : '新建模型'}</div>
+          <div className="model-form-row">
+            <label>协议类型</label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input type="radio" checked={form.protocol === 'gemini'} onChange={() => setForm(f => ({ ...f, protocol: 'gemini' }))} /> Gemini
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input type="radio" checked={form.protocol === 'openai-compat'} onChange={() => setForm(f => ({ ...f, protocol: 'openai-compat' }))} /> OpenAI 兼容
+              </label>
+            </div>
+          </div>
+          <div className="model-form-row">
+            <label>模型能力</label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input type="checkbox" checked={form.supportsAudio} onChange={e => setForm(f => ({ ...f, supportsAudio: e.target.checked }))} /> 音频转写
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input type="checkbox" checked={form.supportsText} onChange={e => setForm(f => ({ ...f, supportsText: e.target.checked }))} /> 文本处理
+              </label>
+            </div>
+          </div>
+          <div className="model-form-row"><label>Provider</label><input className="input" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} placeholder="我的中转站" style={{ flex: 1, maxWidth: 300 }} /></div>
+          <div className="model-form-row"><label>Base URL</label><input className="input" value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.example.com/v1" style={{ flex: 1, maxWidth: 400 }} /></div>
+          <div className="model-form-row"><label>Model ID</label><input className="input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="gemini-3-flash-preview" style={{ flex: 1, maxWidth: 300 }} /></div>
+          <div className="model-form-row"><label>API Key</label><input className="input" type="password" value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} style={{ flex: 1, maxWidth: 400 }} /></div>
+          <div className="model-form-actions">
+            <button className="model-form-btn" onClick={cancelForm}>取消</button>
+            <button className="model-form-btn primary" onClick={saveCustomModel} disabled={!form.provider || !form.baseUrl || !form.model || (!form.supportsAudio && !form.supportsText)}>保存</button>
+          </div>
+        </div>
+      ) : (
+        <button className="add-model-btn" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true) }}>+ 添加自定义模型</button>
+      )}
+    </div>
+  )
+}

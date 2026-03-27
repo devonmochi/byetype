@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub general: GeneralConfig,
+    pub models: ModelsConfig,
     pub transcribe: TranscribeConfig,
     pub optimize: OptimizeConfig,
     pub advanced: AdvancedConfig,
@@ -31,6 +32,34 @@ pub struct GeneralConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ModelsConfig {
+    pub builtin_api_keys: BuiltinApiKeys,
+    #[serde(default)]
+    pub custom: Vec<CustomModelEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuiltinApiKeys {
+    pub gemini: String,
+    pub qwen: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomModelEntry {
+    pub id: String,
+    pub provider: String,
+    pub model: String,
+    pub protocol: String,
+    pub base_url: String,
+    pub api_key: String,
+    pub supports_audio: bool,
+    pub supports_text: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ThinkingConfig {
     pub enabled: bool,
     pub budget: u32,
@@ -48,30 +77,16 @@ pub struct PromptsConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscribeConfig {
-    pub model: String,
-    pub gemini_api_key: String,
-    pub qwen_api_key: String,
+    pub model_id: String,
     pub thinking: ThinkingConfig,
     pub prompts: PromptsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OpenAICompatConfig {
-    pub provider_name: String,
-    pub base_url: String,
-    pub model: String,
-    pub api_key: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct OptimizeConfig {
     pub enabled: bool,
-    #[serde(rename = "type")]
-    pub optimize_type: String,
-    pub openai_compat: OpenAICompatConfig,
-    pub gemini_model: String,
+    pub model_id: String,
     pub thinking: ThinkingConfig,
     pub prompt: String,
 }
@@ -96,10 +111,15 @@ impl Default for AppConfig {
                 max_recording_seconds: 180,
                 microphone: "system-default".to_string(),
             },
+            models: ModelsConfig {
+                builtin_api_keys: BuiltinApiKeys {
+                    gemini: String::new(),
+                    qwen: String::new(),
+                },
+                custom: Vec::new(),
+            },
             transcribe: TranscribeConfig {
-                model: "gemini-3-flash-preview".to_string(),
-                gemini_api_key: String::new(),
-                qwen_api_key: String::new(),
+                model_id: "builtin-gemini-3-flash".to_string(),
                 thinking: ThinkingConfig {
                     enabled: false,
                     budget: 1024,
@@ -113,14 +133,7 @@ impl Default for AppConfig {
             },
             optimize: OptimizeConfig {
                 enabled: false,
-                optimize_type: "openai-compat".to_string(),
-                openai_compat: OpenAICompatConfig {
-                    provider_name: String::new(),
-                    base_url: String::new(),
-                    model: String::new(),
-                    api_key: String::new(),
-                },
-                gemini_model: "gemini-3-flash-preview".to_string(),
+                model_id: String::new(),
                 thinking: ThinkingConfig {
                     enabled: false,
                     budget: 1024,

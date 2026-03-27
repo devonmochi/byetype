@@ -102,3 +102,13 @@ export async function installAndRestart(): Promise<void> {
   return invoke<void>('install_and_restart')
 }
 
+export interface ConnectivityResult {
+  success: boolean
+  latencyMs: number
+  error: string | null
+}
+
+export async function testModelConnectivity(modelId: string): Promise<ConnectivityResult> {
+  return invoke<ConnectivityResult>('test_model_connectivity', { modelId })
+}
+

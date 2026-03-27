@@ -48,6 +48,7 @@ pub fn run() {
             commands::retry_record,
             commands::cancel_task,
             commands::list_input_devices,
+            commands::test_model_connectivity,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

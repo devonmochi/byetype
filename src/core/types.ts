@@ -19,30 +19,36 @@ export interface ThinkingConfig {
   level: 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH'
 }
 
-export interface TranscribeConfig {
-  model: 'gemini-3-flash-preview' | 'gemini-3.1-flash-lite-preview' | 'qwen3-omni-flash'
-  geminiApiKey: string
-  qwenApiKey: string
-  thinking: ThinkingConfig
-  prompts: {
-    agent: string
-    rules: string
-    vocabulary: string
-  }
+export interface CustomModelEntry {
+  id: string
+  provider: string
+  model: string
+  protocol: 'gemini' | 'openai-compat'
+  baseUrl: string
+  apiKey: string
+  supportsAudio: boolean
+  supportsText: boolean
 }
 
-export interface OpenAICompatConfig {
-  providerName: string
-  baseUrl: string
-  model: string
-  apiKey: string
+export interface BuiltinApiKeys {
+  gemini: string
+  qwen: string
+}
+
+export interface ModelsConfig {
+  builtinApiKeys: BuiltinApiKeys
+  custom: CustomModelEntry[]
+}
+
+export interface TranscribeConfig {
+  modelId: string
+  thinking: ThinkingConfig
+  prompts: { agent: string; rules: string; vocabulary: string }
 }
 
 export interface OptimizeConfig {
   enabled: boolean
-  type: 'openai-compat' | 'gemini'
-  openaiCompat: OpenAICompatConfig
-  geminiModel: string
+  modelId: string
   thinking: ThinkingConfig
   prompt: string
 }
@@ -57,6 +63,7 @@ export interface AdvancedConfig {
 
 export interface AppConfig {
   general: GeneralConfig
+  models: ModelsConfig
   transcribe: TranscribeConfig
   optimize: OptimizeConfig
   advanced: AdvancedConfig
