@@ -6,6 +6,7 @@ use tauri::{Manager, State};
 use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
 use crate::config::types::AppConfig;
+use crate::ai;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -193,5 +194,49 @@ pub fn list_input_devices() -> Result<Vec<AudioDevice>, String> {
     }
 
     Ok(devices)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectivityResult {
+    pub success: bool,
+    pub latency_ms: u64,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn test_model_connectivity(
+    config_manager: State<'_, ConfigManager>,
+    model_id: String,
+) -> Result<ConnectivityResult, String> {
+    let config = config_manager.get();
+    let resolved = ai::models::resolve_model(&config, &model_id)?;
+
+    if resolved.api_key.is_empty() {
+        return Ok(ConnectivityResult {
+            success: false,
+            latency_ms: 0,
+            error: Some("请先填写 API Key".to_string()),
+        });
+    }
+
+    let client = reqwest::Client::new();
+    let start = std::time::Instant::now();
+
+    let result = match resolved.protocol.as_str() {
+        "gemini" => {
+            ai::gemini::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
+        }
+        _ => {
+            ai::openai_compat::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
+        }
+    };
+
+    let latency = start.elapsed().as_millis() as u64;
+
+    match result {
+        Ok(()) => Ok(ConnectivityResult { success: true, latency_ms: latency, error: None }),
+        Err(e) => Ok(ConnectivityResult { success: false, latency_ms: latency, error: Some(e) }),
+    }
 }
 
