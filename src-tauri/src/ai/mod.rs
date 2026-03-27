@@ -1,5 +1,6 @@
 pub mod types;
 pub mod retry;
+pub mod models;
 pub mod gemini;
 pub mod qwen;
 pub mod openai_compat;
