@@ -1,10 +1,9 @@
 pub mod types;
 pub mod retry;
-pub mod models;
 pub mod gemini;
-pub mod qwen;
 pub mod openai_compat;
 pub mod prompt;
+pub mod models;
 
 use crate::config::types::AppConfig;
 use std::path::Path;
@@ -16,21 +15,32 @@ pub async fn transcribe(
     config: &AppConfig,
     prompts_dir: &Path,
 ) -> Result<String, String> {
+    let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
     let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir);
 
-    match config.transcribe.model.as_str() {
-        "qwen3-omni-flash" => {
-            qwen::transcribe(client, audio_base64, &system_prompt, &config.transcribe.qwen_api_key).await
-        }
-        model => {
+    match resolved.protocol.as_str() {
+        "gemini" => {
             gemini::transcribe(
                 client,
                 audio_base64,
                 &system_prompt,
-                &config.transcribe.gemini_api_key,
-                model,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
                 &config.transcribe.thinking,
-            ).await
+            )
+            .await
+        }
+        _ => {
+            openai_compat::transcribe(
+                client,
+                audio_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
         }
     }
 }
@@ -51,24 +61,31 @@ pub async fn optimize(
         return Ok(text.to_string());
     }
 
-    match config.optimize.optimize_type.as_str() {
+    let resolved = models::resolve_model(config, &config.optimize.model_id)?;
+
+    match resolved.protocol.as_str() {
         "gemini" => {
             gemini::optimize(
                 client,
                 text,
                 &system_prompt,
-                &config.transcribe.gemini_api_key,
-                &config.optimize.gemini_model,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
                 &config.optimize.thinking,
-            ).await
+            )
+            .await
         }
         _ => {
             openai_compat::optimize(
                 client,
                 text,
                 &system_prompt,
-                &config.optimize.openai_compat,
-            ).await
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
         }
     }
 }
