@@ -1,4 +1,5 @@
 pub mod types;
+mod migration;
 
 use std::fs;
 use std::path::PathBuf;
@@ -31,7 +32,22 @@ impl ConfigManager {
     fn load(path: &PathBuf) -> AppConfig {
         if path.exists() {
             match fs::read_to_string(path) {
-                Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
+                Ok(raw) => {
+                    // Try to parse as Value first for migration
+                    match serde_json::from_str::<serde_json::Value>(&raw) {
+                        Ok(mut json_value) => {
+                            if migration::migrate_if_needed(&mut json_value) {
+                                // Migration occurred, save the migrated config back to disk
+                                if let Ok(migrated_json) = serde_json::to_string_pretty(&json_value) {
+                                    fs::write(path, &migrated_json).ok();
+                                }
+                            }
+                            // Deserialize from the (possibly migrated) Value
+                            serde_json::from_value(json_value).unwrap_or_default()
+                        }
+                        Err(_) => AppConfig::default(),
+                    }
+                }
                 Err(_) => AppConfig::default(),
             }
         } else {
