@@ -24,11 +24,14 @@ pub async fn transcribe(
     system_prompt: &str,
     api_key: &str,
     model: &str,
+    base_url: &str,
     thinking: &ThinkingConfig,
 ) -> Result<String, String> {
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-        model, api_key
+        "{}/v1beta/models/{}:generateContent?key={}",
+        base_url.trim_end_matches('/'),
+        model,
+        api_key
     );
 
     let system_instruction = if system_prompt.is_empty() {
@@ -85,11 +88,14 @@ pub async fn optimize(
     system_prompt: &str,
     api_key: &str,
     model: &str,
+    base_url: &str,
     thinking: &ThinkingConfig,
 ) -> Result<String, String> {
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-        model, api_key
+        "{}/v1beta/models/{}:generateContent?key={}",
+        base_url.trim_end_matches('/'),
+        model,
+        api_key
     );
 
     let system_instruction = if system_prompt.is_empty() {
@@ -137,6 +143,49 @@ pub async fn optimize(
         serde_json::from_str(&body).map_err(|e| format!("Failed to parse Gemini response: {}", e))?;
 
     extract_gemini_text(&gemini_resp)
+}
+
+pub async fn test_connectivity(
+    client: &Client,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<(), String> {
+    let url = format!(
+        "{}/v1beta/models/{}:generateContent?key={}",
+        base_url.trim_end_matches('/'),
+        model,
+        api_key
+    );
+
+    let request = GeminiRequest {
+        system_instruction: None,
+        contents: vec![GeminiContent {
+            role: Some("user".to_string()),
+            parts: vec![GeminiPart::Text {
+                text: "hi".to_string(),
+            }],
+        }],
+        generation_config: None,
+    };
+
+    let resp = client
+        .post(&url)
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("Gemini connectivity test failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read Gemini response: {}", e))?;
+        return Err(format!("Gemini API error ({}): {}", status, body));
+    }
+
+    Ok(())
 }
 
 fn extract_gemini_text(resp: &GeminiResponse) -> Result<String, String> {
