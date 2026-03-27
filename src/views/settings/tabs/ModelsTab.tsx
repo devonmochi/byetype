@@ -75,6 +75,18 @@ export function ModelsTab({ config, onSave }: Props) {
   const geminiKey = config.models.builtinApiKeys.gemini
   const qwenKey = config.models.builtinApiKeys.qwen
 
+  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'qwen'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
+    if (!acc[m.provider]) {
+      acc[m.provider] = {
+        keyField: m.protocol === 'gemini' ? 'gemini' : 'qwen',
+        placeholder: m.protocol === 'gemini' ? 'AIzaSy...' : 'sk-...',
+        models: [],
+      }
+    }
+    acc[m.provider].models.push(m)
+    return acc
+  }, {})
+
   return (
     <div>
       <div className="models-header">
@@ -83,28 +95,28 @@ export function ModelsTab({ config, onSave }: Props) {
       </div>
 
       <div className="models-section-title">预置模型</div>
-      {BUILTIN_MODELS.map(b => {
-        const isGemini = b.protocol === 'gemini'
-        const keyValue = isGemini ? geminiKey : qwenKey
-        const keyField = isGemini ? 'gemini' as const : 'qwen' as const
-        const isSharedKey = isGemini && b.id !== 'builtin-gemini-3-flash'
+      {Object.entries(builtinByProvider).map(([provider, group]) => {
+        const keyValue = group.keyField === 'gemini' ? geminiKey : qwenKey
         return (
-          <div key={b.id} className="model-card">
+          <div key={provider} className="model-card">
             <div className="model-card-header">
-              <span className="model-card-title">{b.provider} - {b.model}</span>
-              <div className="model-card-actions">
-                {renderTestResult(b.id)}
-                <button className="model-test-btn" onClick={() => testModel(b.id)}>测试</button>
-              </div>
+              <span className="model-card-title">{provider}</span>
             </div>
-            {isSharedKey ? (
-              <div className="model-card-subtitle">共享上方 Gemini API Key</div>
-            ) : (
-              <div className="model-card-row">
-                <label>API Key</label>
-                <input className="input" type="password" value={keyValue} onChange={e => updateBuiltinKey(keyField, e.target.value)} placeholder={isGemini ? 'AIzaSy...' : 'sk-...'} style={{ flex: 1, maxWidth: 350 }} />
-              </div>
-            )}
+            <div className="model-card-row">
+              <label>API Key</label>
+              <input className="input" type="password" value={keyValue} onChange={e => updateBuiltinKey(group.keyField, e.target.value)} placeholder={group.placeholder} style={{ flex: 1, maxWidth: 350 }} />
+            </div>
+            <div className="provider-model-list">
+              {group.models.map(m => (
+                <div key={m.id} className="provider-model-item">
+                  <span className="provider-model-name">{m.model}</span>
+                  <div className="model-card-actions">
+                    {renderTestResult(m.id)}
+                    <button className="model-test-btn" onClick={() => testModel(m.id)}>测试</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )
       })}
@@ -150,7 +162,7 @@ export function ModelsTab({ config, onSave }: Props) {
               </label>
             </div>
           </div>
-          <div className="model-form-row"><label>Provider</label><input className="input" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} placeholder="我的中转站" style={{ flex: 1, maxWidth: 300 }} /></div>
+          <div className="model-form-row"><label>Provider</label><input className="input" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} placeholder="提供商名称" style={{ flex: 1, maxWidth: 300 }} /></div>
           <div className="model-form-row"><label>Base URL</label><input className="input" value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.example.com/v1" style={{ flex: 1, maxWidth: 400 }} /></div>
           <div className="model-form-row"><label>Model ID</label><input className="input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="gemini-3-flash-preview" style={{ flex: 1, maxWidth: 300 }} /></div>
           <div className="model-form-row"><label>API Key</label><input className="input" type="password" value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} style={{ flex: 1, maxWidth: 400 }} /></div>

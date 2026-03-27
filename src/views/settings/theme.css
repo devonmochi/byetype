@@ -775,3 +775,7 @@
 .test-all-btn { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-family: inherit; cursor: pointer; border: 1px solid var(--border-color); background: none; color: var(--text-primary); transition: border-color 0.15s, color 0.15s; }
 .test-all-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .test-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.provider-model-list { margin-top: 8px; border-top: 1px solid var(--border-color-light); }
+.provider-model-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; }
+.provider-model-item:not(:last-child) { border-bottom: 1px solid var(--border-color-light); }
+.provider-model-name { font-size: 12px; color: var(--text-primary); }

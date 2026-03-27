@@ -64,33 +64,32 @@ export function TranscribeTab({ config, onSave }: Props) {
             )}
           </select>
         </SettingRow>
-      </SettingGroup>
-
-      {isTranscribeGemini && (
-        <SettingGroup title="思考模式">
-          <SettingRow label="启用思考" description="让模型在转写前先进行推理">
-            <Toggle
-              checked={transcribe.thinking.enabled}
-              onChange={checked => updateTranscribeThinking({ enabled: checked })}
-            />
-          </SettingRow>
-          {transcribe.thinking.enabled && (
-            <SettingRow label="Thinking Level" description="思考深度级别">
-              <select
-                className="select"
-                value={transcribe.thinking.level}
-                onChange={e => updateTranscribeThinking({ level: e.target.value as ThinkingConfig['level'] })}
-                style={{ width: 120 }}
-              >
-                <option value="MINIMAL">MINIMAL</option>
-                <option value="LOW">LOW</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HIGH">HIGH</option>
-              </select>
+        {isTranscribeGemini && (
+          <>
+            <SettingRow label="启用思考" description="让模型在转写前先进行推理">
+              <Toggle
+                checked={transcribe.thinking.enabled}
+                onChange={checked => updateTranscribeThinking({ enabled: checked })}
+              />
             </SettingRow>
-          )}
-        </SettingGroup>
-      )}
+            {transcribe.thinking.enabled && (
+              <SettingRow label="Thinking Level" description="思考深度级别">
+                <select
+                  className="select"
+                  value={transcribe.thinking.level}
+                  onChange={e => updateTranscribeThinking({ level: e.target.value as ThinkingConfig['level'] })}
+                  style={{ width: 120 }}
+                >
+                  <option value="MINIMAL">MINIMAL</option>
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                </select>
+              </SettingRow>
+            )}
+          </>
+        )}
+      </SettingGroup>
 
       {/* 区域二：文本优化 */}
       <h3 className="section-title">文本优化</h3>
@@ -105,29 +104,26 @@ export function TranscribeTab({ config, onSave }: Props) {
       </SettingGroup>
 
       {optimize.enabled && (
-        <>
-          <SettingGroup title="优化模型">
-            <SettingRow label="优化模型">
-              <select
-                className="select"
-                value={optimize.modelId}
-                onChange={e => updateOptimize({ modelId: e.target.value })}
-                style={{ width: 260 }}
-              >
-                <optgroup label="预置模型">
-                  {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+        <SettingGroup title="模型">
+          <SettingRow label="优化模型">
+            <select
+              className="select"
+              value={optimize.modelId}
+              onChange={e => updateOptimize({ modelId: e.target.value })}
+              style={{ width: 260 }}
+            >
+              <optgroup label="预置模型">
+                {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+              </optgroup>
+              {customText.length > 0 && (
+                <optgroup label="自定义模型">
+                  {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
                 </optgroup>
-                {customText.length > 0 && (
-                  <optgroup label="自定义模型">
-                    {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
-                  </optgroup>
-                )}
-              </select>
-            </SettingRow>
-          </SettingGroup>
-
+              )}
+            </select>
+          </SettingRow>
           {isOptimizeGemini && (
-            <SettingGroup title="优化思考模式">
+            <>
               <SettingRow label="启用思考" description="让模型在优化前先进行推理">
                 <Toggle
                   checked={optimize.thinking.enabled}
@@ -149,9 +145,9 @@ export function TranscribeTab({ config, onSave }: Props) {
                   </select>
                 </SettingRow>
               )}
-            </SettingGroup>
+            </>
           )}
-        </>
+        </SettingGroup>
       )}
 
       {/* 区域三：提示词 */}
