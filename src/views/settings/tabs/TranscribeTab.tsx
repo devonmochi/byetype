@@ -1,4 +1,5 @@
-import { AppConfig, ThinkingConfig } from '../../../core/types'
+import type { AppConfig, ThinkingConfig } from '../../../core/types'
+import { getAudioModels, getTextModels, findModel } from '../../../core/models'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
@@ -9,21 +10,21 @@ interface Props {
   onSave: (config: AppConfig) => void
 }
 
-const MODELS = [
-  { value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash', recommended: true },
-  { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite' },
-  { value: 'qwen3-omni-flash', label: 'Qwen3 Omni Flash' },
-]
-
 export function TranscribeTab({ config, onSave }: Props) {
   const { transcribe, optimize } = config
-  const isQwen = transcribe.model === 'qwen3-omni-flash'
+
+  const audioModels = getAudioModels(config)
+  const textModels = getTextModels(config)
+  const transcribeModel = findModel(config, transcribe.modelId)
+  const optimizeModel = findModel(config, optimize.modelId)
+  const isTranscribeGemini = transcribeModel?.protocol === 'gemini'
+  const isOptimizeGemini = optimizeModel?.protocol === 'gemini'
 
   const updateTranscribe = (changes: Partial<AppConfig['transcribe']>) => {
     onSave({ ...config, transcribe: { ...transcribe, ...changes } })
   }
 
-  const updateTranscribeThinking = (changes: Partial<AppConfig['transcribe']['thinking']>) => {
+  const updateTranscribeThinking = (changes: Partial<ThinkingConfig>) => {
     updateTranscribe({ thinking: { ...transcribe.thinking, ...changes } })
   }
 
@@ -31,13 +32,14 @@ export function TranscribeTab({ config, onSave }: Props) {
     onSave({ ...config, optimize: { ...optimize, ...changes } })
   }
 
-  const updateOpenAI = (changes: Partial<AppConfig['optimize']['openaiCompat']>) => {
-    updateOptimize({ openaiCompat: { ...optimize.openaiCompat, ...changes } })
-  }
-
   const updateOptimizeThinking = (changes: Partial<ThinkingConfig>) => {
     updateOptimize({ thinking: { ...optimize.thinking, ...changes } })
   }
+
+  const builtinAudio = audioModels.filter(m => m.builtin)
+  const customAudio = audioModels.filter(m => !m.builtin)
+  const builtinText = textModels.filter(m => m.builtin)
+  const customText = textModels.filter(m => !m.builtin)
 
   return (
     <div>
@@ -48,67 +50,47 @@ export function TranscribeTab({ config, onSave }: Props) {
         <SettingRow label="转写模型">
           <select
             className="select"
-            value={transcribe.model}
-            onChange={e => updateTranscribe({ model: e.target.value as typeof transcribe.model })}
-            style={{ width: 200 }}
+            value={transcribe.modelId}
+            onChange={e => updateTranscribe({ modelId: e.target.value })}
+            style={{ width: 260 }}
           >
-            {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}{m.recommended ? ' (推荐)' : ''}</option>)}
+            <optgroup label="预置模型">
+              {builtinAudio.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+            </optgroup>
+            {customAudio.length > 0 && (
+              <optgroup label="自定义模型">
+                {customAudio.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+              </optgroup>
+            )}
           </select>
         </SettingRow>
       </SettingGroup>
 
-      <SettingGroup title="API 密钥">
-        <SettingRow label="Google Gemini API Key">
-          <input
-            className="input input-wide"
-            type="password"
-            value={transcribe.geminiApiKey}
-            onChange={e => updateTranscribe({ geminiApiKey: e.target.value })}
-            placeholder="AIzaSy..."
-          />
-        </SettingRow>
-        <SettingRow label="阿里云 Qwen API Key">
-          <input
-            className="input input-wide"
-            type="password"
-            value={transcribe.qwenApiKey}
-            onChange={e => updateTranscribe({ qwenApiKey: e.target.value })}
-            placeholder="sk-..."
-          />
-        </SettingRow>
-      </SettingGroup>
-
-      <SettingGroup title="思考模式">
-        {isQwen ? (
-          <div style={{ padding: '12px 16px', color: 'var(--text-tertiary)', fontSize: 13 }}>
-            当前模型不支持思考模式
-          </div>
-        ) : (
-          <>
-            <SettingRow label="启用思考" description="让模型在转写前先进行推理">
-              <Toggle
-                checked={transcribe.thinking.enabled}
-                onChange={checked => updateTranscribeThinking({ enabled: checked })}
-              />
+      {isTranscribeGemini && (
+        <SettingGroup title="思考模式">
+          <SettingRow label="启用思考" description="让模型在转写前先进行推理">
+            <Toggle
+              checked={transcribe.thinking.enabled}
+              onChange={checked => updateTranscribeThinking({ enabled: checked })}
+            />
+          </SettingRow>
+          {transcribe.thinking.enabled && (
+            <SettingRow label="Thinking Level" description="思考深度级别">
+              <select
+                className="select"
+                value={transcribe.thinking.level}
+                onChange={e => updateTranscribeThinking({ level: e.target.value as ThinkingConfig['level'] })}
+                style={{ width: 120 }}
+              >
+                <option value="MINIMAL">MINIMAL</option>
+                <option value="LOW">LOW</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="HIGH">HIGH</option>
+              </select>
             </SettingRow>
-            {transcribe.thinking.enabled && (
-              <SettingRow label="Thinking Level" description="思考深度级别">
-                <select
-                  className="select"
-                  value={transcribe.thinking.level}
-                  onChange={e => updateTranscribeThinking({ level: e.target.value as typeof transcribe.thinking.level })}
-                  style={{ width: 120 }}
-                >
-                  <option value="MINIMAL">MINIMAL</option>
-                  <option value="LOW">LOW</option>
-                  <option value="MEDIUM">MEDIUM</option>
-                  <option value="HIGH">HIGH</option>
-                </select>
-              </SettingRow>
-            )}
-          </>
-        )}
-      </SettingGroup>
+          )}
+        </SettingGroup>
+      )}
 
       {/* 区域二：文本优化 */}
       <h3 className="section-title">文本优化</h3>
@@ -124,44 +106,28 @@ export function TranscribeTab({ config, onSave }: Props) {
 
       {optimize.enabled && (
         <>
-          <SettingGroup title="模型类型">
-            <SettingRow label="优化引擎">
-              <div style={{ display: 'flex', gap: 16 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  <input type="radio" value="openai-compat" checked={optimize.type === 'openai-compat'} onChange={() => updateOptimize({ type: 'openai-compat' })} />
-                  OpenAI 兼容
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  <input type="radio" value="gemini" checked={optimize.type === 'gemini'} onChange={() => updateOptimize({ type: 'gemini' })} />
-                  Gemini
-                </label>
-              </div>
+          <SettingGroup title="优化模型">
+            <SettingRow label="优化模型">
+              <select
+                className="select"
+                value={optimize.modelId}
+                onChange={e => updateOptimize({ modelId: e.target.value })}
+                style={{ width: 260 }}
+              >
+                <optgroup label="预置模型">
+                  {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+                </optgroup>
+                {customText.length > 0 && (
+                  <optgroup label="自定义模型">
+                    {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+                  </optgroup>
+                )}
+              </select>
             </SettingRow>
           </SettingGroup>
 
-          {optimize.type === 'openai-compat' ? (
-            <SettingGroup title="OpenAI 兼容配置">
-              <SettingRow label="Provider 名称">
-                <input className="input" value={optimize.openaiCompat.providerName} onChange={e => updateOpenAI({ providerName: e.target.value })} placeholder="DeepSeek" style={{ width: 200 }} />
-              </SettingRow>
-              <SettingRow label="Base URL">
-                <input className="input input-wide" value={optimize.openaiCompat.baseUrl} onChange={e => updateOpenAI({ baseUrl: e.target.value })} placeholder="https://api.deepseek.com/v1" />
-              </SettingRow>
-              <SettingRow label="Model">
-                <input className="input" value={optimize.openaiCompat.model} onChange={e => updateOpenAI({ model: e.target.value })} placeholder="deepseek-chat" style={{ width: 200 }} />
-              </SettingRow>
-              <SettingRow label="API Key">
-                <input className="input input-wide" type="password" value={optimize.openaiCompat.apiKey} onChange={e => updateOpenAI({ apiKey: e.target.value })} />
-              </SettingRow>
-            </SettingGroup>
-          ) : (
-            <SettingGroup title="Gemini 配置">
-              <SettingRow label="Gemini 模型" description="复用转写设置中的 API Key">
-                <select className="select" value={optimize.geminiModel} onChange={e => updateOptimize({ geminiModel: e.target.value })} style={{ width: 200 }}>
-                  <option value="gemini-3-flash-preview">Gemini 3.0 Flash (推荐)</option>
-                  <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
-                </select>
-              </SettingRow>
+          {isOptimizeGemini && (
+            <SettingGroup title="优化思考模式">
               <SettingRow label="启用思考" description="让模型在优化前先进行推理">
                 <Toggle
                   checked={optimize.thinking.enabled}

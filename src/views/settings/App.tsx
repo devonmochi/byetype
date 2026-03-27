@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { GeneralTab } from './tabs/GeneralTab'
 import { TranscribeTab } from './tabs/TranscribeTab'
+import { ModelsTab } from './tabs/ModelsTab'
 import { HistoryTab } from './tabs/HistoryTab'
 import { AboutTab } from './tabs/AboutTab'
 import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
@@ -11,6 +12,7 @@ import './theme.css'
 const TABS = [
   { id: 'history', label: '历史记录' },
   { id: 'transcribe', label: '语音转写' },
+  { id: 'models', label: '模型管理' },
   { id: 'general', label: '通用设置' },
   { id: 'about', label: '关于' },
 ]
@@ -138,6 +140,7 @@ export function App() {
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
+        {activeTab === 'models' && <ModelsTab config={config} onSave={handleSave} />}
         {activeTab === 'about' && (
           <AboutTab
             updateState={updateState}

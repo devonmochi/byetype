@@ -1,4 +1,4 @@
-import type { AppConfig, CustomModelEntry } from './types'
+import type { AppConfig } from './types'
 
 export interface ModelEntry {
   id: string
