@@ -117,6 +117,20 @@ ByeType 的核心特色是**提示词驱动的高可定制性** — 通过编辑
 
 ![设置界面](docs/images/settings.png)
 
+### 快速预设
+
+ByeType 提供 3 种推荐模式，在「语音转写」页面顶部一键切换：
+
+| 预设 | 模型组合 | 说明 |
+|------|---------|------|
+| ⚡ 效果最好 | Gemini 3 Flash（转写+优化） | 综合体验最佳，质量和速度均衡 |
+| 🚀 极速轻量 | Gemini 3.1 Flash Lite（转写+优化） | Gemini 3 Flash 的备选方案 |
+| 🏠 国内模型 | LongCat 转写 + DeepSeek 优化 | 国内直连，无需代理 |
+
+> **为什么有两个 Gemini？** Gemini 模型经常遇到资源配额限制，有时 Flash 好用，有时 Flash Lite 好用。整体体验最好的是 Gemini 3 Flash，碰到限制时切换到 Flash Lite 即可。
+>
+> **为什么有国内模型？** LongCat + DeepSeek 的组合是国内直连方案中识别效率最高的，不需要代理，开箱即用。
+
 ## 🤖 AI 模型配置
 
 所有模型在「设置 → 模型管理」中统一配置。
