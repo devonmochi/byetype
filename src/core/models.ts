@@ -34,14 +34,14 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsText: true,
   },
   {
-    id: 'builtin-qwen3-omni-flash',
-    provider: '\u963f\u91cc\u4e91\u767e\u70bc',
-    model: 'qwen3-omni-flash',
+    id: 'builtin-deepseek-chat',
+    provider: 'DeepSeek',
+    model: 'deepseek-chat',
     protocol: 'openai-compat',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    baseUrl: 'https://api.deepseek.com/v1',
     builtin: true,
-    supportsAudio: true,
-    supportsText: false,
+    supportsAudio: false,
+    supportsText: true,
   },
   {
     id: 'builtin-longcat-flash-omni',
@@ -60,7 +60,7 @@ export function getAllModels(config: AppConfig): ModelEntry[] {
     let apiKey = ''
     if (b.protocol === 'gemini') apiKey = config.models.builtinApiKeys.gemini
     else if (b.protocol === 'longcat') apiKey = config.models.builtinApiKeys.longcat
-    else if (b.id === 'builtin-qwen3-omni-flash') apiKey = config.models.builtinApiKeys.qwen
+    else if (b.id === 'builtin-deepseek-chat') apiKey = config.models.builtinApiKeys.deepseek
     return { ...b, apiKey }
   })
   const customs: ModelEntry[] = config.models.custom.map(c => ({ ...c, builtin: false }))

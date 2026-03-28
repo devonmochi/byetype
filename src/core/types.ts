@@ -32,7 +32,7 @@ export interface CustomModelEntry {
 
 export interface BuiltinApiKeys {
   gemini: string
-  qwen: string
+  deepseek: string
   longcat: string
 }
 
