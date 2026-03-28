@@ -4,16 +4,18 @@ import { TranscribeTab } from './tabs/TranscribeTab'
 import { ModelsTab } from './tabs/ModelsTab'
 import { HistoryTab } from './tabs/HistoryTab'
 import { AboutTab } from './tabs/AboutTab'
+import { PromptsTab } from './tabs/PromptsTab'
 import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
 import { getVersion } from '@tauri-apps/api/app'
 import { getConfig, saveConfig, getTheme, onThemeChange, onEvent, checkUpdate } from '../../lib/tauri-api'
 import './theme.css'
 
 const TABS = [
-  { id: 'history', label: '历史记录' },
-  { id: 'transcribe', label: '语音转写' },
-  { id: 'models', label: '模型管理' },
   { id: 'general', label: '通用设置' },
+  { id: 'models', label: '模型管理' },
+  { id: 'transcribe', label: '转写设置' },
+  { id: 'prompts', label: '提示词' },
+  { id: 'history', label: '历史记录' },
   { id: 'about', label: '关于' },
 ]
 
@@ -27,7 +29,7 @@ const INITIAL_UPDATE_STATE: UpdateState = {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState('history')
+  const [activeTab, setActiveTab] = useState('general')
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [saved, setSaved] = useState(false)
   const [updateState, setUpdateState] = useState<UpdateState>(INITIAL_UPDATE_STATE)
@@ -141,6 +143,7 @@ export function App() {
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
         {activeTab === 'models' && <ModelsTab config={config} onSave={handleSave} />}
+        {activeTab === 'prompts' && <PromptsTab config={config} onSave={handleSave} />}
         {activeTab === 'about' && (
           <AboutTab
             updateState={updateState}
