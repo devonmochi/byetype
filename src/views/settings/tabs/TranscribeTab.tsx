@@ -3,7 +3,6 @@ import { getAudioModels, getTextModels, findModel } from '../../../core/models'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
-import { PromptsTab } from './PromptsTab'
 
 interface Props {
   config: AppConfig
@@ -43,7 +42,7 @@ export function TranscribeTab({ config, onSave }: Props) {
 
   return (
     <div>
-      <h2 className="content-title">语音转写</h2>
+      <h2 className="content-title">转写设置</h2>
 
       {/* 区域一：转写模型 */}
       <SettingGroup title="模型">
@@ -150,9 +149,6 @@ export function TranscribeTab({ config, onSave }: Props) {
         </SettingGroup>
       )}
 
-      {/* 区域三：提示词 */}
-      <h3 className="section-title">提示词</h3>
-      <PromptsTab config={config} onSave={onSave} />
     </div>
   )
 }
