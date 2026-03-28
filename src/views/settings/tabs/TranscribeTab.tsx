@@ -23,6 +23,14 @@ const PRESETS: PresetConfig[] = [
     optimizeModelId: 'builtin-gemini-3-flash',
   },
   {
+    id: 'lite',
+    title: '🚀 极速轻量',
+    desc: 'Gemini 3.1 Flash Lite 极速处理',
+    tag: '需代理 · Flash 备选方案',
+    transcribeModelId: 'builtin-gemini-3.1-flash-lite',
+    optimizeModelId: 'builtin-gemini-3.1-flash-lite',
+  },
+  {
     id: 'domestic',
     title: '🏠 国内模型',
     desc: 'LongCat 转写 + DeepSeek 优化',
