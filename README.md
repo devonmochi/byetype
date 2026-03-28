@@ -127,7 +127,8 @@ ByeType 的核心特色是**提示词驱动的高可定制性** — 通过编辑
 |------|--------|---------|------|
 | Gemini 3.0 Flash | `gemini-3-flash-preview` | [Google AI Studio](https://aistudio.google.com/) | ⭐ **推荐**，速度和质量均衡 |
 | Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite-preview` | 同上 | 更快速，适合低延迟场景 |
-| Qwen3 Omni Flash | `qwen3-omni-flash` | [阿里云百炼](https://bailian.console.aliyun.com/) | 🇨🇳 国内直连，无需代理 |
+| LongCat Flash Omni | `LongCat-Flash-Omni-2603` | [LongCat](https://api.longcat.chat/) | 🇨🇳 国内直连，语音转写 |
+| DeepSeek Chat | `deepseek-chat` | [DeepSeek](https://platform.deepseek.com/) | 🇨🇳 国内直连，文本优化 |
 
 API Key 填写位置：设置 → 模型管理 → 对应模型卡片
 
