@@ -4,6 +4,34 @@ import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
 
+interface PresetConfig {
+  id: string
+  title: string
+  desc: string
+  tag: string
+  transcribeModelId: string
+  optimizeModelId: string
+}
+
+const PRESETS: PresetConfig[] = [
+  {
+    id: 'best',
+    title: '⚡ 效果最好',
+    desc: 'Gemini 3 Flash 全能处理',
+    tag: '需代理 · 转写+优化一体',
+    transcribeModelId: 'builtin-gemini-3-flash',
+    optimizeModelId: 'builtin-gemini-3-flash',
+  },
+  {
+    id: 'domestic',
+    title: '🏠 国内模型',
+    desc: 'LongCat 转写 + DeepSeek 优化',
+    tag: '无需代理 · 纯国内服务',
+    transcribeModelId: 'builtin-longcat-flash-omni',
+    optimizeModelId: 'builtin-deepseek-chat',
+  },
+]
+
 interface Props {
   config: AppConfig
   onSave: (config: AppConfig) => void
@@ -35,6 +63,21 @@ export function TranscribeTab({ config, onSave }: Props) {
     updateOptimize({ thinking: { ...optimize.thinking, ...changes } })
   }
 
+  const activePreset = PRESETS.find(
+    p =>
+      transcribe.modelId === p.transcribeModelId &&
+      optimize.modelId === p.optimizeModelId &&
+      optimize.enabled
+  )
+
+  const applyPreset = (preset: PresetConfig) => {
+    onSave({
+      ...config,
+      transcribe: { ...transcribe, modelId: preset.transcribeModelId },
+      optimize: { ...optimize, enabled: true, modelId: preset.optimizeModelId },
+    })
+  }
+
   const builtinAudio = audioModels.filter(m => m.builtin)
   const customAudio = audioModels.filter(m => !m.builtin)
   const builtinText = textModels.filter(m => m.builtin)
@@ -43,6 +86,26 @@ export function TranscribeTab({ config, onSave }: Props) {
   return (
     <div>
       <h2 className="content-title">转写设置</h2>
+
+      <div className="preset-section">
+        <div className="preset-section-title">快速预设</div>
+        <div className="preset-cards">
+          {PRESETS.map(preset => (
+            <div
+              key={preset.id}
+              className={`preset-card${activePreset?.id === preset.id ? ' active' : ''}`}
+              onClick={() => applyPreset(preset)}
+            >
+              {activePreset?.id === preset.id && (
+                <span className="preset-card-badge">✓ 当前</span>
+              )}
+              <div className="preset-card-title">{preset.title}</div>
+              <div className="preset-card-desc">{preset.desc}</div>
+              <div className="preset-card-tag">{preset.tag}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* 区域一：转写模型 */}
       <SettingGroup title="模型">
