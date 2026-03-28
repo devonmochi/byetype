@@ -22,6 +22,28 @@ export function ModelsTab({ config, onSave }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
 
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
+
+  const toggleKeyVisibility = (key: string) => {
+    setVisibleKeys(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const EyeIcon = ({ visible }: { visible: boolean }) => (
+    visible ? (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    ) : (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+        <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+    )
+  )
+
   const updateBuiltinKey = (key: 'gemini' | 'qwen' | 'longcat', value: string) => {
     onSave({ ...config, models: { ...config.models, builtinApiKeys: { ...config.models.builtinApiKeys, [key]: value } } })
   }
@@ -103,7 +125,14 @@ export function ModelsTab({ config, onSave }: Props) {
             </div>
             <div className="model-card-row">
               <label>API Key</label>
-              <input className="input" type="password" value={keyValue} onChange={e => updateBuiltinKey(group.keyField, e.target.value)} placeholder={group.placeholder} style={{ flex: 1, maxWidth: 350 }} />
+              <div className="api-key-wrapper">
+                <input className="input" type={visibleKeys[group.keyField] ? 'text' : 'password'} value={keyValue} onChange={e => updateBuiltinKey(group.keyField, e.target.value)} placeholder={group.placeholder} />
+                {keyValue && (
+                  <button className="api-key-toggle" onClick={() => toggleKeyVisibility(group.keyField)} title={visibleKeys[group.keyField] ? '隐藏密钥' : '显示密钥'}>
+                    <EyeIcon visible={visibleKeys[group.keyField]} />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="provider-model-list">
               {group.models.map(m => (
@@ -164,7 +193,17 @@ export function ModelsTab({ config, onSave }: Props) {
           <div className="model-form-row"><label>Provider</label><input className="input" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} placeholder="提供商名称" style={{ flex: 1, maxWidth: 300 }} /></div>
           <div className="model-form-row"><label>Base URL</label><input className="input" value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.example.com/v1" style={{ flex: 1, maxWidth: 400 }} /></div>
           <div className="model-form-row"><label>Model ID</label><input className="input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="gemini-3-flash-preview" style={{ flex: 1, maxWidth: 300 }} /></div>
-          <div className="model-form-row"><label>API Key</label><input className="input" type="password" value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} style={{ flex: 1, maxWidth: 400 }} /></div>
+          <div className="model-form-row">
+            <label>API Key</label>
+            <div className="api-key-wrapper" style={{ maxWidth: 400 }}>
+              <input className="input" type={visibleKeys['custom-form'] ? 'text' : 'password'} value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} />
+              {form.apiKey && (
+                <button className="api-key-toggle" onClick={() => toggleKeyVisibility('custom-form')} title={visibleKeys['custom-form'] ? '隐藏密钥' : '显示密钥'}>
+                  <EyeIcon visible={visibleKeys['custom-form']} />
+                </button>
+              )}
+            </div>
+          </div>
           <div className="model-form-actions">
             <button className="model-form-btn" onClick={cancelForm}>取消</button>
             <button className="model-form-btn primary" onClick={saveCustomModel} disabled={!form.provider || !form.baseUrl || !form.model || (!form.supportsAudio && !form.supportsText)}>保存</button>
