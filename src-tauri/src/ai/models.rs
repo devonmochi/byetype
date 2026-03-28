@@ -30,13 +30,13 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_text: true,
     },
     BuiltinModel {
-        id: "builtin-qwen3-omni-flash",
-        provider: "阿里云百炼",
-        model: "qwen3-omni-flash",
+        id: "builtin-deepseek-chat",
+        provider: "DeepSeek",
+        model: "deepseek-chat",
         protocol: "openai-compat",
-        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        supports_audio: true,
-        supports_text: false,
+        base_url: "https://api.deepseek.com/v1",
+        supports_audio: false,
+        supports_text: true,
     },
     BuiltinModel {
         id: "builtin-longcat-flash-omni",
@@ -60,7 +60,7 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
     if let Some(builtin) = BUILTIN_MODELS.iter().find(|m| m.id == model_id) {
         let api_key = match builtin.protocol {
             "gemini" => &config.models.builtin_api_keys.gemini,
-            "openai-compat" => &config.models.builtin_api_keys.qwen,
+            "openai-compat" => &config.models.builtin_api_keys.deepseek,
             "longcat" => &config.models.builtin_api_keys.longcat,
             _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
         };
