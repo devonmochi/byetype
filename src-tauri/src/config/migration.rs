@@ -16,7 +16,6 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
     }
 
     let gemini_api_key = raw.get("transcribe").and_then(|t| t.get("geminiApiKey")).and_then(|v| v.as_str()).unwrap_or_default().to_string();
-    let qwen_api_key = raw.get("transcribe").and_then(|t| t.get("qwenApiKey")).and_then(|v| v.as_str()).unwrap_or_default().to_string();
     let old_model = raw.get("transcribe").and_then(|t| t.get("model")).and_then(|v| v.as_str()).unwrap_or("gemini-3-flash-preview").to_string();
     let transcribe_model_id = model_name_to_builtin_id(&old_model);
 
@@ -52,7 +51,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
     };
 
     raw["models"] = serde_json::json!({
-        "builtinApiKeys": { "gemini": gemini_api_key, "qwen": qwen_api_key },
+        "builtinApiKeys": { "gemini": gemini_api_key, "deepseek": "", "longcat": "" },
         "custom": custom_models,
     });
 
@@ -72,7 +71,6 @@ fn model_name_to_builtin_id(model_name: &str) -> String {
     match model_name {
         "gemini-3-flash-preview" => "builtin-gemini-3-flash".to_string(),
         "gemini-3.1-flash-lite-preview" => "builtin-gemini-3.1-flash-lite".to_string(),
-        "qwen3-omni-flash" => "builtin-qwen3-omni-flash".to_string(),
         _ => "builtin-gemini-3-flash".to_string(),
     }
 }
