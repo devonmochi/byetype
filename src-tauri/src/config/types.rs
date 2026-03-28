@@ -42,7 +42,8 @@ pub struct ModelsConfig {
 #[serde(rename_all = "camelCase")]
 pub struct BuiltinApiKeys {
     pub gemini: String,
-    pub qwen: String,
+    #[serde(default)]
+    pub deepseek: String,
     #[serde(default)]
     pub longcat: String,
 }
@@ -116,7 +117,7 @@ impl Default for AppConfig {
             models: ModelsConfig {
                 builtin_api_keys: BuiltinApiKeys {
                     gemini: String::new(),
-                    qwen: String::new(),
+                    deepseek: String::new(),
                     longcat: String::new(),
                 },
                 custom: Vec::new(),
