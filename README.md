@@ -3,15 +3,28 @@
 **告别打字，用说的。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-brightgreen?style=flat-square)](#-安装)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20iOS-brightgreen?style=flat-square)](#-安装)
 
-**Markdown 驱动的 AI 语音输入工具** — 可编辑的识别规则、词汇表、后置文本优化，最大限度匹配你的行业术语和个人工作习惯。
+ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdown 格式的提示词，你可以自定义识别规则、专有词汇和文本优化策略，让语音输入最大限度匹配你的行业术语和个人习惯。
 
-**免费开源，使用你自己的 API Key** — ByeType 本身不收费、不经手数据，语音直接发送到你选择的 AI 服务商（Google、DeepSeek 等）
+免费开源，使用你自己的 API Key — ByeType 本身不收费、不经手数据，语音直接发送到你选择的 AI 服务商（Google、DeepSeek 等）。支持 macOS、Windows 桌面端，以及 iPhone / iPad（通过 iOS 快捷指令）。
+
+## 📱 iPhone / iPad
+
+通过 iOS 快捷指令，在手机和平板上也能获得和桌面版一样的自定义词汇和转录效果。
+
+| 快捷指令 | 模型 | 安装 |
+|---------|------|------|
+| ByeType LongCat | LongCat Flash Omni（国内直连） | [添加到快捷指令](https://www.icloud.com/shortcuts/32e44afb36734dedab1ad61d863481e3) |
+| ByeType Gemini | Gemini 3 Flash | [添加到快捷指令](https://www.icloud.com/shortcuts/0d88271d332c457c81c122e37657b09a) |
+
+> 安装后需要在快捷指令中填写你自己的 API Key和规则词汇等，和桌面版共用同一个 Key。
+
+## 🖥️ macOS / Windows
 
 ### 快速预设
 
-ByeType 提供 3 种推荐模式，在「语音转写」页面顶部一键切换：
+ByeType 桌面版提供 3 种推荐模式，在「语音转写」页面顶部一键切换：
 
 | 预设 | 模型组合 | 说明 |
 |------|---------|------|
