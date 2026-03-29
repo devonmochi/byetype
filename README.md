@@ -332,3 +332,9 @@ npm run tauri build    # 生产构建
 ## 📄 许可证
 
 [MIT](LICENSE)
+
+---
+
+如果这个项目对你有帮助，欢迎点一个 Star。
+
+欢迎提 Issue 或直接发 PR。感谢 [Linux.do](https://linux.do/) 社区推动。
