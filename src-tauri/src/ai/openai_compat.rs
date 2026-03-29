@@ -14,21 +14,22 @@ pub async fn transcribe(
 
     let request = ChatCompletionRequest {
         model: model.to_string(),
-        messages: vec![ChatMessage {
-            role: "user".to_string(),
-            content: ChatContent::Parts(vec![
-                ChatContentPart::Text {
-                    text: system_prompt.to_string(),
-                },
-                ChatContentPart::InputAudio {
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(system_prompt.to_string()),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Parts(vec![ChatContentPart::InputAudio {
                     input_audio: AudioData {
                         audio_type: None,
                         data: format!("data:;base64,{}", audio_base64),
                         format: "flac".to_string(),
                     },
-                },
-            ]),
-        }],
+                }]),
+            },
+        ],
         modalities: Some(vec!["text".to_string()]),
         output_modalities: None,
         stream: None,
