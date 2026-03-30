@@ -46,6 +46,8 @@ pub struct BuiltinApiKeys {
     pub deepseek: String,
     #[serde(default)]
     pub longcat: String,
+    #[serde(default)]
+    pub dashscope: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,6 +121,7 @@ impl Default for AppConfig {
                     gemini: String::new(),
                     deepseek: String::new(),
                     longcat: String::new(),
+                    dashscope: String::new(),
                 },
                 custom: Vec::new(),
             },
