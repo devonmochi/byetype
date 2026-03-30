@@ -293,3 +293,190 @@ pub async fn longcat_test_connectivity(
 
     Ok(())
 }
+
+/// Parse a complete SSE response body into a single text string.
+/// Iterates over `data: {...}` lines, extracts delta.content from each chunk, and concatenates.
+fn parse_sse_text(body: &str) -> Result<String, String> {
+    let mut result = String::new();
+    for line in body.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with(':') {
+            continue;
+        }
+        if let Some(data) = line.strip_prefix("data: ") {
+            let data = data.trim();
+            if data == "[DONE]" {
+                break;
+            }
+            let chunk: super::types::StreamChunk =
+                serde_json::from_str(data).map_err(|e| format!("Failed to parse SSE chunk: {}", e))?;
+            if let Some(content) = chunk
+                .choices
+                .as_ref()
+                .and_then(|c| c.first())
+                .and_then(|c| c.delta.as_ref())
+                .and_then(|d| d.content.as_ref())
+            {
+                result.push_str(content);
+            }
+        }
+    }
+    Ok(result)
+}
+
+pub async fn qwen_omni_transcribe(
+    client: &Client,
+    audio_base64: &str,
+    system_prompt: &str,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<String, String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(system_prompt.to_string()),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Parts(vec![ChatContentPart::InputAudio {
+                    input_audio: AudioData {
+                        audio_type: None,
+                        data: format!("data:;base64,{}", audio_base64),
+                        format: "flac".to_string(),
+                    },
+                }]),
+            },
+        ],
+        modalities: Some(vec!["text".to_string()]),
+        output_modalities: None,
+        stream: Some(true),
+        max_tokens: None,
+        stream_options: Some(super::types::StreamOptions { include_usage: true }),
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("Qwen Omni transcribe request failed: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("Qwen Omni API error ({}): {}", status, body));
+    }
+
+    let text = parse_sse_text(&body)?;
+    if text.is_empty() {
+        return Err("No text in Qwen Omni transcribe response".to_string());
+    }
+    Ok(text.trim().to_string())
+}
+
+pub async fn qwen_omni_optimize(
+    client: &Client,
+    text: &str,
+    system_prompt: &str,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<String, String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(system_prompt.to_string()),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Text(user_content),
+            },
+        ],
+        modalities: Some(vec!["text".to_string()]),
+        output_modalities: None,
+        stream: Some(true),
+        max_tokens: None,
+        stream_options: Some(super::types::StreamOptions { include_usage: true }),
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("Qwen Omni optimize request failed: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("Qwen Omni API error ({}): {}", status, body));
+    }
+
+    let result = parse_sse_text(&body)?;
+    if result.is_empty() {
+        return Ok(text.to_string());
+    }
+    Ok(result.trim().to_string())
+}
+
+pub async fn qwen_omni_test_connectivity(
+    client: &Client,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<(), String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: ChatContent::Text("hi".to_string()),
+        }],
+        modalities: Some(vec!["text".to_string()]),
+        output_modalities: None,
+        stream: Some(true),
+        max_tokens: Some(32),
+        stream_options: Some(super::types::StreamOptions { include_usage: true }),
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("Qwen Omni connectivity test failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
+        return Err(format!("Qwen Omni API error ({}): {}", status, body));
+    }
+
+    Ok(())
+}
