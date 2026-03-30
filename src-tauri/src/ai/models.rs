@@ -47,6 +47,24 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_audio: true,
         supports_text: false,
     },
+    BuiltinModel {
+        id: "builtin-qwen-omni-plus",
+        provider: "阿里云百炼",
+        model: "qwen3.5-omni-plus",
+        protocol: "qwen-omni",
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        supports_audio: true,
+        supports_text: true,
+    },
+    BuiltinModel {
+        id: "builtin-qwen-omni-flash",
+        provider: "阿里云百炼",
+        model: "qwen3.5-omni-flash",
+        protocol: "qwen-omni",
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        supports_audio: true,
+        supports_text: true,
+    },
 ];
 
 pub struct ResolvedModel {
@@ -62,6 +80,7 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
             "gemini" => &config.models.builtin_api_keys.gemini,
             "openai-compat" => &config.models.builtin_api_keys.deepseek,
             "longcat" => &config.models.builtin_api_keys.longcat,
+            "qwen-omni" => &config.models.builtin_api_keys.dashscope,
             _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
         };
         return Ok(ResolvedModel {
