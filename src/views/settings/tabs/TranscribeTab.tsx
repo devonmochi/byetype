@@ -38,6 +38,22 @@ const PRESETS: PresetConfig[] = [
     transcribeModelId: 'builtin-longcat-flash-omni',
     optimizeModelId: 'builtin-deepseek-chat',
   },
+  {
+    id: 'domestic-plus',
+    title: '🇨🇳 国内直连 1',
+    desc: 'Qwen Omni Plus 全能处理',
+    tag: '无需代理 · 转写+优化一体',
+    transcribeModelId: 'builtin-qwen-omni-plus',
+    optimizeModelId: 'builtin-qwen-omni-plus',
+  },
+  {
+    id: 'domestic-flash',
+    title: '🇨🇳 国内直连 2',
+    desc: 'Qwen Omni Flash 全能处理',
+    tag: '无需代理 · 极速轻量',
+    transcribeModelId: 'builtin-qwen-omni-flash',
+    optimizeModelId: 'builtin-qwen-omni-flash',
+  },
 ]
 
 interface Props {

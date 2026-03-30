@@ -44,7 +44,7 @@ export function ModelsTab({ config, onSave }: Props) {
     )
   )
 
-  const updateBuiltinKey = (key: 'gemini' | 'deepseek' | 'longcat', value: string) => {
+  const updateBuiltinKey = (key: 'gemini' | 'deepseek' | 'longcat' | 'dashscope', value: string) => {
     onSave({ ...config, models: { ...config.models, builtinApiKeys: { ...config.models.builtinApiKeys, [key]: value } } })
   }
 
@@ -98,9 +98,9 @@ export function ModelsTab({ config, onSave }: Props) {
   const deepseekKey = config.models.builtinApiKeys.deepseek
   const longcatKey = config.models.builtinApiKeys.longcat
 
-  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'deepseek' | 'longcat'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
+  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'deepseek' | 'longcat' | 'dashscope'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
     if (!acc[m.provider]) {
-      const keyField = m.protocol === 'gemini' ? 'gemini' : m.protocol === 'longcat' ? 'longcat' : 'deepseek'
+      const keyField = m.protocol === 'gemini' ? 'gemini' : m.protocol === 'longcat' ? 'longcat' : m.protocol === 'qwen-omni' ? 'dashscope' : 'deepseek'
       const placeholder = m.protocol === 'gemini' ? 'AIzaSy...' : 'sk-...'
       acc[m.provider] = { keyField, placeholder, models: [] }
     }
@@ -117,7 +117,7 @@ export function ModelsTab({ config, onSave }: Props) {
 
       <div className="models-section-title">预置模型</div>
       {Object.entries(builtinByProvider).map(([provider, group]) => {
-        const keyValue = group.keyField === 'gemini' ? geminiKey : group.keyField === 'longcat' ? longcatKey : deepseekKey
+        const keyValue = group.keyField === 'gemini' ? geminiKey : group.keyField === 'longcat' ? longcatKey : group.keyField === 'dashscope' ? config.models.builtinApiKeys.dashscope : deepseekKey
         return (
           <div key={provider} className="model-card">
             <div className="model-card-header">
