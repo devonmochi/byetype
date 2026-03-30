@@ -34,6 +34,7 @@ pub async fn transcribe(
         output_modalities: None,
         stream: None,
         max_tokens: None,
+        stream_options: None,
     };
 
     let resp = client
@@ -96,6 +97,7 @@ pub async fn optimize(
         output_modalities: None,
         stream: None,
         max_tokens: None,
+        stream_options: None,
     };
 
     let resp = client
@@ -175,6 +177,7 @@ pub async fn longcat_transcribe(
         output_modalities: Some(vec!["text".to_string()]),
         stream: Some(false),
         max_tokens: Some(2048),
+        stream_options: None,
     };
 
     let resp = client
@@ -227,6 +230,7 @@ pub async fn test_connectivity(
         output_modalities: None,
         stream: None,
         max_tokens: None,
+        stream_options: None,
     };
 
     let resp = client
@@ -267,6 +271,7 @@ pub async fn longcat_test_connectivity(
         output_modalities: Some(vec!["text".to_string()]),
         stream: Some(false),
         max_tokens: Some(32),
+        stream_options: None,
     };
 
     let resp = client
