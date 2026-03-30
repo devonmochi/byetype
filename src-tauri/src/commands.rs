@@ -230,6 +230,9 @@ pub async fn test_model_connectivity(
         "longcat" => {
             ai::openai_compat::longcat_test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
         }
+        "qwen-omni" => {
+            ai::openai_compat::qwen_omni_test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
+        }
         _ => {
             ai::openai_compat::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
         }

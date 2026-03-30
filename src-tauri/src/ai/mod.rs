@@ -42,6 +42,17 @@ pub async fn transcribe(
             )
             .await
         }
+        "qwen-omni" => {
+            openai_compat::qwen_omni_transcribe(
+                client,
+                audio_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
         _ => {
             openai_compat::transcribe(
                 client,
@@ -84,6 +95,17 @@ pub async fn optimize(
                 &resolved.model,
                 &resolved.base_url,
                 &config.optimize.thinking,
+            )
+            .await
+        }
+        "qwen-omni" => {
+            openai_compat::qwen_omni_optimize(
+                client,
+                text,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
             )
             .await
         }
