@@ -4,7 +4,7 @@ export interface ModelEntry {
   id: string
   provider: string
   model: string
-  protocol: 'gemini' | 'openai-compat' | 'longcat'
+  protocol: 'gemini' | 'openai-compat' | 'longcat' | 'qwen-omni'
   baseUrl: string
   apiKey: string
   builtin: boolean
@@ -53,6 +53,26 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsAudio: true,
     supportsText: false,
   },
+  {
+    id: 'builtin-qwen-omni-plus',
+    provider: '阿里云百炼',
+    model: 'qwen3.5-omni-plus',
+    protocol: 'qwen-omni',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    builtin: true,
+    supportsAudio: true,
+    supportsText: true,
+  },
+  {
+    id: 'builtin-qwen-omni-flash',
+    provider: '阿里云百炼',
+    model: 'qwen3.5-omni-flash',
+    protocol: 'qwen-omni',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    builtin: true,
+    supportsAudio: true,
+    supportsText: true,
+  },
 ]
 
 export function getAllModels(config: AppConfig): ModelEntry[] {
@@ -61,6 +81,7 @@ export function getAllModels(config: AppConfig): ModelEntry[] {
     if (b.protocol === 'gemini') apiKey = config.models.builtinApiKeys.gemini
     else if (b.protocol === 'longcat') apiKey = config.models.builtinApiKeys.longcat
     else if (b.id === 'builtin-deepseek-chat') apiKey = config.models.builtinApiKeys.deepseek
+    else if (b.protocol === 'qwen-omni') apiKey = config.models.builtinApiKeys.dashscope
     return { ...b, apiKey }
   })
   const customs: ModelEntry[] = config.models.custom.map(c => ({ ...c, builtin: false }))

@@ -23,7 +23,7 @@ export interface CustomModelEntry {
   id: string
   provider: string
   model: string
-  protocol: 'gemini' | 'openai-compat' | 'longcat'
+  protocol: 'gemini' | 'openai-compat' | 'longcat' | 'qwen-omni'
   baseUrl: string
   apiKey: string
   supportsAudio: boolean
@@ -34,6 +34,7 @@ export interface BuiltinApiKeys {
   gemini: string
   deepseek: string
   longcat: string
+  dashscope: string
 }
 
 export interface ModelsConfig {
