@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri2-json-schema/refs/heads/main/schemas/2.x.x/tauri-config.schema.json",
   "productName": "ByeType",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "identifier": "com.byetype.app",
   "build": {
     "frontendDist": "../dist",
