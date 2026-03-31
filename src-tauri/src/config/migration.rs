@@ -51,7 +51,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
     };
 
     raw["models"] = serde_json::json!({
-        "builtinApiKeys": { "gemini": gemini_api_key, "deepseek": "", "longcat": "" },
+        "builtinApiKeys": { "gemini": gemini_api_key, "deepseek": "" },
         "custom": custom_models,
     });
 

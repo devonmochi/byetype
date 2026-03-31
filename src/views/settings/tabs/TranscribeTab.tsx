@@ -15,6 +15,22 @@ interface PresetConfig {
 
 const PRESETS: PresetConfig[] = [
   {
+    id: 'domestic-best',
+    title: '⚡ 效果最好',
+    desc: 'Qwen 3.5 Omni Plus 全能处理',
+    tag: '无需代理',
+    transcribeModelId: 'builtin-qwen-omni-plus',
+    optimizeModelId: 'builtin-qwen-omni-plus',
+  },
+  {
+    id: 'domestic-lite',
+    title: '🚀 极速轻量',
+    desc: 'Qwen 3.5 Omni Flash 极速处理',
+    tag: '无需代理',
+    transcribeModelId: 'builtin-qwen-omni-flash',
+    optimizeModelId: 'builtin-qwen-omni-flash',
+  },
+  {
     id: 'best',
     title: '⚡ 效果最好',
     desc: 'Gemini 3 Flash 全能处理',
@@ -29,22 +45,6 @@ const PRESETS: PresetConfig[] = [
     tag: '需代理',
     transcribeModelId: 'builtin-gemini-3.1-flash-lite',
     optimizeModelId: 'builtin-gemini-3.1-flash-lite',
-  },
-  {
-    id: 'domestic-plus',
-    title: '🏠 国内直连',
-    desc: 'Qwen 3.5 Omni Plus 快如闪电',
-    tag: '无需代理',
-    transcribeModelId: 'builtin-qwen-omni-plus',
-    optimizeModelId: 'builtin-qwen-omni-plus',
-  },
-  {
-    id: 'domestic-flash',
-    title: '🏠 国内直连',
-    desc: 'Qwen 3.5 Omni Flash 快如闪电',
-    tag: '无需代理',
-    transcribeModelId: 'builtin-qwen-omni-flash',
-    optimizeModelId: 'builtin-qwen-omni-flash',
   },
 ]
 

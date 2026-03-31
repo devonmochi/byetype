@@ -45,8 +45,6 @@ pub struct BuiltinApiKeys {
     #[serde(default)]
     pub deepseek: String,
     #[serde(default)]
-    pub longcat: String,
-    #[serde(default)]
     pub dashscope: String,
 }
 
@@ -120,7 +118,6 @@ impl Default for AppConfig {
                 builtin_api_keys: BuiltinApiKeys {
                     gemini: String::new(),
                     deepseek: String::new(),
-                    longcat: String::new(),
                     dashscope: String::new(),
                 },
                 custom: Vec::new(),

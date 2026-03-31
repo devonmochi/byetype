@@ -12,6 +12,24 @@ pub struct BuiltinModel {
 
 pub static BUILTIN_MODELS: &[BuiltinModel] = &[
     BuiltinModel {
+        id: "builtin-qwen-omni-plus",
+        provider: "阿里云百炼",
+        model: "qwen3.5-omni-plus",
+        protocol: "qwen-omni",
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        supports_audio: true,
+        supports_text: true,
+    },
+    BuiltinModel {
+        id: "builtin-qwen-omni-flash",
+        provider: "阿里云百炼",
+        model: "qwen3.5-omni-flash",
+        protocol: "qwen-omni",
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        supports_audio: true,
+        supports_text: true,
+    },
+    BuiltinModel {
         id: "builtin-gemini-3-flash",
         provider: "Google Gemini",
         model: "gemini-3-flash-preview",
@@ -38,33 +56,6 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_audio: false,
         supports_text: true,
     },
-    BuiltinModel {
-        id: "builtin-longcat-flash-omni",
-        provider: "LongCat",
-        model: "LongCat-Flash-Omni-2603",
-        protocol: "longcat",
-        base_url: "https://api.longcat.chat/openai/v1",
-        supports_audio: true,
-        supports_text: false,
-    },
-    BuiltinModel {
-        id: "builtin-qwen-omni-plus",
-        provider: "阿里云百炼",
-        model: "qwen3.5-omni-plus",
-        protocol: "qwen-omni",
-        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        supports_audio: true,
-        supports_text: true,
-    },
-    BuiltinModel {
-        id: "builtin-qwen-omni-flash",
-        provider: "阿里云百炼",
-        model: "qwen3.5-omni-flash",
-        protocol: "qwen-omni",
-        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        supports_audio: true,
-        supports_text: true,
-    },
 ];
 
 pub struct ResolvedModel {
@@ -79,7 +70,6 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
         let api_key = match builtin.protocol {
             "gemini" => &config.models.builtin_api_keys.gemini,
             "openai-compat" => &config.models.builtin_api_keys.deepseek,
-            "longcat" => &config.models.builtin_api_keys.longcat,
             "qwen-omni" => &config.models.builtin_api_keys.dashscope,
             _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
         };
