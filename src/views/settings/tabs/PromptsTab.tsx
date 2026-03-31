@@ -11,7 +11,6 @@ import {
   readPromptFile,
   writePromptFile,
   selectFile,
-  onThemeChange,
 } from '../../../lib/tauri-api'
 
 const PROMPT_FILES = [
@@ -180,16 +179,20 @@ function PromptsTabInner({ config, onSave }: Props) {
   }, [])
 
   useEffect(() => {
-    const unsub = onThemeChange((theme) => {
+    const el = document.documentElement
+    const apply = () => {
       if (viewRef.current) {
+        const isDark = el.dataset.theme === 'dark'
         viewRef.current.dispatch({
           effects: themeCompartment.current.reconfigure(
-            theme === 'dark' ? oneDark : []
+            isDark ? oneDark : []
           )
         })
       }
-    })
-    return () => { unsub() }
+    }
+    const observer = new MutationObserver(apply)
+    observer.observe(el, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
