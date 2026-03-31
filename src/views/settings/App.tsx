@@ -7,7 +7,7 @@ import { AboutTab } from './tabs/AboutTab'
 import { PromptsTab } from './tabs/PromptsTab'
 import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
 import { getVersion } from '@tauri-apps/api/app'
-import { getConfig, saveConfig, getTheme, onThemeChange, onEvent, checkUpdate } from '../../lib/tauri-api'
+import { getConfig, saveConfig, onEvent, checkUpdate } from '../../lib/tauri-api'
 import './theme.css'
 
 const TABS = [
@@ -43,14 +43,6 @@ export function App() {
   useEffect(() => {
     getConfig().then((c) => setConfig(c))
     getVersion().then((v) => setAppVersion(v))
-
-    getTheme().then((theme) => {
-      document.documentElement.dataset.theme = theme
-    })
-
-    const unsubTheme = onThemeChange((theme) => {
-      document.documentElement.dataset.theme = theme
-    })
 
     let unsubUpdateAvailable: (() => void) | null = null
     onEvent<UpdateInfo>('update-available', (payload) => {
@@ -96,7 +88,6 @@ export function App() {
     }).then(unsub => { unsubNavigate = unsub })
 
     return () => {
-      unsubTheme()
       unsubUpdateAvailable?.()
       unsubProgress?.()
       unsubComplete?.()
@@ -104,6 +95,26 @@ export function App() {
       unsubNavigate?.()
     }
   }, [])
+
+  useEffect(() => {
+    const theme = config?.general.theme
+    if (!theme) return
+
+    if (theme === 'light' || theme === 'dark') {
+      document.documentElement.dataset.theme = theme
+      return
+    }
+
+    // theme === 'system': follow OS preference
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    document.documentElement.dataset.theme = mq.matches ? 'dark' : 'light'
+
+    const handler = (e: MediaQueryListEvent) => {
+      document.documentElement.dataset.theme = e.matches ? 'dark' : 'light'
+    }
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [config?.general.theme])
 
   const handleSave = useCallback((newConfig: AppConfig) => {
     setConfig(newConfig)
