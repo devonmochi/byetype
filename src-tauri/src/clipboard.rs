@@ -1,4 +1,4 @@
-use arboard::Clipboard;
+﻿use arboard::Clipboard;
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -76,6 +76,67 @@ mod macos {
     }
 }
 
+#[cfg(target_os = "windows")]
+mod windows {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput,
+        INPUT,
+        INPUT_0,
+        INPUT_KEYBOARD,
+        KEYBDINPUT,
+        KEYEVENTF_KEYUP,
+        VK_CONTROL,
+        VK_V,
+    };
+
+    pub fn simulate_paste() -> Result<(), String> {
+        let vk_control = u16::try_from(VK_CONTROL)
+            .map_err(|_| "Invalid VK_CONTROL value".to_string())?;
+        let vk_v = u16::try_from(VK_V)
+            .map_err(|_| "Invalid VK_V value".to_string())?;
+
+        let inputs = [
+            keyboard_input(vk_control, 0),
+            keyboard_input(vk_v, 0),
+            keyboard_input(vk_v, KEYEVENTF_KEYUP),
+            keyboard_input(vk_control, KEYEVENTF_KEYUP),
+        ];
+
+        let sent = unsafe {
+            SendInput(
+                inputs.len() as u32,
+                inputs.as_ptr(),
+                std::mem::size_of::<INPUT>() as i32,
+            )
+        };
+
+        if sent != inputs.len() as u32 {
+            return Err(format!(
+                "Failed to simulate paste: SendInput sent {}/{} events",
+                sent,
+                inputs.len()
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn keyboard_input(vk: u16, flags: u32) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: flags,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }
+    }
+}
+
 pub fn paste_text(text: &str) -> Result<(), String> {
     let mut clipboard = Clipboard::new()
         .map_err(|e| format!("Failed to access clipboard: {}", e))?;
@@ -93,11 +154,7 @@ pub fn paste_text(text: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("powershell")
-            .arg("-command")
-            .arg("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')")
-            .output()
-            .map_err(|e| format!("Failed to simulate paste: {}", e))?;
+        windows::simulate_paste()?;
     }
 
     Ok(())
