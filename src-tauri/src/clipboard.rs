@@ -1,4 +1,4 @@
-﻿use arboard::Clipboard;
+use arboard::Clipboard;
 
 #[cfg(target_os = "macos")]
 mod macos {

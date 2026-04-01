@@ -91,3 +91,73 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+          updaterJsonKeepUniversal: true
+
+      - name: Upload platform latest.json
+        shell: bash
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          # Download the latest.json just uploaded by tauri-action
+          gh release download "$TAG" --pattern 'latest.json' --output latest.json --clobber
+          # Determine a platform-specific suffix
+          if [[ "${{ matrix.args }}" == *"aarch64"* ]]; then
+            SUFFIX="macos-aarch64"
+          elif [[ "${{ matrix.args }}" == *"x86_64"* ]]; then
+            SUFFIX="macos-x86_64"
+          else
+            SUFFIX="windows-x86_64"
+          fi
+          mv latest.json "latest-${SUFFIX}.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: latest-${{ strategy.job-index }}
+          path: latest-*.json
+
+  merge-updater-json:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: latest-*
+          merge-multiple: true
+          path: updater-parts
+
+      - name: Merge latest.json
+        shell: bash
+        run: |
+          python3 - <<'PYEOF'
+          import json, glob, sys
+
+          parts = sorted(glob.glob("updater-parts/latest-*.json"))
+          if not parts:
+              print("ERROR: no latest-*.json found", file=sys.stderr)
+              sys.exit(1)
+
+          merged = None
+          for p in parts:
+              with open(p) as f:
+                  data = json.load(f)
+              if merged is None:
+                  merged = data
+              else:
+                  merged["platforms"].update(data["platforms"])
+
+          print(f"Merged platforms: {list(merged['platforms'].keys())}")
+          with open("latest.json", "w") as f:
+              json.dump(merged, f, indent=2)
+          PYEOF
+
+      - name: Upload merged latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" latest.json --clobber
