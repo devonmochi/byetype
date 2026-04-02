@@ -28,14 +28,14 @@ ByeType 桌面版提供 4 种推荐模式，在「语音转写」页面顶部一
 
 | 预设 | 模型组合 | 说明 |
 |------|---------|------|
+| ⭐ 推荐 | Qwen 3.5 Omni Plus（转写+优化） | 国内直连，无需代理，效果好 |
+| 🚀 国内极速 | Qwen 3.5 Omni Flash（转写+优化） | 国内直连，无需代理，速度更快 |
 | ⚡ 效果最好 | Gemini 3 Flash（转写+优化） | 综合体验最佳，质量和速度均衡，需代理 |
 | 🚀 极速轻量 | Gemini 3.1 Flash Lite（转写+优化） | Gemini 3 Flash 的备选方案，需代理 |
-| 🏠 国内直连 1 | Qwen 3.5 Omni Plus（转写+优化） | 国内直连，无需代理，效果好 |
-| 🏠 国内直连 2 | Qwen 3.5 Omni Flash（转写+优化） | 国内直连，无需代理，速度更快 |
 
-> **国内用户推荐直接选 Qwen 3.5 Omni**，不需要代理，效果不输 Gemini，速度更快，去阿里云百炼申请一个 DashScope API Key 即可。
+> **推荐使用 Qwen 3.5 Omni**，国内直连无需代理，效果不输 Gemini，速度更快，去阿里云百炼申请一个 DashScope API Key 即可。
 >
-> **能用 Gemini 的用户** 可以继续用 Gemini 3 Flash，碰到配额限制时切换到 Flash Lite 即可。
+> 能用 Gemini 的用户也可以选择 Gemini 3 Flash，碰到配额限制时切换到 Flash Lite 即可。
 
 ![录音 → 转写 → 优化 → 自动粘贴](docs/images/demo.gif)
 
@@ -151,10 +151,10 @@ ByeType 的核心特色是**提示词驱动的高可定制性** — 通过编辑
 
 | 模型 | API ID | 获取 Key | 特点 |
 |------|--------|---------|------|
+| Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
+| Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 国内直连，速度更快 |
 | Gemini 3.0 Flash | `gemini-3-flash-preview` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理 |
 | Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite-preview` | 同上 | 更快速，适合低延迟场景，需代理 |
-| Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
-| Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 🇨🇳 国内直连，速度更快 |
 
 API Key 填写位置：设置 → 模型管理 → 对应模型卡片
 
