@@ -501,7 +501,7 @@
 }
 
 .prompt-editor-container {
-  height: 400px;
+  min-height: 150px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   overflow: hidden;

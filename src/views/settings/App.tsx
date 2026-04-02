@@ -145,7 +145,7 @@ export function App() {
           </button>
         ))}
       </div>
-      <div style={{ flex: 1, padding: 24, overflow: 'auto', position: 'relative' }}>
+      <div style={{ flex: 1, padding: 24, overflow: 'auto', position: 'relative', display: 'flex', flexDirection: 'column' }}>
         <span className={`saved-toast${saved ? ' visible' : ''}`}
           style={{ position: 'absolute', top: 24, right: 24 }}>
           ✓ 已保存

@@ -225,7 +225,7 @@ function PromptsTabInner({ config, onSave }: Props) {
   }
 
   return (
-    <div>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div className="prompt-tabs">
         {PROMPT_FILES.map(f => (
           <button
@@ -247,7 +247,7 @@ function PromptsTabInner({ config, onSave }: Props) {
       </div>
 
       <div className="prompt-editor-container" ref={editorRef}
-        style={{ opacity: loading ? 0.5 : 1, height: 400 }} />
+        style={{ opacity: loading ? 0.5 : 1, flex: 1, minHeight: 150 }} />
 
       <div className={`prompt-save-status ${saveStatus}`}>
         {saveStatus === 'saving' && '保存中...'}
