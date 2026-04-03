@@ -5,6 +5,7 @@ mod bubble;
 mod clipboard;
 mod config;
 mod commands;
+mod preview;
 mod shortcut;
 mod tray;
 mod updater;
@@ -49,6 +50,7 @@ pub fn run() {
             commands::cancel_task,
             commands::list_input_devices,
             commands::test_model_connectivity,
+            commands::update_clipboard_text,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

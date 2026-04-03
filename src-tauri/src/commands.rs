@@ -205,6 +205,14 @@ pub struct ConnectivityResult {
 }
 
 #[tauri::command]
+pub fn update_clipboard_text(text: String) -> Result<(), String> {
+    use arboard::Clipboard;
+    let mut clipboard = Clipboard::new().map_err(|e| format!("Clipboard error: {}", e))?;
+    clipboard.set_text(&text).map_err(|e| format!("Set clipboard failed: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn test_model_connectivity(
     config_manager: State<'_, ConfigManager>,
     model_id: String,
