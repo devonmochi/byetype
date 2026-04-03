@@ -54,7 +54,7 @@ interface Props {
 }
 
 export function TranscribeTab({ config, onSave }: Props) {
-  const { transcribe, optimize } = config
+  const { transcribe, optimize, extract } = config
 
   const audioModels = getAudioModels(config)
   const textModels = getTextModels(config)
@@ -77,6 +77,10 @@ export function TranscribeTab({ config, onSave }: Props) {
 
   const updateOptimizeThinking = (changes: Partial<ThinkingConfig>) => {
     updateOptimize({ thinking: { ...optimize.thinking, ...changes } })
+  }
+
+  const updateExtract = (changes: Partial<AppConfig['extract']>) => {
+    onSave({ ...config, extract: { ...extract, ...changes } })
   }
 
   const activePreset = PRESETS.find(
@@ -227,6 +231,30 @@ export function TranscribeTab({ config, onSave }: Props) {
           )}
         </SettingGroup>
       )}
+
+      {/* 区域三：文本提取 */}
+      <h3 className="section-title">文本提取</h3>
+
+      <SettingGroup title="模型">
+        <SettingRow label="提取模型" description="留空则使用与转写相同的模型">
+          <select
+            className="select"
+            value={extract.modelId || ''}
+            onChange={e => updateExtract({ modelId: e.target.value || undefined })}
+            style={{ width: 260 }}
+          >
+            <option value="">与转写相同</option>
+            <optgroup label="预置模型">
+              {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+            </optgroup>
+            {customText.length > 0 && (
+              <optgroup label="自定义模型">
+                {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+              </optgroup>
+            )}
+          </select>
+        </SettingRow>
+      </SettingGroup>
 
     </div>
   )

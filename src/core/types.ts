@@ -11,6 +11,7 @@ export interface GeneralConfig {
   theme: ThemeMode
   maxRecordingSeconds: number
   microphone: string
+  extractShortcut: string
 }
 
 export interface ThinkingConfig {
@@ -54,6 +55,12 @@ export interface OptimizeConfig {
   prompt: string
 }
 
+export interface ExtractConfig {
+  modelId?: string
+  thinking?: ThinkingConfig
+  prompt: string
+}
+
 export interface AdvancedConfig {
   transcribeTimeout: number
   optimizeTimeout: number
@@ -67,10 +74,11 @@ export interface AppConfig {
   models: ModelsConfig
   transcribe: TranscribeConfig
   optimize: OptimizeConfig
+  extract: ExtractConfig
   advanced: AdvancedConfig
 }
 
-export type TaskStatus = 'recording' | 'transcribing' | 'optimizing' | 'retrying' | 'completed' | 'failed' | 'cancelled'
+export type TaskStatus = 'recording' | 'transcribing' | 'optimizing' | 'retrying' | 'extracting' | 'completed' | 'failed' | 'cancelled'
 
 export interface HistoryRecord {
   id: number
@@ -80,6 +88,9 @@ export interface HistoryRecord {
   optimizeText: string | null
   status: 'completed' | 'failed' | 'cancelled'
   errorMessage?: string
+  recordType?: 'voice' | 'extract'
+  screenshotPath?: string | null
+  extractText?: string | null
 }
 
 export interface RetryStatusUpdate {

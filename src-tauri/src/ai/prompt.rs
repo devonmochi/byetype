@@ -63,3 +63,10 @@ pub fn load_optimize_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
     let content = load_prompt(&prompt_path);
     wrap_document("text-optimize", &content)
 }
+
+pub fn build_extract_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
+    let builtin = prompts_dir.join("text-extract.md").to_string_lossy().to_string();
+    let custom = &config.extract.prompt;
+    let path = resolve_prompt_path(custom, &builtin);
+    load_prompt(&path)
+}

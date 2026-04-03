@@ -123,15 +123,80 @@ interface RecordRowProps {
   onRetry: (id: number) => void
 }
 
+function getExtractStageInfo(record: HistoryRecord): { screenshot: StageStatus; extract: { status: StageStatus; text: string } } {
+  const screenshot: StageStatus = record.screenshotPath ? 'success' : (record.status === 'failed' ? 'error' : 'success')
+
+  let extract: { status: StageStatus; text: string }
+  if (record.extractText) {
+    extract = { status: 'success', text: record.extractText }
+  } else if (record.status === 'failed') {
+    extract = { status: 'error', text: record.errorMessage?.slice(0, 30) || '失败' }
+  } else if (record.status === 'cancelled') {
+    extract = { status: 'pending', text: '已取消' }
+  } else {
+    extract = { status: 'pending', text: '\u2014' }
+  }
+
+  return { screenshot, extract }
+}
+
 function RecordRow({ record, retryStage, onRetry }: RecordRowProps) {
-  const info = getStageInfo(record, retryStage)
+  const isExtract = record.recordType === 'extract'
   const isRetrying = !!retryStage
+
+  if (isExtract) {
+    const info = getExtractStageInfo(record)
+    const screenshotMissing = !record.screenshotPath
+    return (
+      <div className="history-row">
+        <div className="history-row-top">
+          <span className="history-time">
+            <span style={{ marginRight: 4 }}>{'\uD83D\uDCF7'}</span>
+            {formatTime(record.createdAt)}
+          </span>
+          <div className="history-pipeline">
+            <span className="history-stage-dot"><StageIndicator status={info.screenshot} /> 截图</span>
+            <span className="history-arrow">{'\u2192'}</span>
+            <span className="history-stage-dot"><StageIndicator status={info.extract.status} /> 提取</span>
+          </div>
+          <button
+            className={`history-retry-btn${(record.status === 'failed' || record.status === 'cancelled') && !isRetrying && !screenshotMissing ? ' highlight' : ''}`}
+            disabled={isRetrying || screenshotMissing}
+            title={screenshotMissing ? '截图文件已丢失' : isRetrying ? '重试中' : '重试'}
+            onClick={() => onRetry(record.id)}
+          >
+            {isRetrying ? '重试中' : '重试'}
+          </button>
+        </div>
+        <div className="history-row-bottom">
+          <div className="history-text-cell">
+            <span className="history-text-label">提取</span>
+            <span
+              className="history-text-content"
+              style={info.extract.status === 'error' ? { color: '#ff3b30' } : undefined}
+              title={info.extract.text}
+            >
+              {info.extract.text}
+            </span>
+            {info.extract.status === 'success' && record.extractText && (
+              <CopyButton text={record.extractText} />
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const info = getStageInfo(record, retryStage)
   const audioMissing = !record.audioPath
 
   return (
     <div className="history-row">
       <div className="history-row-top">
-        <span className="history-time">{formatTime(record.createdAt)}</span>
+        <span className="history-time">
+          <span style={{ marginRight: 4 }}>{'\uD83C\uDFA4'}</span>
+          {formatTime(record.createdAt)}
+        </span>
         <div className="history-pipeline">
           <span className="history-stage-dot"><StageIndicator status={info.audio} /> 音频</span>
           <span className="history-arrow">{'\u2192'}</span>
@@ -233,7 +298,7 @@ export function HistoryTab() {
     <div>
       <h2 className="content-title">历史记录</h2>
       {records.length === 0 ? (
-        <div className="history-empty">暂无录音记录</div>
+        <div className="history-empty">暂无记录</div>
       ) : (
         <div className="history-list">
           {[...records].reverse().map(record => (

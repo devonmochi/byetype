@@ -13,15 +13,22 @@ import {
   selectFile,
 } from '../../../lib/tauri-api'
 
-const PROMPT_FILES = [
+const VOICE_PROMPT_FILES = [
   { key: 'agent', label: '角色定义', configPath: 'transcribe.prompts.agent' as const, builtinFilename: 'agent.md' },
   { key: 'rules', label: '转录规则', configPath: 'transcribe.prompts.rules' as const, builtinFilename: 'rules.md' },
   { key: 'vocabulary', label: '专有词汇', configPath: 'transcribe.prompts.vocabulary' as const, builtinFilename: 'vocabulary.md' },
   { key: 'textOptimize', label: '文本优化', configPath: 'optimize.prompt' as const, builtinFilename: 'text-optimize.md' },
 ]
 
+const EXTRACT_PROMPT_FILES = [
+  { key: 'textExtract', label: '提取规则', configPath: 'extract.prompt' as const, builtinFilename: 'text-extract.md' },
+]
+
+const ALL_PROMPT_FILES = [...VOICE_PROMPT_FILES, ...EXTRACT_PROMPT_FILES]
+
 function getConfigValue(config: AppConfig, configPath: string): string {
   if (configPath === 'optimize.prompt') return config.optimize.prompt
+  if (configPath === 'extract.prompt') return config.extract.prompt
   const key = configPath.split('.').pop() as keyof AppConfig['transcribe']['prompts']
   return config.transcribe.prompts[key]
 }
@@ -29,6 +36,9 @@ function getConfigValue(config: AppConfig, configPath: string): string {
 function setConfigValue(config: AppConfig, configPath: string, value: string): AppConfig {
   if (configPath === 'optimize.prompt') {
     return { ...config, optimize: { ...config.optimize, prompt: value } }
+  }
+  if (configPath === 'extract.prompt') {
+    return { ...config, extract: { ...config.extract, prompt: value } }
   }
   const key = configPath.split('.').pop() as keyof AppConfig['transcribe']['prompts']
   return {
@@ -46,7 +56,7 @@ interface Props {
 }
 
 function PromptsTabInner({ config, onSave }: Props) {
-  const [activeFile, setActiveFile] = useState(PROMPT_FILES[0].key)
+  const [activeFile, setActiveFile] = useState(ALL_PROMPT_FILES[0].key)
   const [content, setContent] = useState('')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
   const [loading, setLoading] = useState(true)
@@ -63,7 +73,7 @@ function PromptsTabInner({ config, onSave }: Props) {
   contentRef.current = content
   resolvedPathRef.current = resolvedPath
 
-  const activePrompt = PROMPT_FILES.find(f => f.key === activeFile)!
+  const activePrompt = ALL_PROMPT_FILES.find(f => f.key === activeFile)!
 
   const flushSave = useCallback(async () => {
     if (debounceRef.current) {
@@ -92,7 +102,7 @@ function PromptsTabInner({ config, onSave }: Props) {
     }, 500)
   }, [])
 
-  const resolvePath = useCallback(async (prompt: typeof PROMPT_FILES[number]) => {
+  const resolvePath = useCallback(async (prompt: typeof ALL_PROMPT_FILES[number]) => {
     const customPath = getConfigValue(config, prompt.configPath)
     if (customPath) {
       const builtin = await isBuiltinPromptPath(customPath)
@@ -108,7 +118,7 @@ function PromptsTabInner({ config, onSave }: Props) {
     return destPath
   }, [config, onSave])
 
-  const loadFile = useCallback(async (prompt: typeof PROMPT_FILES[number]) => {
+  const loadFile = useCallback(async (prompt: typeof ALL_PROMPT_FILES[number]) => {
     setLoading(true)
     setSaveStatus('idle')
     isLoadingRef.current = true
@@ -227,7 +237,19 @@ function PromptsTabInner({ config, onSave }: Props) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div className="prompt-tabs">
-        {PROMPT_FILES.map(f => (
+        <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'uppercase', padding: '4px 8px', letterSpacing: 1 }}>语音转写</div>
+        {VOICE_PROMPT_FILES.map(f => (
+          <button
+            key={f.key}
+            className={`prompt-tab${activeFile === f.key ? ' active' : ''}`}
+            onClick={() => handleTabSwitch(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
+        <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+        <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'uppercase', padding: '4px 8px', letterSpacing: 1 }}>文本提取</div>
+        {EXTRACT_PROMPT_FILES.map(f => (
           <button
             key={f.key}
             className={`prompt-tab${activeFile === f.key ? ' active' : ''}`}
@@ -264,6 +286,7 @@ export const PromptsTab = memo(PromptsTabInner, (prev, next) => {
     prev.config.transcribe.prompts.rules === next.config.transcribe.prompts.rules &&
     prev.config.transcribe.prompts.vocabulary === next.config.transcribe.prompts.vocabulary &&
     prev.config.optimize.prompt === next.config.optimize.prompt &&
+    prev.config.extract.prompt === next.config.extract.prompt &&
     prev.onSave === next.onSave
   )
 })

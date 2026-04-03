@@ -4,6 +4,10 @@ use base64::Engine as _;
 
 const MAX_RECORDS: usize = 3;
 
+fn default_record_type() -> String {
+    "voice".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryRecord {
@@ -15,6 +19,12 @@ pub struct HistoryRecord {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    #[serde(default = "default_record_type")]
+    pub record_type: String,
+    #[serde(default)]
+    pub screenshot_path: Option<String>,
+    #[serde(default)]
+    pub extract_text: Option<String>,
 }
 
 pub struct HistoryManager {
@@ -46,21 +56,27 @@ impl HistoryManager {
             let content = std::fs::read_to_string(&self.json_path).unwrap_or_default();
             self.records = serde_json::from_str(&content).unwrap_or_default();
         }
-        // Validate audio paths
+        // Validate audio and screenshot paths
         for record in &mut self.records {
             if let Some(ref path) = record.audio_path {
                 if !Path::new(path).exists() {
                     record.audio_path = None;
                 }
             }
+            if let Some(ref path) = record.screenshot_path {
+                if !Path::new(path).exists() {
+                    record.screenshot_path = None;
+                }
+            }
         }
-        // Clean orphan audio files
+        // Clean orphan audio/screenshot files
         if let Ok(entries) = std::fs::read_dir(&self.audio_dir) {
-            let referenced: std::collections::HashSet<String> = self
+            let mut referenced: std::collections::HashSet<String> = self
                 .records
                 .iter()
                 .filter_map(|r| r.audio_path.clone())
                 .collect();
+            referenced.extend(self.records.iter().filter_map(|r| r.screenshot_path.clone()));
             for entry in entries.flatten() {
                 let path = entry.path().to_string_lossy().to_string();
                 if !referenced.contains(&path) {
@@ -114,10 +130,58 @@ impl HistoryManager {
             optimize_text,
             status: status.to_string(),
             error_message,
+            record_type: "voice".to_string(),
+            screenshot_path: None,
+            extract_text: None,
         });
         while self.records.len() > MAX_RECORDS {
             let oldest = self.records.remove(0);
             if let Some(ref path) = oldest.audio_path {
+                let _ = std::fs::remove_file(path);
+            }
+            if let Some(ref path) = oldest.screenshot_path {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+        self.persist()
+    }
+
+    pub fn add_extract_record(
+        &mut self,
+        screenshot_base64: Option<&str>,
+        extract_text: Option<String>,
+        status: &str,
+        error_message: Option<String>,
+    ) -> Result<(), String> {
+        let id = self.next_id();
+        let mut screenshot_path: Option<String> = None;
+        if let Some(b64) = screenshot_base64 {
+            let dest = self.audio_dir.join(format!("{}.png", id));
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .map_err(|e| format!("Failed to decode screenshot: {}", e))?;
+            std::fs::write(&dest, &bytes)
+                .map_err(|e| format!("Failed to write screenshot: {}", e))?;
+            screenshot_path = Some(dest.to_string_lossy().to_string());
+        }
+        self.records.push(HistoryRecord {
+            id,
+            created_at: now_iso(),
+            audio_path: None,
+            transcribe_text: None,
+            optimize_text: None,
+            status: status.to_string(),
+            error_message,
+            record_type: "extract".to_string(),
+            screenshot_path,
+            extract_text,
+        });
+        while self.records.len() > MAX_RECORDS {
+            let oldest = self.records.remove(0);
+            if let Some(ref path) = oldest.audio_path {
+                let _ = std::fs::remove_file(path);
+            }
+            if let Some(ref path) = oldest.screenshot_path {
                 let _ = std::fs::remove_file(path);
             }
         }

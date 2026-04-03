@@ -138,6 +138,129 @@ pub async fn optimize(
     Ok(result)
 }
 
+pub async fn extract_text(
+    client: &Client,
+    image_base64: &str,
+    system_prompt: &str,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<String, String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(system_prompt.to_string()),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Parts(vec![ChatContentPart::ImageUrl {
+                    image_url: ImageUrlData {
+                        url: format!("data:image/png;base64,{}", image_base64),
+                    },
+                }]),
+            },
+        ],
+        modalities: Some(vec!["text".to_string()]),
+        output_modalities: None,
+        stream: Some(false),
+        max_tokens: None,
+        stream_options: None,
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("OpenAI-compat extract_text request failed: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read OpenAI-compat response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("OpenAI-compat API error ({}): {}", status, body));
+    }
+
+    let chat_resp: ChatCompletionResponse =
+        serde_json::from_str(&body).map_err(|e| format!("Failed to parse OpenAI-compat response: {}", e))?;
+
+    let text = chat_resp
+        .choices
+        .as_ref()
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.message.as_ref())
+        .and_then(|msg| msg.content.as_ref())
+        .ok_or_else(|| "No text in OpenAI-compat extract_text response".to_string())?;
+
+    Ok(text.trim().to_string())
+}
+
+pub async fn qwen_omni_extract_text(
+    client: &Client,
+    image_base64: &str,
+    system_prompt: &str,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+) -> Result<String, String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let request = ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(system_prompt.to_string()),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Parts(vec![ChatContentPart::ImageUrl {
+                    image_url: ImageUrlData {
+                        url: format!("data:image/png;base64,{}", image_base64),
+                    },
+                }]),
+            },
+        ],
+        modalities: Some(vec!["text".to_string()]),
+        output_modalities: None,
+        stream: Some(true),
+        max_tokens: None,
+        stream_options: Some(super::types::StreamOptions { include_usage: true }),
+    };
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("Qwen Omni extract_text request failed: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("Qwen Omni API error ({}): {}", status, body));
+    }
+
+    let text = parse_sse_text(&body)?;
+    if text.is_empty() {
+        return Err("No text in Qwen Omni extract_text response".to_string());
+    }
+    Ok(text.trim().to_string())
+}
+
 pub async fn test_connectivity(
     client: &Client,
     api_key: &str,
