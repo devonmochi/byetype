@@ -106,6 +106,8 @@ pub enum ChatContentPart {
     Text { text: String },
     #[serde(rename = "input_audio")]
     InputAudio { input_audio: AudioData },
+    #[serde(rename = "image_url")]
+    ImageUrl { image_url: ImageUrlData },
 }
 
 #[derive(Serialize)]
@@ -114,6 +116,11 @@ pub struct AudioData {
     pub audio_type: Option<String>,
     pub data: String,
     pub format: String,
+}
+
+#[derive(Serialize)]
+pub struct ImageUrlData {
+    pub url: String,
 }
 
 #[derive(Deserialize)]
