@@ -56,7 +56,7 @@ interface Props {
 }
 
 function PromptsTabInner({ config, onSave }: Props) {
-  const [activeFile, setActiveFile] = useState(PROMPT_FILES[0].key)
+  const [activeFile, setActiveFile] = useState(ALL_PROMPT_FILES[0].key)
   const [content, setContent] = useState('')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
   const [loading, setLoading] = useState(true)

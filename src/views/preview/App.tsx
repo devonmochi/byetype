@@ -31,11 +31,11 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '4px 0 8px 0', gap: '8px', WebkitAppRegion: 'drag' as any }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '4px 0 8px 0', gap: '8px', ...({ WebkitAppRegion: 'drag' } as any) }}>
         <button
           onClick={handleCopy}
           style={{
-            WebkitAppRegion: 'no-drag' as any,
+            ...({ WebkitAppRegion: 'no-drag' } as any),
             padding: '4px 12px',
             border: '1px solid #444',
             borderRadius: '4px',
