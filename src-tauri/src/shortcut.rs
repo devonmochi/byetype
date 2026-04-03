@@ -111,6 +111,26 @@ pub fn register(
         })
         .map_err(|e| format!("Failed to register shortcut '{}': {}", shortcut_key, e))?;
 
+    // Register extract shortcut (text extraction via screenshot + OCR)
+    let extract_key = {
+        let cfg = app.state::<ConfigManager>().get();
+        if cfg.general.extract_shortcut.is_empty() {
+            "F6".to_string()
+        } else {
+            cfg.general.extract_shortcut.clone()
+        }
+    };
+
+    let extract_app = app.clone();
+    app.global_shortcut()
+        .on_shortcut(extract_key.as_str(), move |_app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            crate::task::start_extraction(&extract_app);
+        })
+        .map_err(|e| format!("Failed to register extract shortcut '{}': {}", extract_key, e))?;
+
     Ok(())
 }
 
