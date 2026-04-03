@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         bubble: resolve(__dirname, 'bubble.html'),
+        preview: resolve(__dirname, 'preview.html'),
       }
     }
   },
