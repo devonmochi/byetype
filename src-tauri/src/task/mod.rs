@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
 use tauri::{AppHandle, Emitter, Manager};
+use base64::Engine as _;
 use crate::config::ConfigManager;
 use crate::ai;
 use history::{HistoryManager, HistoryRecord};
@@ -429,6 +430,213 @@ fn finish_pipeline(
             "status": status
         }));
     }
+
+    // Decrement active count
+    mgr.active_count = mgr.active_count.saturating_sub(1);
+}
+
+/// Called from shortcut.rs when user triggers the extract shortcut.
+/// Takes a screenshot via interactive selection, OCRs it, and copies text to clipboard.
+pub fn start_extraction(app: &AppHandle) -> Option<u32> {
+    let config = app.state::<ConfigManager>().get();
+    let task_id = {
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        if mgr.active_count >= config.advanced.max_parallel {
+            eprintln!(
+                "[TaskManager] Max parallel tasks reached ({}), cannot start extraction",
+                config.advanced.max_parallel
+            );
+            return None;
+        }
+        if mgr.active_count == 0 {
+            mgr.task_counter = 0;
+        }
+        mgr.task_counter += 1;
+        mgr.active_count += 1;
+        let token = CancellationToken::new();
+        let id = mgr.task_counter;
+        mgr.cancel_tokens.insert(id, (token, None));
+        id
+    };
+
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        run_extract_pipeline(&app_handle, task_id).await;
+    });
+    Some(task_id)
+}
+
+async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
+    let tmp_path = std::env::temp_dir().join(format!("byetype_capture_{}.png", task_id));
+
+    // Phase 0: Interactive screenshot capture
+    let capture_result = tokio::process::Command::new("screencapture")
+        .arg("-i")
+        .arg(tmp_path.as_os_str())
+        .status()
+        .await;
+
+    let exited_ok = match capture_result {
+        Ok(status) => status.success(),
+        Err(e) => {
+            eprintln!("[TaskManager] screencapture failed to launch: {}", e);
+            false
+        }
+    };
+
+    if !exited_ok {
+        // User cancelled the selection or screencapture failed — silent cleanup
+        let _ = std::fs::remove_file(&tmp_path);
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        return;
+    }
+
+    // Read and base64-encode the screenshot
+    let png_bytes = match std::fs::read(&tmp_path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("[TaskManager] Failed to read screenshot: {}", e);
+            let _ = std::fs::remove_file(&tmp_path);
+            finish_extract_pipeline(
+                app, task_id, None, None, "failed",
+                Some(format!("Failed to read screenshot: {}", e)),
+            );
+            return;
+        }
+    };
+    let _ = std::fs::remove_file(&tmp_path);
+    let image_base64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
+
+    // Show bubble with extracting status
+    if let Err(e) = crate::bubble::show(app, task_id) {
+        eprintln!("[TaskManager] Failed to show bubble: {}", e);
+    }
+    let _ = crate::bubble::update(app, task_id, "extracting");
+
+    // Get config snapshot and prompts_dir
+    let (config, prompts_dir, token) = {
+        let state = app.state::<SharedTaskManager>();
+        let mgr = state.lock().unwrap();
+        let tok = mgr.cancel_tokens.get(&task_id).map(|(t, _)| t.clone());
+        (app.state::<ConfigManager>().get(), mgr.prompts_dir.clone(), tok)
+    };
+
+    let token = match token {
+        Some(t) => t,
+        None => return,
+    };
+
+    let max_retries = config.advanced.max_retries;
+    let extract_timeout = config.advanced.transcribe_timeout; // reuse transcribe timeout for extract
+
+    // Build HTTP client
+    let client = match build_client(&config.advanced.proxy_url) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[TaskManager] Failed to build client: {}", e);
+            finish_extract_pipeline(
+                app, task_id, Some(&image_base64), None, "failed", Some(e),
+            );
+            return;
+        }
+    };
+
+    // Phase 1: Extract text from screenshot via AI
+    let extract_result = {
+        let client = client.clone();
+        let img = image_base64.clone();
+        let cfg = config.clone();
+        let pd = prompts_dir.clone();
+        tokio::select! {
+            result = ai::retry::with_retry(
+                || {
+                    let client = client.clone();
+                    let img = img.clone();
+                    let cfg = cfg.clone();
+                    let pd = pd.clone();
+                    async move {
+                        ai::extract_text(&client, &img, &cfg, &pd).await
+                    }
+                },
+                max_retries,
+                extract_timeout,
+                |_attempt| {
+                    let _ = crate::bubble::update(app, task_id, "retrying");
+                },
+            ) => result,
+            _ = token.cancelled() => {
+                eprintln!("[TaskManager] Task {} cancelled during extraction", task_id);
+                return;
+            }
+        }
+    };
+
+    match extract_result {
+        Ok(text) => {
+            // Copy text to clipboard (without pasting)
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                let _ = clipboard.set_text(&text);
+            }
+
+            // Show preview window
+            if let Err(e) = crate::preview::show(app, &text) {
+                eprintln!("[TaskManager] Failed to show preview: {}", e);
+            }
+
+            finish_extract_pipeline(
+                app, task_id, Some(&image_base64), Some(text), "completed", None,
+            );
+        }
+        Err(e) => {
+            eprintln!("[TaskManager] Extraction failed: {}", e);
+            finish_extract_pipeline(
+                app, task_id, Some(&image_base64), None, "failed", Some(e),
+            );
+        }
+    }
+}
+
+fn finish_extract_pipeline(
+    app: &AppHandle,
+    task_id: u32,
+    screenshot_base64: Option<&str>,
+    extract_text: Option<String>,
+    status: &str,
+    error_message: Option<String>,
+) {
+    let state = app.state::<SharedTaskManager>();
+    let mut mgr = state.lock().unwrap();
+
+    // Atomic guard: whoever removes the token first owns cleanup
+    match mgr.cancel_tokens.remove(&task_id) {
+        Some((token, _)) if token.is_cancelled() => return,
+        Some(_) => { /* normal completion, proceed */ }
+        None => return,
+    }
+
+    // Update bubble
+    let bubble_delay = if status == "completed" { 1500 } else { 3000 };
+    let _ = crate::bubble::update(app, task_id, status);
+    let _ = crate::bubble::hide(app, task_id, bubble_delay);
+
+    // Save history
+    if let Err(e) = mgr.history.add_extract_record(
+        screenshot_base64,
+        extract_text,
+        status,
+        error_message,
+    ) {
+        eprintln!("[TaskManager] Failed to add extract history record: {}", e);
+    }
+
+    // Emit updated records
+    let records = mgr.history.get_records();
+    let json_records = serde_json::to_value(records).unwrap_or(serde_json::json!([]));
+    let _ = app.emit("history-updated", json_records);
 
     // Decrement active count
     mgr.active_count = mgr.active_count.saturating_sub(1);
