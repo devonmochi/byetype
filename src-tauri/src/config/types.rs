@@ -7,6 +7,8 @@ pub struct AppConfig {
     pub models: ModelsConfig,
     pub transcribe: TranscribeConfig,
     pub optimize: OptimizeConfig,
+    #[serde(default)]
+    pub extract: ExtractConfig,
     pub advanced: AdvancedConfig,
 }
 
@@ -16,6 +18,10 @@ fn default_max_recording_seconds() -> u32 {
 
 fn default_microphone() -> String {
     "system-default".to_string()
+}
+
+fn default_extract_shortcut() -> String {
+    "F6".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +34,8 @@ pub struct GeneralConfig {
     pub max_recording_seconds: u32,
     #[serde(default = "default_microphone")]
     pub microphone: String,
+    #[serde(default = "default_extract_shortcut")]
+    pub extract_shortcut: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +104,24 @@ pub struct OptimizeConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ExtractConfig {
+    pub model_id: Option<String>,
+    pub thinking: Option<ThinkingConfig>,
+    pub prompt: String,
+}
+
+impl Default for ExtractConfig {
+    fn default() -> Self {
+        Self {
+            model_id: None,
+            thinking: None,
+            prompt: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AdvancedConfig {
     pub transcribe_timeout: u32,
     pub optimize_timeout: u32,
@@ -113,6 +139,7 @@ impl Default for AppConfig {
                 theme: "system".to_string(),
                 max_recording_seconds: 180,
                 microphone: "system-default".to_string(),
+                extract_shortcut: "F6".to_string(),
             },
             models: ModelsConfig {
                 builtin_api_keys: BuiltinApiKeys {
@@ -145,6 +172,7 @@ impl Default for AppConfig {
                 },
                 prompt: String::new(),
             },
+            extract: ExtractConfig::default(),
             advanced: AdvancedConfig {
                 transcribe_timeout: 10,
                 optimize_timeout: 10,
