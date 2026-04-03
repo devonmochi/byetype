@@ -56,6 +56,56 @@ pub async fn transcribe(
     }
 }
 
+/// Extract text from an image using the configured provider.
+pub async fn extract_text(
+    client: &reqwest::Client,
+    image_base64: &str,
+    config: &AppConfig,
+    prompts_dir: &Path,
+) -> Result<String, String> {
+    let model_id = config.extract.model_id.as_deref().unwrap_or(&config.transcribe.model_id);
+    let resolved = models::resolve_model(config, model_id)?;
+    let thinking = config.extract.thinking.as_ref().unwrap_or(&config.transcribe.thinking);
+    let system_prompt = prompt::build_extract_prompt(config, prompts_dir);
+
+    match resolved.protocol.as_str() {
+        "gemini" => {
+            gemini::extract_text(
+                client,
+                image_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+                thinking,
+            )
+            .await
+        }
+        "qwen-omni" => {
+            openai_compat::qwen_omni_extract_text(
+                client,
+                image_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
+        _ => {
+            openai_compat::extract_text(
+                client,
+                image_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
+    }
+}
+
 /// Optimize text using the configured provider.
 pub async fn optimize(
     client: &reqwest::Client,
