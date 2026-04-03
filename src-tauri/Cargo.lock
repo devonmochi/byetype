@@ -423,7 +423,7 @@ checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
 name = "byetype"
-version = "1.6.3"
+version = "1.6.4"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -5140,6 +5140,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

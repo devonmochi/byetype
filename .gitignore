@@ -38,3 +38,4 @@ docs/post*.md
 generate_icons.py
 DESIGN-*.md
 src-tauri/gen/schemas/
+.superpowers/

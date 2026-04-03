@@ -474,18 +474,24 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
     let capture_result = tokio::process::Command::new("screencapture")
         .arg("-i")
         .arg(tmp_path.as_os_str())
-        .status()
+        .output()
         .await;
 
-    let exited_ok = match capture_result {
-        Ok(status) => status.success(),
+    let exited_ok = match &capture_result {
+        Ok(output) => {
+            if !output.stderr.is_empty() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("[TaskManager] screencapture stderr: {}", stderr.trim());
+            }
+            output.status.success()
+        }
         Err(e) => {
             eprintln!("[TaskManager] screencapture failed to launch: {}", e);
             false
         }
     };
 
-    if !exited_ok {
+    if !exited_ok || !tmp_path.exists() {
         // User cancelled the selection or screencapture failed — silent cleanup
         let _ = std::fs::remove_file(&tmp_path);
         let state = app.state::<SharedTaskManager>();
