@@ -16,6 +16,7 @@ interface Props {
 
 export function GeneralTab({ config, onSave }: Props) {
   const [recording, setRecording] = useState(false)
+  const [recordingExtract, setRecordingExtract] = useState(false)
   const [devices, setDevices] = useState<AudioDevice[]>([])
 
   // Load device list
@@ -71,6 +72,22 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecording(false)
   }
 
+  const handleExtractKeyDown = (e: React.KeyboardEvent) => {
+    if (!recordingExtract) return
+    e.preventDefault()
+    const key = e.key === ' ' ? 'Space' : e.key
+    const parts: string[] = []
+    if (e.ctrlKey) parts.push('Ctrl')
+    if (e.altKey) parts.push('Alt')
+    if (e.shiftKey) parts.push('Shift')
+    if (e.metaKey) parts.push('Command')
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
+    parts.push(key)
+    const combo = parts.join('+')
+    update({ extractShortcut: combo })
+    setRecordingExtract(false)
+  }
+
   const themes: { value: ThemeMode; label: string; style: React.CSSProperties }[] = [
     { value: 'light', label: '浅色', style: { background: '#ffffff', border: '1px solid #d2d2d7' } },
     { value: 'dark', label: '深色', style: { background: '#1c1c1e' } },
@@ -106,6 +123,17 @@ export function GeneralTab({ config, onSave }: Props) {
             onKeyDown={handleKeyDown}
             onFocus={() => setRecording(true)}
             onBlur={() => setRecording(false)}
+            readOnly
+            style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+          />
+        </SettingRow>
+        <SettingRow label="文本提取快捷键" description={recordingExtract ? '请按下快捷键...' : '点击后按下新快捷键'}>
+          <input
+            className={`kbd${recordingExtract ? ' recording' : ''}`}
+            value={config.general.extractShortcut}
+            onKeyDown={handleExtractKeyDown}
+            onFocus={() => setRecordingExtract(true)}
+            onBlur={() => setRecordingExtract(false)}
             readOnly
             style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
           />
