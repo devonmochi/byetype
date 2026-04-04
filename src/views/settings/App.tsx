@@ -4,19 +4,31 @@ import { TranscribeTab } from './tabs/TranscribeTab'
 import { ModelsTab } from './tabs/ModelsTab'
 import { HistoryTab } from './tabs/HistoryTab'
 import { AboutTab } from './tabs/AboutTab'
-import { PromptsTab } from './tabs/PromptsTab'
+import { ExtractTab } from './tabs/ExtractTab'
+import { VoicePromptsTab } from './tabs/VoicePromptsTab'
+import { ExtractPromptsTab } from './tabs/ExtractPromptsTab'
 import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
 import { getVersion } from '@tauri-apps/api/app'
 import { getConfig, saveConfig, onEvent, checkUpdate } from '../../lib/tauri-api'
 import './theme.css'
 
-const TABS = [
-  { id: 'general', label: '通用设置' },
-  { id: 'models', label: '模型管理' },
-  { id: 'transcribe', label: '转写设置' },
-  { id: 'prompts', label: '提示词' },
-  { id: 'history', label: '历史记录' },
-  { id: 'about', label: '关于' },
+type TabItem =
+  | { type: 'tab'; id: string; label: string }
+  | { type: 'group'; label: string }
+  | { type: 'divider' }
+
+const TABS: TabItem[] = [
+  { type: 'tab', id: 'general', label: '通用设置' },
+  { type: 'tab', id: 'models', label: '模型管理' },
+  { type: 'group', label: '语音转写' },
+  { type: 'tab', id: 'transcribe', label: '转写设置' },
+  { type: 'tab', id: 'voice-prompts', label: '转写提示词' },
+  { type: 'group', label: '图像识别' },
+  { type: 'tab', id: 'extract', label: '识别设置' },
+  { type: 'tab', id: 'extract-prompts', label: '识别提示词' },
+  { type: 'divider' },
+  { type: 'tab', id: 'history', label: '历史记录' },
+  { type: 'tab', id: 'about', label: '关于' },
 ]
 
 const INITIAL_UPDATE_STATE: UpdateState = {
@@ -133,17 +145,25 @@ export function App() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', height: '100vh', display: 'flex' }}>
       <div className="sidebar">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            className={`sidebar-item${activeTab === tab.id ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-            style={{ position: 'relative' }}
-          >
-            {tab.label}
-            {tab.id === 'about' && showDot && <span className="sidebar-dot" />}
-          </button>
-        ))}
+        {TABS.map((item, i) => {
+          if (item.type === 'group') {
+            return <div key={`group-${i}`} className="sidebar-group">{item.label}</div>
+          }
+          if (item.type === 'divider') {
+            return <div key={`div-${i}`} className="sidebar-divider" />
+          }
+          return (
+            <button
+              key={item.id}
+              className={`sidebar-item${activeTab === item.id ? ' active' : ''}`}
+              onClick={() => setActiveTab(item.id)}
+              style={{ position: 'relative' }}
+            >
+              {item.label}
+              {item.id === 'about' && showDot && <span className="sidebar-dot" />}
+            </button>
+          )
+        })}
       </div>
       <div style={{ flex: 1, padding: 24, overflow: 'auto', position: 'relative', display: 'flex', flexDirection: 'column' }}>
         <span className={`saved-toast${saved ? ' visible' : ''}`}
@@ -154,7 +174,9 @@ export function App() {
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
         {activeTab === 'models' && <ModelsTab config={config} onSave={handleSave} />}
-        {activeTab === 'prompts' && <PromptsTab config={config} onSave={handleSave} />}
+        {activeTab === 'extract' && <ExtractTab config={config} onSave={handleSave} />}
+        {activeTab === 'voice-prompts' && <VoicePromptsTab config={config} onSave={handleSave} />}
+        {activeTab === 'extract-prompts' && <ExtractPromptsTab config={config} onSave={handleSave} />}
         {activeTab === 'about' && (
           <AboutTab
             updateState={updateState}

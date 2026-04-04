@@ -79,6 +79,21 @@
   font-weight: 500;
 }
 
+.sidebar-group {
+  font-size: 10px;
+  color: var(--text-disabled);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 4px 16px;
+  margin: 12px 8px 4px;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 8px 16px;
+}
+
 /* === Setting Group === */
 .setting-group {
   background: var(--group-bg);
