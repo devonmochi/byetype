@@ -157,7 +157,7 @@ function RecordRow({ record, retryStage, onRetry }: RecordRowProps) {
           <div className="history-pipeline">
             <span className="history-stage-dot"><StageIndicator status={info.screenshot} /> 截图</span>
             <span className="history-arrow">{'\u2192'}</span>
-            <span className="history-stage-dot"><StageIndicator status={info.extract.status} /> 提取</span>
+            <span className="history-stage-dot"><StageIndicator status={info.extract.status} /> 识别</span>
           </div>
           <button
             className={`history-retry-btn${(record.status === 'failed' || record.status === 'cancelled') && !isRetrying && !screenshotMissing ? ' highlight' : ''}`}
@@ -170,7 +170,7 @@ function RecordRow({ record, retryStage, onRetry }: RecordRowProps) {
         </div>
         <div className="history-row-bottom">
           <div className="history-text-cell">
-            <span className="history-text-label">提取</span>
+            <span className="history-text-label">识别</span>
             <span
               className="history-text-content"
               style={info.extract.status === 'error' ? { color: '#ff3b30' } : undefined}

@@ -13,7 +13,7 @@ const shapeMap: Record<string, () => string> = {
   optimizing: () =>
     `<div class="s-optimizing">Thinking...<span class="cancel-btn">\u2715</span></div>`,
   extracting: () =>
-    `<div class="s-extracting">Extracting...<span class="cancel-btn">\u2715</span></div>`,
+    `<div class="s-extracting">Thinking...<span class="cancel-btn">\u2715</span></div>`,
   retrying: () =>
     `<div class="s-retrying">Thinking...<span class="cancel-btn">\u2715</span></div>`,
   completed: () =>
