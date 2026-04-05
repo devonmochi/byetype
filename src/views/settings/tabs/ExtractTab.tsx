@@ -1,5 +1,5 @@
 import type { AppConfig } from '../../../core/types'
-import { getTextModels } from '../../../core/models'
+import { getVisionModels } from '../../../core/models'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 
@@ -11,9 +11,9 @@ interface Props {
 export function ExtractTab({ config, onSave }: Props) {
   const { extract } = config
 
-  const textModels = getTextModels(config)
-  const builtinText = textModels.filter(m => m.builtin)
-  const customText = textModels.filter(m => !m.builtin)
+  const visionModels = getVisionModels(config)
+  const builtinVision = visionModels.filter(m => m.builtin)
+  const customVision = visionModels.filter(m => !m.builtin)
 
   const updateExtract = (changes: Partial<AppConfig['extract']>) => {
     onSave({ ...config, extract: { ...extract, ...changes } })
@@ -32,11 +32,11 @@ export function ExtractTab({ config, onSave }: Props) {
             style={{ width: 260 }}
           >
             <optgroup label="预置模型">
-              {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+              {builtinVision.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
             </optgroup>
-            {customText.length > 0 && (
+            {customVision.length > 0 && (
               <optgroup label="自定义模型">
-                {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+                {customVision.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
               </optgroup>
             )}
           </select>
