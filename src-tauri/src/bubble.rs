@@ -30,6 +30,17 @@ fn cursor_position() -> (f64, f64) {
             }
         }
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::Foundation::POINT;
+        use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+        let mut point = POINT { x: 0, y: 0 };
+        if unsafe { GetCursorPos(&mut point) } != 0 {
+            return (point.x as f64, point.y as f64);
+        }
+    }
+
     (100.0, 100.0)
 }
 
