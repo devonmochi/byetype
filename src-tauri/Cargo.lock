@@ -431,6 +431,7 @@ dependencies = [
  "cpal",
  "dirs 6.0.0",
  "flacenc",
+ "image",
  "objc",
  "open",
  "reqwest",
