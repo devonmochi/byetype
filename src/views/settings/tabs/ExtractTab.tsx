@@ -21,17 +21,16 @@ export function ExtractTab({ config, onSave }: Props) {
 
   return (
     <div>
-      <h2 className="content-title">识别设置</h2>
+      <h2 className="content-title">图像识别设置</h2>
 
       <SettingGroup title="模型">
-        <SettingRow label="图像识别模型" description="留空则使用与转写相同的模型">
+        <SettingRow label="图像识别模型">
           <select
             className="select"
             value={extract.modelId || ''}
             onChange={e => updateExtract({ modelId: e.target.value || undefined })}
             style={{ width: 260 }}
           >
-            <option value="">与转写相同</option>
             <optgroup label="预置模型">
               {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
             </optgroup>
