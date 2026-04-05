@@ -8,6 +8,7 @@ pub struct BuiltinModel {
     pub base_url: &'static str,
     pub supports_audio: bool,
     pub supports_text: bool,
+    pub supports_vision: bool,
 }
 
 pub static BUILTIN_MODELS: &[BuiltinModel] = &[
@@ -19,6 +20,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
         supports_audio: true,
         supports_text: true,
+        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-qwen-omni-flash",
@@ -28,6 +30,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
         supports_audio: true,
         supports_text: true,
+        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-gemini-3-flash",
@@ -37,6 +40,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         base_url: "https://generativelanguage.googleapis.com",
         supports_audio: true,
         supports_text: true,
+        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-gemini-3.1-flash-lite",
@@ -46,6 +50,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         base_url: "https://generativelanguage.googleapis.com",
         supports_audio: true,
         supports_text: true,
+        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-deepseek-chat",
@@ -55,6 +60,37 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         base_url: "https://api.deepseek.com/v1",
         supports_audio: false,
         supports_text: true,
+        supports_vision: false,
+    },
+    BuiltinModel {
+        id: "builtin-or-qwen3.6-plus-free",
+        provider: "OpenRouter",
+        model: "qwen/qwen3.6-plus:free",
+        protocol: "openai-compat",
+        base_url: "https://openrouter.ai/api/v1",
+        supports_audio: false,
+        supports_text: true,
+        supports_vision: true,
+    },
+    BuiltinModel {
+        id: "builtin-or-gemini-3-flash",
+        provider: "OpenRouter",
+        model: "google/gemini-3-flash-preview",
+        protocol: "openai-compat",
+        base_url: "https://openrouter.ai/api/v1",
+        supports_audio: true,
+        supports_text: true,
+        supports_vision: true,
+    },
+    BuiltinModel {
+        id: "builtin-or-gemini-3.1-flash-lite",
+        provider: "OpenRouter",
+        model: "google/gemini-3.1-flash-lite-preview",
+        protocol: "openai-compat",
+        base_url: "https://openrouter.ai/api/v1",
+        supports_audio: true,
+        supports_text: true,
+        supports_vision: true,
     },
 ];
 
@@ -67,11 +103,15 @@ pub struct ResolvedModel {
 
 pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel, String> {
     if let Some(builtin) = BUILTIN_MODELS.iter().find(|m| m.id == model_id) {
-        let api_key = match builtin.protocol {
-            "gemini" => &config.models.builtin_api_keys.gemini,
-            "openai-compat" => &config.models.builtin_api_keys.deepseek,
-            "qwen-omni" => &config.models.builtin_api_keys.dashscope,
-            _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
+        let api_key = if model_id.starts_with("builtin-or-") {
+            &config.models.builtin_api_keys.openrouter
+        } else {
+            match builtin.protocol {
+                "gemini" => &config.models.builtin_api_keys.gemini,
+                "openai-compat" => &config.models.builtin_api_keys.deepseek,
+                "qwen-omni" => &config.models.builtin_api_keys.dashscope,
+                _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
+            }
         };
         return Ok(ResolvedModel {
             protocol: builtin.protocol.to_string(),
