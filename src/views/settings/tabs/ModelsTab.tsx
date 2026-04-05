@@ -13,7 +13,7 @@ interface TestResults {
 }
 
 const EMPTY_FORM: Omit<CustomModelEntry, 'id'> = {
-  provider: '', model: '', protocol: 'gemini', baseUrl: '', apiKey: '', supportsAudio: true, supportsText: true,
+  provider: '', model: '', protocol: 'gemini', baseUrl: '', apiKey: '', supportsAudio: true, supportsText: true, supportsVision: true,
 }
 
 export function ModelsTab({ config, onSave }: Props) {
@@ -23,6 +23,7 @@ export function ModelsTab({ config, onSave }: Props) {
   const [form, setForm] = useState(EMPTY_FORM)
 
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
+  const [showCustom, setShowCustom] = useState(false)
 
   const toggleKeyVisibility = (key: string) => {
     setVisibleKeys(prev => ({ ...prev, [key]: !prev[key] }))
@@ -44,7 +45,7 @@ export function ModelsTab({ config, onSave }: Props) {
     )
   )
 
-  const updateBuiltinKey = (key: 'gemini' | 'deepseek' | 'dashscope', value: string) => {
+  const updateBuiltinKey = (key: 'gemini' | 'deepseek' | 'dashscope' | 'openrouter', value: string) => {
     onSave({ ...config, models: { ...config.models, builtinApiKeys: { ...config.models.builtinApiKeys, [key]: value } } })
   }
 
@@ -80,7 +81,7 @@ export function ModelsTab({ config, onSave }: Props) {
 
   const startEdit = (entry: CustomModelEntry) => {
     setEditingId(entry.id)
-    setForm({ provider: entry.provider, model: entry.model, protocol: entry.protocol, baseUrl: entry.baseUrl, apiKey: entry.apiKey, supportsAudio: entry.supportsAudio, supportsText: entry.supportsText })
+    setForm({ provider: entry.provider, model: entry.model, protocol: entry.protocol, baseUrl: entry.baseUrl, apiKey: entry.apiKey, supportsAudio: entry.supportsAudio, supportsText: entry.supportsText, supportsVision: entry.supportsVision })
     setShowForm(true)
   }
 
@@ -97,10 +98,10 @@ export function ModelsTab({ config, onSave }: Props) {
   const geminiKey = config.models.builtinApiKeys.gemini
   const deepseekKey = config.models.builtinApiKeys.deepseek
 
-  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'deepseek' | 'dashscope'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
+  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'deepseek' | 'dashscope' | 'openrouter'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
     if (!acc[m.provider]) {
-      const keyField = m.protocol === 'gemini' ? 'gemini' : m.protocol === 'qwen-omni' ? 'dashscope' : 'deepseek'
-      const placeholder = m.protocol === 'gemini' ? 'AIzaSy...' : 'sk-...'
+      const keyField = m.provider === 'OpenRouter' ? 'openrouter' : m.protocol === 'gemini' ? 'gemini' : m.protocol === 'qwen-omni' ? 'dashscope' : 'deepseek'
+      const placeholder = m.provider === 'OpenRouter' ? 'sk-or-v1-...' : m.protocol === 'gemini' ? 'AIzaSy...' : 'sk-...'
       acc[m.provider] = { keyField, placeholder, models: [] }
     }
     acc[m.provider].models.push(m)
@@ -116,7 +117,10 @@ export function ModelsTab({ config, onSave }: Props) {
 
       <div className="models-section-title">预置模型</div>
       {Object.entries(builtinByProvider).map(([provider, group]) => {
-        const keyValue = group.keyField === 'gemini' ? geminiKey : group.keyField === 'dashscope' ? config.models.builtinApiKeys.dashscope : deepseekKey
+        const keyValue = group.keyField === 'gemini' ? geminiKey
+          : group.keyField === 'dashscope' ? config.models.builtinApiKeys.dashscope
+          : group.keyField === 'openrouter' ? config.models.builtinApiKeys.openrouter
+          : deepseekKey
         return (
           <div key={provider} className="model-card">
             <div className="model-card-header">
@@ -148,21 +152,25 @@ export function ModelsTab({ config, onSave }: Props) {
         )
       })}
 
-      <div className="models-section-title">自定义模型</div>
-      {config.models.custom.map(entry => (
-        <div key={entry.id} className="model-card">
-          <div className="model-card-header">
-            <span className="model-card-title">{entry.provider} - {entry.model}</span>
-            <div className="model-card-actions">
-              {renderTestResult(entry.id)}
-              <button className="model-test-btn" onClick={() => testModel(entry.id)}>测试</button>
-              <button className="model-action-btn" onClick={() => startEdit(entry)}>编辑</button>
-              <button className="model-action-btn danger" onClick={() => deleteCustomModel(entry.id)}>删除</button>
+      <div className="models-section-title" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setShowCustom(!showCustom)}>
+        自定义模型 {showCustom ? '▼' : '▶'}
+      </div>
+      {showCustom ? (
+        <>
+          {config.models.custom.map(entry => (
+            <div key={entry.id} className="model-card">
+              <div className="model-card-header">
+                <span className="model-card-title">{entry.provider} - {entry.model}</span>
+                <div className="model-card-actions">
+                  {renderTestResult(entry.id)}
+                  <button className="model-test-btn" onClick={() => testModel(entry.id)}>测试</button>
+                  <button className="model-action-btn" onClick={() => startEdit(entry)}>编辑</button>
+                  <button className="model-action-btn danger" onClick={() => deleteCustomModel(entry.id)}>删除</button>
+                </div>
+              </div>
+              <div className="model-card-subtitle">{entry.protocol} · {entry.baseUrl}</div>
             </div>
-          </div>
-          <div className="model-card-subtitle">{entry.protocol} · {entry.baseUrl}</div>
-        </div>
-      ))}
+          ))}
 
       {showForm ? (
         <div className="model-form">
@@ -171,10 +179,13 @@ export function ModelsTab({ config, onSave }: Props) {
             <label>协议类型</label>
             <div style={{ display: 'flex', gap: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
-                <input type="radio" checked={form.protocol === 'gemini'} onChange={() => setForm(f => ({ ...f, protocol: 'gemini' }))} /> Gemini
+                <input type="radio" checked={form.protocol === 'gemini'} onChange={() => setForm(f => ({ ...f, protocol: 'gemini', baseUrl: '' }))} /> Gemini
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
-                <input type="radio" checked={form.protocol === 'openai-compat'} onChange={() => setForm(f => ({ ...f, protocol: 'openai-compat' }))} /> OpenAI 兼容
+                <input type="radio" checked={form.protocol === 'openai-compat' && form.baseUrl !== 'https://openrouter.ai/api/v1'} onChange={() => setForm(f => ({ ...f, protocol: 'openai-compat', baseUrl: '' }))} /> OpenAI 兼容
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input type="radio" checked={form.protocol === 'openai-compat' && form.baseUrl === 'https://openrouter.ai/api/v1'} onChange={() => setForm(f => ({ ...f, protocol: 'openai-compat', baseUrl: 'https://openrouter.ai/api/v1' }))} /> OpenRouter
               </label>
             </div>
           </div>
@@ -183,6 +194,9 @@ export function ModelsTab({ config, onSave }: Props) {
             <div style={{ display: 'flex', gap: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
                 <input type="checkbox" checked={form.supportsAudio} onChange={e => setForm(f => ({ ...f, supportsAudio: e.target.checked }))} /> 音频转写
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input type="checkbox" checked={form.supportsVision} onChange={e => setForm(f => ({ ...f, supportsVision: e.target.checked }))} /> 图像识别
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)' }}>
                 <input type="checkbox" checked={form.supportsText} onChange={e => setForm(f => ({ ...f, supportsText: e.target.checked }))} /> 文本处理
@@ -205,11 +219,15 @@ export function ModelsTab({ config, onSave }: Props) {
           </div>
           <div className="model-form-actions">
             <button className="model-form-btn" onClick={cancelForm}>取消</button>
-            <button className="model-form-btn primary" onClick={saveCustomModel} disabled={!form.provider || !form.baseUrl || !form.model || (!form.supportsAudio && !form.supportsText)}>保存</button>
+            <button className="model-form-btn primary" onClick={saveCustomModel} disabled={!form.provider || !form.baseUrl || !form.model || (!form.supportsAudio && !form.supportsText && !form.supportsVision)}>保存</button>
           </div>
         </div>
       ) : (
         <button className="add-model-btn" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true) }}>+ 添加自定义模型</button>
+      )}
+        </>
+      ) : (
+        <button className="add-model-btn" onClick={() => setShowCustom(true)} style={{ color: 'var(--text-tertiary)', borderColor: 'var(--border-secondary)', fontSize: 12 }}>展开自定义模型</button>
       )}
     </div>
   )
