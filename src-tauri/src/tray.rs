@@ -10,6 +10,8 @@ fn show_settings(app: &AppHandle) {
         // Temporarily become a Regular app so macOS activates the window
         #[cfg(target_os = "macos")]
         let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        #[cfg(target_os = "windows")]
+        let _ = win.set_skip_taskbar(false);
 
         let _ = win.center();
         let _ = win.show();

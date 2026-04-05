@@ -100,13 +100,15 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Intercept settings window close: hide instead of destroy, revert to Accessory
+            // Intercept settings window close: hide instead of destroy
             if window.label() == "settings" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
                     #[cfg(target_os = "macos")]
                     let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    #[cfg(target_os = "windows")]
+                    let _ = window.set_skip_taskbar(true);
                 }
             }
         })
