@@ -31,6 +31,7 @@
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-unregister-all",
+    "core:window:allow-start-dragging",
     "core:window:allow-create",
     "core:webview:allow-create-webview-window",
     "autostart:allow-enable",
