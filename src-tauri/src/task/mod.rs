@@ -468,54 +468,11 @@ pub fn start_extraction(app: &AppHandle) -> Option<u32> {
 }
 
 async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
-    let tmp_path = std::env::temp_dir().join(format!("byetype_capture_{}.png", task_id));
-
-    // Phase 0: Interactive screenshot capture
-    let capture_result = tokio::process::Command::new("screencapture")
-        .arg("-i")
-        .arg(tmp_path.as_os_str())
-        .output()
-        .await;
-
-    let exited_ok = match &capture_result {
-        Ok(output) => {
-            if !output.stderr.is_empty() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                eprintln!("[TaskManager] screencapture stderr: {}", stderr.trim());
-            }
-            output.status.success()
-        }
-        Err(e) => {
-            eprintln!("[TaskManager] screencapture failed to launch: {}", e);
-            false
-        }
+    // Phase 0: Interactive screenshot capture (platform-specific)
+    let image_base64 = match capture_screenshot(app, task_id).await {
+        Some(b64) => b64,
+        None => return, // User cancelled or capture failed
     };
-
-    if !exited_ok || !tmp_path.exists() {
-        // User cancelled the selection or screencapture failed — silent cleanup
-        let _ = std::fs::remove_file(&tmp_path);
-        let state = app.state::<SharedTaskManager>();
-        let mut mgr = state.lock().unwrap();
-        mgr.cancel_tokens.remove(&task_id);
-        mgr.active_count = mgr.active_count.saturating_sub(1);
-        return;
-    }
-
-    // Read and base64-encode the screenshot
-    let png_bytes = match std::fs::read(&tmp_path) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("[TaskManager] Failed to read screenshot: {}", e);
-            let _ = std::fs::remove_file(&tmp_path);
-            finish_extract_pipeline(
-                app, task_id, None, None, "failed",
-                Some(format!("Failed to read screenshot: {}", e)),
-            );
-            return;
-        }
-    };
-    let _ = std::fs::remove_file(&tmp_path);
-    let image_base64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
 
     // Show bubble with extracting status
     if let Err(e) = crate::bubble::show(app, task_id) {
@@ -646,4 +603,154 @@ fn finish_extract_pipeline(
 
     // Decrement active count
     mgr.active_count = mgr.active_count.saturating_sub(1);
+}
+
+/// Platform-specific screenshot capture. Returns base64-encoded PNG or None if cancelled/failed.
+async fn capture_screenshot(app: &AppHandle, task_id: u32) -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        return capture_screenshot_macos(app, task_id).await;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        return capture_screenshot_windows(app, task_id).await;
+    }
+
+    #[allow(unreachable_code)]
+    {
+        eprintln!("[TaskManager] Screenshot not supported on this platform");
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        None
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<String> {
+    let tmp_path = std::env::temp_dir().join(format!("byetype_capture_{}.png", task_id));
+
+    let capture_result = tokio::process::Command::new("screencapture")
+        .arg("-i")
+        .arg(tmp_path.as_os_str())
+        .output()
+        .await;
+
+    let exited_ok = match &capture_result {
+        Ok(output) => {
+            if !output.stderr.is_empty() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("[TaskManager] screencapture stderr: {}", stderr.trim());
+            }
+            output.status.success()
+        }
+        Err(e) => {
+            eprintln!("[TaskManager] screencapture failed to launch: {}", e);
+            false
+        }
+    };
+
+    if !exited_ok || !tmp_path.exists() {
+        let _ = std::fs::remove_file(&tmp_path);
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        return None;
+    }
+
+    let png_bytes = match std::fs::read(&tmp_path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("[TaskManager] Failed to read screenshot: {}", e);
+            let _ = std::fs::remove_file(&tmp_path);
+            finish_extract_pipeline(
+                app, task_id, None, None, "failed",
+                Some(format!("Failed to read screenshot: {}", e)),
+            );
+            return None;
+        }
+    };
+    let _ = std::fs::remove_file(&tmp_path);
+    Some(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
+}
+
+#[cfg(target_os = "windows")]
+async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<String> {
+    // Launch Snipping Tool in clipboard mode
+    let capture_result = tokio::process::Command::new("snippingtool")
+        .arg("/clip")
+        .output()
+        .await;
+
+    let exited_ok = match &capture_result {
+        Ok(output) => output.status.success(),
+        Err(e) => {
+            eprintln!("[TaskManager] snippingtool failed to launch: {}, trying ms-screenclip", e);
+            // Fallback: try ms-screenclip URI scheme
+            let fallback = tokio::process::Command::new("explorer")
+                .arg("ms-screenclip:")
+                .output()
+                .await;
+            // ms-screenclip returns immediately; wait a moment for user to complete capture
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            match &fallback {
+                Ok(output) => output.status.success(),
+                Err(e2) => {
+                    eprintln!("[TaskManager] ms-screenclip also failed: {}", e2);
+                    false
+                }
+            }
+        }
+    };
+
+    if !exited_ok {
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        return None;
+    }
+
+    // Read image from clipboard
+    let png_bytes = match clipboard_image_to_png() {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("[TaskManager] Failed to read clipboard image: {}", e);
+            // User likely cancelled — silent cleanup
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
+            return None;
+        }
+    };
+
+    Some(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
+}
+
+#[cfg(target_os = "windows")]
+fn clipboard_image_to_png() -> Result<Vec<u8>, String> {
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|e| format!("Failed to access clipboard: {}", e))?;
+    let img_data = clipboard.get_image()
+        .map_err(|e| format!("No image in clipboard: {}", e))?;
+
+    // Convert RGBA data to PNG bytes using image crate
+    use image::{ImageBuffer, RgbaImage};
+    let rgba: RgbaImage = ImageBuffer::from_raw(
+        img_data.width as u32,
+        img_data.height as u32,
+        img_data.bytes.into_owned(),
+    )
+    .ok_or_else(|| "Failed to create image buffer from clipboard data".to_string())?;
+
+    let mut png_buf: Vec<u8> = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut png_buf);
+    rgba.write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| format!("Failed to encode PNG: {}", e))?;
+
+    Ok(png_buf)
 }
