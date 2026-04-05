@@ -43,6 +43,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
                 "apiKey": api_key,
                 "supportsAudio": false,
                 "supportsText": true,
+                "supportsVision": false,
             }));
             "migrated-openai-compat".to_string()
         } else {
@@ -51,7 +52,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
     };
 
     raw["models"] = serde_json::json!({
-        "builtinApiKeys": { "gemini": gemini_api_key, "deepseek": "" },
+        "builtinApiKeys": { "gemini": gemini_api_key, "deepseek": "", "dashscope": "", "openrouter": "" },
         "custom": custom_models,
     });
 

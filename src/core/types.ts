@@ -29,12 +29,14 @@ export interface CustomModelEntry {
   apiKey: string
   supportsAudio: boolean
   supportsText: boolean
+  supportsVision: boolean
 }
 
 export interface BuiltinApiKeys {
   gemini: string
   deepseek: string
   dashscope: string
+  openrouter: string
 }
 
 export interface ModelsConfig {

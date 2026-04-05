@@ -12,6 +12,10 @@ pub struct AppConfig {
     pub advanced: AdvancedConfig,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 fn default_max_recording_seconds() -> u32 {
     180
 }
@@ -54,6 +58,8 @@ pub struct BuiltinApiKeys {
     pub deepseek: String,
     #[serde(default)]
     pub dashscope: String,
+    #[serde(default)]
+    pub openrouter: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +73,8 @@ pub struct CustomModelEntry {
     pub api_key: String,
     pub supports_audio: bool,
     pub supports_text: bool,
+    #[serde(default = "default_true")]
+    pub supports_vision: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +154,7 @@ impl Default for AppConfig {
                     gemini: String::new(),
                     deepseek: String::new(),
                     dashscope: String::new(),
+                    openrouter: String::new(),
                 },
                 custom: Vec::new(),
             },
