@@ -33,9 +33,13 @@ jobs:
         run: |
           PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p')
           if [ -z "$PREV_TAG" ]; then
-            NOTES=$(git log --pretty=format:'- %s' -10)
+            RAW=$(git log --pretty=format:'%s' -10)
           else
-            NOTES=$(git log --pretty=format:'- %s' ${PREV_TAG}..HEAD --no-merges)
+            RAW=$(git log --pretty=format:'%s' ${PREV_TAG}..HEAD --no-merges)
+          fi
+          NOTES=$(echo "$RAW" | grep -viE '^(chore|build|ci|docs|style|test|refactor)(\(.*\))?:' | sed -E 's/^[a-zA-Z]+(\(.*\))?:[[:space:]]*//' | sed 's/^/- /')
+          if [ -z "$NOTES" ]; then
+            NOTES=$(echo "$RAW" | sed -E 's/^[a-zA-Z]+(\(.*\))?:[[:space:]]*//' | sed 's/^/- /')
           fi
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
