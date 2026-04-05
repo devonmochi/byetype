@@ -51,6 +51,8 @@ pub fn run() {
             commands::list_input_devices,
             commands::test_model_connectivity,
             commands::update_clipboard_text,
+            preview::set_preview_pinned,
+            preview::close_preview_window,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

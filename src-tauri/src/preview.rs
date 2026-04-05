@@ -1,6 +1,24 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
 
+static PINNED: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn set_preview_pinned(pinned: bool) {
+    PINNED.store(pinned, Ordering::Relaxed);
+}
+
+#[tauri::command]
+pub fn close_preview_window(app: AppHandle) {
+    if let Some(window) = app.get_webview_window("preview") {
+        let _ = window.close();
+    }
+}
+
 pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
+    // Reset pinned state for each new preview
+    PINNED.store(false, Ordering::Relaxed);
+
     // Close existing preview window if any
     if let Some(window) = app.get_webview_window("preview") {
         let _ = window.close();
@@ -31,12 +49,14 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         let _ = window_clone.show();
     });
 
-    // Close window on blur (focus lost)
+    // Close window on blur (focus lost) — only if not pinned
     let app_handle = app.clone();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::Focused(false) = event {
-            if let Some(w) = app_handle.get_webview_window("preview") {
-                let _ = w.close();
+            if !PINNED.load(Ordering::Relaxed) {
+                if let Some(w) = app_handle.get_webview_window("preview") {
+                    let _ = w.close();
+                }
             }
         }
     });
