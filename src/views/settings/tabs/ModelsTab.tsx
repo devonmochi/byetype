@@ -141,6 +141,11 @@ export function ModelsTab({ config, onSave }: Props) {
               {group.models.map(m => (
                 <div key={m.id} className="provider-model-item">
                   <span className="provider-model-name">{m.model}</span>
+                  <span className="model-caps">
+                    {m.supportsAudio && <span className="cap-tag cap-audio">音频</span>}
+                    {m.supportsVision && <span className="cap-tag cap-vision">图像</span>}
+                    {m.supportsText && <span className="cap-tag cap-text">文本</span>}
+                  </span>
                   <div className="model-card-actions">
                     {renderTestResult(m.id)}
                     <button className="model-test-btn" onClick={() => testModel(m.id)}>测试</button>
@@ -168,7 +173,14 @@ export function ModelsTab({ config, onSave }: Props) {
                   <button className="model-action-btn danger" onClick={() => deleteCustomModel(entry.id)}>删除</button>
                 </div>
               </div>
-              <div className="model-card-subtitle">{entry.protocol} · {entry.baseUrl}</div>
+              <div className="model-card-subtitle">
+                {entry.protocol} · {entry.baseUrl}
+                <span className="model-caps" style={{ marginLeft: 8 }}>
+                  {entry.supportsAudio && <span className="cap-tag cap-audio">音频</span>}
+                  {entry.supportsVision && <span className="cap-tag cap-vision">图像</span>}
+                  {entry.supportsText && <span className="cap-tag cap-text">文本</span>}
+                </span>
+              </div>
             </div>
           ))}
 
