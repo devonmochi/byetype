@@ -28,7 +28,7 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
     let line_count = text.lines().count().max(3).min(20);
     let max_line_len = text.lines().map(|l| l.len()).max().unwrap_or(40);
     let width = (max_line_len as f64 * 8.0 + 80.0).clamp(320.0, 600.0);
-    let height = (line_count as f64 * 22.0 + 80.0).clamp(120.0, 400.0);
+    let height = (line_count as f64 * 22.0 + 140.0).clamp(180.0, 460.0);
 
     let window = WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
         .title("ByeType Preview")

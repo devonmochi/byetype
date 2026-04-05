@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const PinIcon = ({ pinned }: { pinned: boolean }) => (
   <svg
@@ -61,7 +62,7 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* 标题栏 */}
       <div
-        data-tauri-drag-region
+        onMouseDown={() => getCurrentWindow().startDragging()}
         style={{
           display: 'flex',
           alignItems: 'center',
