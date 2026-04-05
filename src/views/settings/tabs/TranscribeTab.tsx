@@ -46,6 +46,14 @@ const PRESETS: PresetConfig[] = [
     transcribeModelId: 'builtin-gemini-3.1-flash-lite',
     optimizeModelId: 'builtin-gemini-3.1-flash-lite',
   },
+  {
+    id: 'openrouter',
+    title: '🌐 OpenRouter',
+    desc: 'Gemini 3 Flash via OpenRouter',
+    tag: '需代理',
+    transcribeModelId: 'builtin-or-gemini-3-flash',
+    optimizeModelId: 'builtin-or-qwen3.6-plus-free',
+  },
 ]
 
 interface Props {
