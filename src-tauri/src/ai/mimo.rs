@@ -26,6 +26,7 @@ pub async fn transcribe(
                         audio_type: None,
                         data: format!("data:;base64,{}", audio_base64),
                         format: "flac".to_string(),
+                        sample_rate: None,
                     },
                 }]),
             },
