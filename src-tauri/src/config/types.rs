@@ -60,6 +60,8 @@ pub struct BuiltinApiKeys {
     pub dashscope: String,
     #[serde(default)]
     pub openrouter: String,
+    #[serde(default)]
+    pub mimo: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +157,7 @@ impl Default for AppConfig {
                     deepseek: String::new(),
                     dashscope: String::new(),
                     openrouter: String::new(),
+                    mimo: String::new(),
                 },
                 custom: Vec::new(),
             },
