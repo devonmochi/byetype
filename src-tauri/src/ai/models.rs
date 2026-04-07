@@ -92,6 +92,16 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_text: true,
         supports_vision: true,
     },
+    BuiltinModel {
+        id: "builtin-mimo-v2-omni",
+        provider: "小米 MiMo",
+        model: "mimo-v2-omni",
+        protocol: "mimo",
+        base_url: "https://api.xiaomimimo.com/v1",
+        supports_audio: true,
+        supports_text: true,
+        supports_vision: true,
+    },
 ];
 
 pub struct ResolvedModel {
@@ -110,6 +120,7 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
                 "gemini" => &config.models.builtin_api_keys.gemini,
                 "openai-compat" => &config.models.builtin_api_keys.deepseek,
                 "qwen-omni" => &config.models.builtin_api_keys.dashscope,
+                "mimo" => &config.models.builtin_api_keys.mimo,
                 _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
             }
         };

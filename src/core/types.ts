@@ -24,7 +24,7 @@ export interface CustomModelEntry {
   id: string
   provider: string
   model: string
-  protocol: 'gemini' | 'openai-compat' | 'qwen-omni'
+  protocol: 'gemini' | 'openai-compat' | 'qwen-omni' | 'mimo'
   baseUrl: string
   apiKey: string
   supportsAudio: boolean
@@ -37,6 +37,7 @@ export interface BuiltinApiKeys {
   deepseek: string
   dashscope: string
   openrouter: string
+  mimo: string
 }
 
 export interface ModelsConfig {

@@ -2,6 +2,7 @@ pub mod types;
 pub mod retry;
 pub mod gemini;
 pub mod openai_compat;
+pub mod mimo;
 pub mod prompt;
 pub mod models;
 
@@ -33,6 +34,17 @@ pub async fn transcribe(
         }
         "qwen-omni" => {
             openai_compat::qwen_omni_transcribe(
+                client,
+                audio_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
+        "mimo" => {
+            mimo::transcribe(
                 client,
                 audio_base64,
                 &system_prompt,
@@ -92,6 +104,17 @@ pub async fn extract_text(
             )
             .await
         }
+        "mimo" => {
+            mimo::extract_text(
+                client,
+                image_base64,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
         _ => {
             openai_compat::extract_text(
                 client,
@@ -139,6 +162,17 @@ pub async fn optimize(
         }
         "qwen-omni" => {
             openai_compat::qwen_omni_optimize(
+                client,
+                text,
+                &system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
+        "mimo" => {
+            mimo::optimize(
                 client,
                 text,
                 &system_prompt,

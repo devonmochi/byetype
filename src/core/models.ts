@@ -4,7 +4,7 @@ export interface ModelEntry {
   id: string
   provider: string
   model: string
-  protocol: 'gemini' | 'openai-compat' | 'qwen-omni'
+  protocol: 'gemini' | 'openai-compat' | 'qwen-omni' | 'mimo'
   baseUrl: string
   apiKey: string
   builtin: boolean
@@ -102,6 +102,17 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsText: true,
     supportsVision: true,
   },
+  {
+    id: 'builtin-mimo-v2-omni',
+    provider: '小米 MiMo',
+    model: 'mimo-v2-omni',
+    protocol: 'mimo',
+    baseUrl: 'https://api.xiaomimimo.com/v1',
+    builtin: true,
+    supportsAudio: true,
+    supportsText: true,
+    supportsVision: true,
+  },
 ]
 
 export function getAllModels(config: AppConfig): ModelEntry[] {
@@ -111,6 +122,7 @@ export function getAllModels(config: AppConfig): ModelEntry[] {
     else if (b.protocol === 'gemini') apiKey = config.models.builtinApiKeys.gemini
     else if (b.id === 'builtin-deepseek-chat') apiKey = config.models.builtinApiKeys.deepseek
     else if (b.protocol === 'qwen-omni') apiKey = config.models.builtinApiKeys.dashscope
+    else if (b.protocol === 'mimo') apiKey = config.models.builtinApiKeys.mimo
     return { ...b, apiKey }
   })
   const customs: ModelEntry[] = config.models.custom.map(c => ({
