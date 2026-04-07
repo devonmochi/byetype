@@ -213,8 +213,8 @@ pub fn retry_record(app: &AppHandle, record_id: u64) {
     });
 }
 
-fn build_client(proxy_url: &str) -> Result<reqwest::Client, String> {
-    if proxy_url.is_empty() {
+fn build_client(proxy_enabled: bool, proxy_url: &str) -> Result<reqwest::Client, String> {
+    if !proxy_enabled || proxy_url.is_empty() {
         reqwest::Client::builder()
             .build()
             .map_err(|e| format!("Failed to build HTTP client: {}", e))
@@ -247,7 +247,7 @@ async fn run_pipeline(
     let optimize_timeout = config.advanced.optimize_timeout;
 
     // Build HTTP client (once per pipeline run)
-    let client = match build_client(&config.advanced.proxy_url) {
+    let client = match build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("[TaskManager] Failed to build client: {}", e);
@@ -512,7 +512,7 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
     let extract_timeout = config.advanced.transcribe_timeout; // reuse transcribe timeout for extract
 
     // Build HTTP client
-    let client = match build_client(&config.advanced.proxy_url) {
+    let client = match build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("[TaskManager] Failed to build client: {}", e);
@@ -696,13 +696,31 @@ async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<Strin
 async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<String> {
     use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-    // 1. Capture full screen with xcap (blocking, run on thread pool)
+    // 1. Capture the monitor where the cursor is (blocking, run on thread pool)
     let full_image = match tokio::task::spawn_blocking(|| {
+        use windows_sys::Win32::Foundation::POINT;
+        use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+
         let monitors = xcap::Monitor::all().map_err(|e| format!("Monitor::all failed: {}", e))?;
         if monitors.is_empty() {
             return Err("No monitors found".to_string());
         }
-        monitors[0]
+
+        // Find the monitor containing the cursor
+        let mut cursor = POINT { x: 0, y: 0 };
+        let target = if unsafe { GetCursorPos(&mut cursor) } != 0 {
+            monitors.iter().find(|m| {
+                let mx = m.x();
+                let my = m.y();
+                let mw = m.width() as i32;
+                let mh = m.height() as i32;
+                cursor.x >= mx && cursor.x < mx + mw && cursor.y >= my && cursor.y < my + mh
+            }).unwrap_or(&monitors[0])
+        } else {
+            &monitors[0]
+        };
+
+        target
             .capture_image()
             .map_err(|e| format!("capture_image failed: {}", e))
     })
