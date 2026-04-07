@@ -2,11 +2,7 @@ use arboard::Clipboard;
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use core_graphics::event::{CGEvent, CGEventFlags, CGKeyCode, CGEventTapLocation};
-    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
     use std::ffi::c_void;
-
-    const KEY_V: CGKeyCode = 9;
 
     extern "C" {
         fn CFStringCreateWithCString(
@@ -56,85 +52,29 @@ mod macos {
             trusted
         }
     }
-
-    pub fn simulate_paste() -> Result<(), String> {
-        let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
-            .map_err(|_| "Failed to create CGEventSource".to_string())?;
-
-        let key_down = CGEvent::new_keyboard_event(source.clone(), KEY_V, true)
-            .map_err(|_| "Failed to create key down event".to_string())?;
-        key_down.set_flags(CGEventFlags::CGEventFlagCommand);
-
-        let key_up = CGEvent::new_keyboard_event(source, KEY_V, false)
-            .map_err(|_| "Failed to create key up event".to_string())?;
-        key_up.set_flags(CGEventFlags::CGEventFlagCommand);
-
-        key_down.post(CGEventTapLocation::HID);
-        key_up.post(CGEventTapLocation::HID);
-
-        Ok(())
-    }
 }
 
-#[cfg(target_os = "windows")]
-mod windows {
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput,
-        INPUT,
-        INPUT_0,
-        INPUT_KEYBOARD,
-        KEYBDINPUT,
-        KEYEVENTF_KEYUP,
-        VK_CONTROL,
-        VK_V,
-    };
+fn simulate_paste() -> Result<(), String> {
+    use enigo::{Enigo, Keyboard, Settings, Key, Direction};
 
-    pub fn simulate_paste() -> Result<(), String> {
-        let vk_control = u16::try_from(VK_CONTROL)
-            .map_err(|_| "Invalid VK_CONTROL value".to_string())?;
-        let vk_v = u16::try_from(VK_V)
-            .map_err(|_| "Invalid VK_V value".to_string())?;
+    let mut enigo = Enigo::new(&Settings::default())
+        .map_err(|e| format!("Failed to create Enigo instance: {}", e))?;
 
-        let inputs = [
-            keyboard_input(vk_control, 0),
-            keyboard_input(vk_v, 0),
-            keyboard_input(vk_v, KEYEVENTF_KEYUP),
-            keyboard_input(vk_control, KEYEVENTF_KEYUP),
-        ];
+    #[cfg(target_os = "macos")]
+    let modifier = Key::Meta;
+    #[cfg(target_os = "windows")]
+    let modifier = Key::Control;
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    compile_error!("simulate_paste is only supported on macOS and Windows");
 
-        let sent = unsafe {
-            SendInput(
-                inputs.len() as u32,
-                inputs.as_ptr(),
-                std::mem::size_of::<INPUT>() as i32,
-            )
-        };
+    enigo.key(modifier, Direction::Press)
+        .map_err(|e| format!("Failed to press modifier: {}", e))?;
+    enigo.key(Key::Unicode('v'), Direction::Click)
+        .map_err(|e| format!("Failed to press V: {}", e))?;
+    enigo.key(modifier, Direction::Release)
+        .map_err(|e| format!("Failed to release modifier: {}", e))?;
 
-        if sent != inputs.len() as u32 {
-            return Err(format!(
-                "Failed to simulate paste: SendInput sent {}/{} events",
-                sent,
-                inputs.len()
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn keyboard_input(vk: u16, flags: u32) -> INPUT {
-        INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 {
-                ki: KEYBDINPUT {
-                    wVk: vk,
-                    wScan: 0,
-                    dwFlags: flags,
-                    time: 0,
-                    dwExtraInfo: 0,
-                },
-            },
-        }
-    }
+    Ok(())
 }
 
 pub fn paste_text(text: &str) -> Result<(), String> {
@@ -149,13 +89,9 @@ pub fn paste_text(text: &str) -> Result<(), String> {
             return Err("Accessibility permission not granted, please allow in System Settings".to_string());
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
-        macos::simulate_paste()?;
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        windows::simulate_paste()?;
-    }
+    simulate_paste()?;
 
     Ok(())
 }
