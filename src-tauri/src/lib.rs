@@ -13,6 +13,7 @@ mod updater;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use config::ConfigManager;
+use task::{ScreenshotSender, ScreenshotImageState};
 use audio::recorder::AudioRecorder;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -51,6 +52,8 @@ pub fn run() {
             commands::list_input_devices,
             commands::test_model_connectivity,
             commands::update_clipboard_text,
+            task::get_screenshot_image,
+            task::submit_screenshot_crop,
             preview::set_preview_pinned,
             preview::close_preview_window,
         ])
@@ -72,6 +75,8 @@ pub fn run() {
             let task_manager: task::SharedTaskManager =
                 Arc::new(Mutex::new(task::TaskManager::new(&data_dir, prompts_dir)));
             app.manage(task_manager);
+            app.manage::<ScreenshotSender>(Arc::new(Mutex::new(None)));
+            app.manage::<ScreenshotImageState>(Arc::new(Mutex::new(None)));
             app.manage(updater::UpdateState::new(None));
 
             let shortcut_key = if initial_shortcut.is_empty() {
