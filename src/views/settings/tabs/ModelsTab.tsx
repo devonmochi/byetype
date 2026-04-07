@@ -45,7 +45,7 @@ export function ModelsTab({ config, onSave }: Props) {
     )
   )
 
-  const updateBuiltinKey = (key: 'gemini' | 'deepseek' | 'dashscope' | 'openrouter' | 'mimo', value: string) => {
+  const updateBuiltinKey = (key: 'gemini' | 'deepseek' | 'dashscope' | 'openrouter' | 'mimo' | 'longcat', value: string) => {
     onSave({ ...config, models: { ...config.models, builtinApiKeys: { ...config.models.builtinApiKeys, [key]: value } } })
   }
 
@@ -98,10 +98,10 @@ export function ModelsTab({ config, onSave }: Props) {
   const geminiKey = config.models.builtinApiKeys.gemini
   const deepseekKey = config.models.builtinApiKeys.deepseek
 
-  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'deepseek' | 'dashscope' | 'openrouter' | 'mimo'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
+  const builtinByProvider = BUILTIN_MODELS.reduce<Record<string, { keyField: 'gemini' | 'deepseek' | 'dashscope' | 'openrouter' | 'mimo' | 'longcat'; placeholder: string; models: typeof BUILTIN_MODELS }>>((acc, m) => {
     if (!acc[m.provider]) {
-      const keyField = m.provider === 'OpenRouter' ? 'openrouter' : m.protocol === 'gemini' ? 'gemini' : m.protocol === 'qwen-omni' ? 'dashscope' : m.protocol === 'mimo' ? 'mimo' : 'deepseek'
-      const placeholder = m.provider === 'OpenRouter' ? 'sk-or-v1-...' : m.protocol === 'gemini' ? 'AIzaSy...' : m.protocol === 'mimo' ? 'sk-...' : 'sk-...'
+      const keyField = m.provider === 'OpenRouter' ? 'openrouter' : m.protocol === 'gemini' ? 'gemini' : m.protocol === 'qwen-omni' ? 'dashscope' : m.protocol === 'mimo' ? 'mimo' : m.protocol === 'longcat' ? 'longcat' : 'deepseek'
+      const placeholder = m.provider === 'OpenRouter' ? 'sk-or-v1-...' : m.protocol === 'gemini' ? 'AIzaSy...' : m.protocol === 'longcat' ? 'ak_...' : 'sk-...'
       acc[m.provider] = { keyField, placeholder, models: [] }
     }
     acc[m.provider].models.push(m)
@@ -121,6 +121,7 @@ export function ModelsTab({ config, onSave }: Props) {
           : group.keyField === 'dashscope' ? config.models.builtinApiKeys.dashscope
           : group.keyField === 'openrouter' ? config.models.builtinApiKeys.openrouter
           : group.keyField === 'mimo' ? config.models.builtinApiKeys.mimo
+          : group.keyField === 'longcat' ? config.models.builtinApiKeys.longcat
           : deepseekKey
         return (
           <div key={provider} className="model-card">
