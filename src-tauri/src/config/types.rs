@@ -139,6 +139,8 @@ pub struct AdvancedConfig {
     pub optimize_timeout: u32,
     pub max_retries: u32,
     pub max_parallel: u32,
+    #[serde(default = "default_true")]
+    pub proxy_enabled: bool,
     pub proxy_url: String,
 }
 
@@ -193,6 +195,7 @@ impl Default for AppConfig {
                 optimize_timeout: 10,
                 max_retries: 3,
                 max_parallel: 3,
+                proxy_enabled: true,
                 proxy_url: String::new(),
             },
         }

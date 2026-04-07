@@ -70,6 +70,7 @@ export interface AdvancedConfig {
   optimizeTimeout: number
   maxRetries: number
   maxParallel: number
+  proxyEnabled: boolean
   proxyUrl: string
 }
 

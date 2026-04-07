@@ -271,14 +271,22 @@ export function GeneralTab({ config, onSave }: Props) {
             style={{ width: 100 }}
           />
         </SettingRow>
-        <SettingRow label="HTTP 代理地址" description="用于 Gemini 等需要代理的服务，留空不使用">
-          <input
-            className="input input-wide"
-            value={config.advanced.proxyUrl}
-            onChange={e => updateAdvanced({ proxyUrl: e.target.value })}
-            placeholder="http://127.0.0.1:10809"
+        <SettingRow label="HTTP 代理" description="用于 Gemini 等需要代理的服务">
+          <Toggle
+            checked={config.advanced.proxyEnabled}
+            onChange={checked => updateAdvanced({ proxyEnabled: checked })}
           />
         </SettingRow>
+        {config.advanced.proxyEnabled && (
+          <SettingRow label="代理地址">
+            <input
+              className="input input-wide"
+              value={config.advanced.proxyUrl}
+              onChange={e => updateAdvanced({ proxyUrl: e.target.value })}
+              placeholder="http://127.0.0.1:10809"
+            />
+          </SettingRow>
+        )}
       </SettingGroup>
     </div>
   )
