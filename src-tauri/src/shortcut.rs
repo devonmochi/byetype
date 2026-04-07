@@ -12,6 +12,19 @@ pub fn register(
     shortcut_key: &str,
     recorder: Arc<AudioRecorder>,
 ) -> Result<(), String> {
+    // Conflict check: recording shortcut vs extract shortcut
+    let extract_key = {
+        let cfg = app.state::<ConfigManager>().get();
+        if cfg.general.extract_shortcut.is_empty() {
+            "F6".to_string()
+        } else {
+            cfg.general.extract_shortcut.clone()
+        }
+    };
+    if shortcut_key == extract_key {
+        return Err("录音快捷键与提取快捷键冲突，请设置不同的快捷键".to_string());
+    }
+
     let app_handle = app.clone();
     // Track the current recording's task_id between start and stop
     let current_task_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));

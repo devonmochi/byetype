@@ -9,6 +9,16 @@ import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
 
+const IS_MACOS = navigator.platform.toUpperCase().includes('MAC')
+
+function formatShortcutDisplay(combo: string): string {
+  if (!IS_MACOS) return combo
+  return combo
+    .replace(/Command/g, '\u2318')
+    .replace(/Shift/g, '\u21E7')
+    .replace(/Alt/g, '\u2325')
+}
+
 interface Props {
   config: AppConfig
   onSave: (config: AppConfig) => void
@@ -18,6 +28,7 @@ export function GeneralTab({ config, onSave }: Props) {
   const [recording, setRecording] = useState(false)
   const [recordingExtract, setRecordingExtract] = useState(false)
   const [devices, setDevices] = useState<AudioDevice[]>([])
+  const [conflictMsg, setConflictMsg] = useState('')
 
   // Load device list
   useEffect(() => {
@@ -56,37 +67,55 @@ export function GeneralTab({ config, onSave }: Props) {
     onSave({ ...config, advanced: { ...config.advanced, ...changes } })
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!recording) return
-    e.preventDefault()
-    const key = e.key === ' ' ? 'Space' : e.key
-    const parts: string[] = []
-    if (e.ctrlKey) parts.push('Ctrl')
-    if (e.altKey) parts.push('Alt')
-    if (e.shiftKey) parts.push('Shift')
-    if (e.metaKey) parts.push('Command')
-    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
-    parts.push(key)
-    const combo = parts.join('+')
-    update({ shortcut: combo })
-    setRecording(false)
+  function createKeyHandler(
+    setRec: (v: boolean) => void,
+    onCapture: (combo: string) => void,
+    otherShortcut: string,
+    otherLabel: string,
+  ) {
+    return (e: React.KeyboardEvent) => {
+      e.preventDefault()
+      if (e.key === 'Escape') {
+        setRec(false)
+        return
+      }
+      if (e.key === 'Tab') return
+      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
+
+      const key = e.key === ' ' ? 'Space' : e.key
+      const parts: string[] = []
+      if (e.ctrlKey) parts.push('Ctrl')
+      if (e.altKey) parts.push('Alt')
+      if (e.shiftKey) parts.push('Shift')
+      if (e.metaKey) parts.push(IS_MACOS ? 'Command' : 'Win')
+      parts.push(key)
+      const combo = parts.join('+')
+
+      if (combo === otherShortcut) {
+        setConflictMsg(`\u4E0E${otherLabel}\u51B2\u7A81`)
+        setTimeout(() => setConflictMsg(''), 3000)
+        setRec(false)
+        return
+      }
+
+      onCapture(combo)
+      setRec(false)
+    }
   }
 
-  const handleExtractKeyDown = (e: React.KeyboardEvent) => {
-    if (!recordingExtract) return
-    e.preventDefault()
-    const key = e.key === ' ' ? 'Space' : e.key
-    const parts: string[] = []
-    if (e.ctrlKey) parts.push('Ctrl')
-    if (e.altKey) parts.push('Alt')
-    if (e.shiftKey) parts.push('Shift')
-    if (e.metaKey) parts.push('Command')
-    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
-    parts.push(key)
-    const combo = parts.join('+')
-    update({ extractShortcut: combo })
-    setRecordingExtract(false)
-  }
+  const handleKeyDown = createKeyHandler(
+    setRecording,
+    (combo) => update({ shortcut: combo }),
+    config.general.extractShortcut,
+    '\u8BC6\u522B\u5FEB\u6377\u952E',
+  )
+
+  const handleExtractKeyDown = createKeyHandler(
+    setRecordingExtract,
+    (combo) => update({ extractShortcut: combo }),
+    config.general.shortcut,
+    '\u5F55\u97F3\u5FEB\u6377\u952E',
+  )
 
   const themes: { value: ThemeMode; label: string; style: React.CSSProperties }[] = [
     { value: 'light', label: '浅色', style: { background: '#ffffff', border: '1px solid #d2d2d7' } },
@@ -116,28 +145,33 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="通用">
-        <SettingRow label="录音快捷键" description={recording ? '请按下快捷键...' : '点击后按下新快捷键'}>
+        <SettingRow label="录音快捷键" description={recording ? '请按下快捷键，ESC 取消' : '点击后按下新快捷键'}>
           <input
             className={`kbd${recording ? ' recording' : ''}`}
-            value={config.general.shortcut}
-            onKeyDown={handleKeyDown}
+            value={formatShortcutDisplay(config.general.shortcut)}
+            onKeyDown={recording ? handleKeyDown : undefined}
             onFocus={() => setRecording(true)}
             onBlur={() => setRecording(false)}
             readOnly
             style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
           />
         </SettingRow>
-        <SettingRow label="识别快捷键" description={recordingExtract ? '请按下快捷键...' : '点击后按下新快捷键'}>
+        <SettingRow label="识别快捷键" description={recordingExtract ? '请按下快捷键，ESC 取消' : '点击后按下新快捷键'}>
           <input
             className={`kbd${recordingExtract ? ' recording' : ''}`}
-            value={config.general.extractShortcut}
-            onKeyDown={handleExtractKeyDown}
+            value={formatShortcutDisplay(config.general.extractShortcut)}
+            onKeyDown={recordingExtract ? handleExtractKeyDown : undefined}
             onFocus={() => setRecordingExtract(true)}
             onBlur={() => setRecordingExtract(false)}
             readOnly
             style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
           />
         </SettingRow>
+        {conflictMsg && (
+          <div style={{ color: '#ff3b30', fontSize: 12, padding: '4px 16px' }}>
+            {conflictMsg}
+          </div>
+        )}
         <SettingRow label="最大录音时长" description="超时自动停止并处理，单位为秒">
           <input
             type="number"

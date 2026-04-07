@@ -44,6 +44,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState('general')
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [saved, setSaved] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const [updateState, setUpdateState] = useState<UpdateState>(INITIAL_UPDATE_STATE)
   const [appVersion, setAppVersion] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,9 +133,15 @@ export function App() {
     setConfig(newConfig)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
-      await saveConfig(newConfig)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 1500)
+      try {
+        await saveConfig(newConfig)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1500)
+      } catch (e: any) {
+        const msg = typeof e === 'string' ? e : e?.message || '保存失败'
+        setErrorMsg(msg)
+        setTimeout(() => setErrorMsg(''), 4000)
+      }
     }, 300)
   }, [])
 
@@ -170,6 +177,12 @@ export function App() {
           style={{ position: 'absolute', top: 24, right: 24 }}>
           ✓ 已保存
         </span>
+        {errorMsg && (
+          <span className="saved-toast visible"
+            style={{ position: 'absolute', top: 24, right: 24, background: '#ff3b30', color: '#fff' }}>
+            ✗ {errorMsg}
+          </span>
+        )}
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
