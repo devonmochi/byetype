@@ -10,6 +10,21 @@ use crate::config::ConfigManager;
 use crate::ai;
 use history::{HistoryManager, HistoryRecord};
 
+/// Screenshot selection coordinates from the overlay window
+#[derive(serde::Deserialize, Clone)]
+pub struct ScreenshotCrop {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+/// Oneshot sender for screenshot crop result. None = user cancelled.
+pub type ScreenshotSender = Arc<Mutex<Option<tokio::sync::oneshot::Sender<Option<ScreenshotCrop>>>>>;
+
+/// Stores the full-screen screenshot base64 for the overlay window to fetch.
+pub type ScreenshotImageState = Arc<Mutex<Option<String>>>;
+
 pub struct TaskManager {
     task_counter: u32,
     active_count: u32,
@@ -753,4 +768,23 @@ fn clipboard_image_to_png() -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to encode PNG: {}", e))?;
 
     Ok(png_buf)
+}
+
+/// Frontend calls this to get the full screenshot for display in the overlay.
+#[tauri::command]
+pub fn get_screenshot_image(
+    state: tauri::State<'_, ScreenshotImageState>,
+) -> Option<String> {
+    state.lock().unwrap().clone()
+}
+
+/// Frontend calls this when user finishes or cancels region selection.
+#[tauri::command]
+pub fn submit_screenshot_crop(
+    crop: Option<ScreenshotCrop>,
+    sender_state: tauri::State<'_, ScreenshotSender>,
+) {
+    if let Some(sender) = sender_state.lock().unwrap().take() {
+        let _ = sender.send(crop);
+    }
 }
