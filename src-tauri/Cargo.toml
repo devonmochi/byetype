@@ -48,3 +48,4 @@ windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
 ] }
 image = { version = "0.25", default-features = false, features = ["png"] }
+xcap = "0.9"

@@ -136,6 +136,13 @@
   </style>
 </head>
 <body>
+  <script>
+    // CSS @supports doesn't reliably detect Windows; use JS
+    if (navigator.userAgent.includes('Windows')) {
+      document.documentElement.style.background = '#1a1a2e';
+      document.body.style.background = '#1a1a2e';
+    }
+  </script>
   <div id="bubble"></div>
   <script type="module" src="/src/views/bubble/main.ts"></script>
 </body>

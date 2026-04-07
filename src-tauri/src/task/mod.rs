@@ -10,6 +10,21 @@ use crate::config::ConfigManager;
 use crate::ai;
 use history::{HistoryManager, HistoryRecord};
 
+/// Screenshot selection coordinates from the overlay window
+#[derive(serde::Deserialize, Clone)]
+pub struct ScreenshotCrop {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+/// Oneshot sender for screenshot crop result. None = user cancelled.
+pub type ScreenshotSender = Arc<Mutex<Option<tokio::sync::oneshot::Sender<Option<ScreenshotCrop>>>>>;
+
+/// Stores the full-screen screenshot base64 for the overlay window to fetch.
+pub type ScreenshotImageState = Arc<Mutex<Option<String>>>;
+
 pub struct TaskManager {
     task_counter: u32,
     active_count: u32,
@@ -679,47 +694,78 @@ async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<Strin
 
 #[cfg(target_os = "windows")]
 async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<String> {
-    // Launch Snipping Tool in clipboard mode
-    let capture_result = tokio::process::Command::new("snippingtool")
-        .arg("/clip")
-        .output()
-        .await;
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-    let exited_ok = match &capture_result {
-        Ok(output) => output.status.success(),
+    // 1. Capture full screen with xcap (blocking, run on thread pool)
+    let full_image = match tokio::task::spawn_blocking(|| {
+        let monitors = xcap::Monitor::all().map_err(|e| format!("Monitor::all failed: {}", e))?;
+        if monitors.is_empty() {
+            return Err("No monitors found".to_string());
+        }
+        monitors[0]
+            .capture_image()
+            .map_err(|e| format!("capture_image failed: {}", e))
+    })
+    .await
+    {
+        Ok(Ok(img)) => img,
+        Ok(Err(e)) => {
+            eprintln!("[TaskManager] xcap capture failed: {}", e);
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
+            return None;
+        }
         Err(e) => {
-            eprintln!("[TaskManager] snippingtool failed to launch: {}, trying ms-screenclip", e);
-            // Fallback: try ms-screenclip URI scheme
-            let fallback = tokio::process::Command::new("explorer")
-                .arg("ms-screenclip:")
-                .output()
-                .await;
-            // ms-screenclip returns immediately; wait a moment for user to complete capture
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            match &fallback {
-                Ok(output) => output.status.success(),
-                Err(e2) => {
-                    eprintln!("[TaskManager] ms-screenclip also failed: {}", e2);
-                    false
-                }
-            }
+            eprintln!("[TaskManager] spawn_blocking panicked: {}", e);
+            return None;
         }
     };
 
-    if !exited_ok {
-        let state = app.state::<SharedTaskManager>();
-        let mut mgr = state.lock().unwrap();
-        mgr.cancel_tokens.remove(&task_id);
-        mgr.active_count = mgr.active_count.saturating_sub(1);
-        return None;
+    // 2. Encode full image to PNG base64
+    let full_base64 = {
+        use image::ImageEncoder;
+        let mut buf: Vec<u8> = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut buf);
+        encoder
+            .write_image(
+                full_image.as_raw(),
+                full_image.width(),
+                full_image.height(),
+                image::ExtendedColorType::Rgba8,
+            )
+            .ok()?;
+        base64::engine::general_purpose::STANDARD.encode(&buf)
+    };
+
+    // 3. Store image state and create oneshot channel
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    {
+        let sender_state = app.state::<ScreenshotSender>();
+        *sender_state.lock().unwrap() = Some(tx);
+        let image_state = app.state::<ScreenshotImageState>();
+        *image_state.lock().unwrap() = Some(full_base64);
     }
 
-    // Read image from clipboard
-    let png_bytes = match clipboard_image_to_png() {
-        Ok(bytes) => bytes,
+    // 4. Create fullscreen overlay window
+    let overlay = match WebviewWindowBuilder::new(
+        app,
+        "screenshot-overlay",
+        WebviewUrl::App("screenshot.html".into()),
+    )
+    .title("")
+    .fullscreen(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focused(true)
+    .build()
+    {
+        Ok(w) => w,
         Err(e) => {
-            eprintln!("[TaskManager] Failed to read clipboard image: {}", e);
-            // User likely cancelled — silent cleanup
+            eprintln!("[TaskManager] Failed to create screenshot overlay: {}", e);
+            cleanup_screenshot_state(app);
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -728,29 +774,62 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         }
     };
 
-    Some(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
+    // 5. Wait for user selection or cancellation
+    let crop = match rx.await {
+        Ok(Some(c)) => c,
+        _ => {
+            // User cancelled or channel dropped
+            let _ = overlay.close();
+            cleanup_screenshot_state(app);
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
+            return None;
+        }
+    };
+
+    // 6. Close overlay window
+    let _ = overlay.close();
+    cleanup_screenshot_state(app);
+
+    // 7. Crop the full image
+    let cropped = image::DynamicImage::ImageRgba8(full_image)
+        .crop_imm(crop.x, crop.y, crop.w, crop.h);
+
+    // 8. Encode cropped image to PNG base64
+    let mut png_buf: Vec<u8> = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut png_buf);
+    cropped
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .ok()?;
+
+    Some(base64::engine::general_purpose::STANDARD.encode(&png_buf))
 }
 
 #[cfg(target_os = "windows")]
-fn clipboard_image_to_png() -> Result<Vec<u8>, String> {
-    let mut clipboard = arboard::Clipboard::new()
-        .map_err(|e| format!("Failed to access clipboard: {}", e))?;
-    let img_data = clipboard.get_image()
-        .map_err(|e| format!("No image in clipboard: {}", e))?;
+fn cleanup_screenshot_state(app: &AppHandle) {
+    let sender_state = app.state::<ScreenshotSender>();
+    *sender_state.lock().unwrap() = None;
+    let image_state = app.state::<ScreenshotImageState>();
+    *image_state.lock().unwrap() = None;
+}
 
-    // Convert RGBA data to PNG bytes using image crate
-    use image::{ImageBuffer, RgbaImage};
-    let rgba: RgbaImage = ImageBuffer::from_raw(
-        img_data.width as u32,
-        img_data.height as u32,
-        img_data.bytes.into_owned(),
-    )
-    .ok_or_else(|| "Failed to create image buffer from clipboard data".to_string())?;
+/// Frontend calls this to get the full screenshot for display in the overlay.
+#[tauri::command]
+pub fn get_screenshot_image(
+    state: tauri::State<'_, ScreenshotImageState>,
+) -> Option<String> {
+    state.lock().unwrap().clone()
+}
 
-    let mut png_buf: Vec<u8> = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut png_buf);
-    rgba.write_to(&mut cursor, image::ImageFormat::Png)
-        .map_err(|e| format!("Failed to encode PNG: {}", e))?;
-
-    Ok(png_buf)
+/// Frontend calls this when user finishes or cancels region selection.
+#[tauri::command]
+pub fn submit_screenshot_crop(
+    crop: Option<ScreenshotCrop>,
+    sender_state: tauri::State<'_, ScreenshotSender>,
+) {
+    if let Some(sender) = sender_state.lock().unwrap().take() {
+        let _ = sender.send(crop);
+    }
 }
