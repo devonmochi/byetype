@@ -52,7 +52,7 @@ fn label_for(task_id: u32) -> String {
 pub fn init(app: &AppHandle) -> Result<(), String> {
     for i in 1..=MAX_BUBBLES {
         let label = label_for(i);
-        WebviewWindowBuilder::new(
+        let mut builder = WebviewWindowBuilder::new(
             app,
             &label,
             WebviewUrl::App("bubble.html".into()),
@@ -65,11 +65,17 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
         .skip_taskbar(true)
         .resizable(false)
         .focused(false)
-        .visible(false)
-        .transparent(true)
-        .shadow(false)
-        .build()
-        .map_err(|e| format!("Failed to pre-create bubble-{}: {}", i, e))?;
+        .visible(false);
+
+        // Windows: skip transparent/shadow — WebView2 transparent rendering is unreliable
+        #[cfg(not(target_os = "windows"))]
+        {
+            builder = builder.transparent(true).shadow(false);
+        }
+
+        builder
+            .build()
+            .map_err(|e| format!("Failed to pre-create bubble-{}: {}", i, e))?;
     }
     Ok(())
 }
