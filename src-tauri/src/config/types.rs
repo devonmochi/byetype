@@ -62,6 +62,8 @@ pub struct BuiltinApiKeys {
     pub openrouter: String,
     #[serde(default)]
     pub mimo: String,
+    #[serde(default)]
+    pub longcat: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,7 +159,11 @@ impl Default for AppConfig {
                     deepseek: String::new(),
                     dashscope: String::new(),
                     openrouter: String::new(),
+<<<<<<< HEAD
                     mimo: String::new(),
+=======
+                    longcat: String::new(),
+>>>>>>> 61d85b0 (feat: 配置类型新增 Longcat API Key 字段)
                 },
                 custom: Vec::new(),
             },
