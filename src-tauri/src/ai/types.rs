@@ -84,6 +84,14 @@ pub struct ChatCompletionRequest {
     pub max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_options: Option<StreamOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingParam>,
+}
+
+#[derive(Serialize)]
+pub struct ThinkingParam {
+    #[serde(rename = "type")]
+    pub thinking_type: String,
 }
 
 #[derive(Serialize)]
@@ -147,6 +155,7 @@ pub struct ChatChoice {
 #[derive(Deserialize)]
 pub struct ChatResponseMessage {
     pub content: Option<String>,
+    pub reasoning_content: Option<String>,
 }
 
 // === SSE streaming types (Qwen Omni) ===

@@ -38,6 +38,7 @@ pub async fn transcribe(
         stream: Some(false),
         max_tokens: None,
         stream_options: None,
+        thinking: None,
     };
 
     let resp = client
@@ -105,6 +106,7 @@ pub async fn optimize(
         stream: Some(false),
         max_tokens: None,
         stream_options: None,
+        thinking: None,
     };
 
     let resp = client
@@ -178,6 +180,7 @@ pub async fn extract_text(
         stream: Some(false),
         max_tokens: None,
         stream_options: None,
+        thinking: None,
     };
 
     let resp = client
@@ -233,6 +236,7 @@ pub async fn test_connectivity(
         stream: Some(false),
         max_tokens: Some(32),
         stream_options: None,
+        thinking: None,
     };
 
     let resp = client
