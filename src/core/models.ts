@@ -81,17 +81,6 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-deepseek-chat',
-    provider: 'DeepSeek',
-    model: 'deepseek-chat',
-    protocol: 'openai-compat',
-    baseUrl: 'https://api.deepseek.com/v1',
-    builtin: true,
-    supportsAudio: false,
-    supportsText: true,
-    supportsVision: false,
-  },
-  {
     id: 'builtin-or-qwen3.6-plus-free',
     provider: 'OpenRouter',
     model: 'qwen/qwen3.6-plus:free',
@@ -123,6 +112,17 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsAudio: true,
     supportsText: true,
     supportsVision: true,
+  },
+  {
+    id: 'builtin-deepseek-chat',
+    provider: 'DeepSeek',
+    model: 'deepseek-chat',
+    protocol: 'openai-compat',
+    baseUrl: 'https://api.deepseek.com/v1',
+    builtin: true,
+    supportsAudio: false,
+    supportsText: true,
+    supportsVision: false,
   },
 ]
 

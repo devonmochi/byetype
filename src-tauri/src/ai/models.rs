@@ -73,16 +73,6 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_vision: true,
     },
     BuiltinModel {
-        id: "builtin-deepseek-chat",
-        provider: "DeepSeek",
-        model: "deepseek-chat",
-        protocol: "openai-compat",
-        base_url: "https://api.deepseek.com/v1",
-        supports_audio: false,
-        supports_text: true,
-        supports_vision: false,
-    },
-    BuiltinModel {
         id: "builtin-or-qwen3.6-plus-free",
         provider: "OpenRouter",
         model: "qwen/qwen3.6-plus:free",
@@ -111,6 +101,16 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_audio: true,
         supports_text: true,
         supports_vision: true,
+    },
+    BuiltinModel {
+        id: "builtin-deepseek-chat",
+        provider: "DeepSeek",
+        model: "deepseek-chat",
+        protocol: "openai-compat",
+        base_url: "https://api.deepseek.com/v1",
+        supports_audio: false,
+        supports_text: true,
+        supports_vision: false,
     },
 ];
 
