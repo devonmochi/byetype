@@ -52,10 +52,12 @@ pub fn save_config(
     recorder: State<'_, Arc<AudioRecorder>>,
     config: AppConfig,
 ) -> Result<bool, String> {
-    let old_shortcut = config_manager.get().general.shortcut.clone();
+    let old_config = config_manager.get();
+    let old_shortcut = old_config.general.shortcut.clone();
+    let old_extract_shortcut = old_config.general.extract_shortcut.clone();
     config_manager.update(config.clone())?;
 
-    if config.general.shortcut != old_shortcut {
+    if config.general.shortcut != old_shortcut || config.general.extract_shortcut != old_extract_shortcut {
         let new_key = if config.general.shortcut.is_empty() {
             "F4".to_string()
         } else {
