@@ -27,11 +27,14 @@ export default function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    const unlisten = listen<string>('preview-text', (event) => {
+    let unlisten: (() => void) | null = null
+    listen<string>('preview-text', (event) => {
       setText(event.payload)
+    }).then((fn) => {
+      unlisten = fn
+      emit('preview-ready', {})
     })
-    emit('preview-ready', {})
-    return () => { unlisten.then(fn => fn()) }
+    return () => { unlisten?.() }
   }, [])
 
   useEffect(() => {
