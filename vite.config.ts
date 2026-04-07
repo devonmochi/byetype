@@ -13,6 +13,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         bubble: resolve(__dirname, 'bubble.html'),
         preview: resolve(__dirname, 'preview.html'),
+        screenshot: resolve(__dirname, 'screenshot.html'),
       }
     }
   },
