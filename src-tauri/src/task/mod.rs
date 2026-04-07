@@ -728,14 +728,19 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         use image::ImageEncoder;
         let mut buf: Vec<u8> = Vec::new();
         let encoder = image::codecs::png::PngEncoder::new(&mut buf);
-        encoder
-            .write_image(
-                full_image.as_raw(),
-                full_image.width(),
-                full_image.height(),
-                image::ExtendedColorType::Rgba8,
-            )
-            .ok()?;
+        if let Err(e) = encoder.write_image(
+            full_image.as_raw(),
+            full_image.width(),
+            full_image.height(),
+            image::ExtendedColorType::Rgba8,
+        ) {
+            eprintln!("[TaskManager] Failed to encode full screenshot ({}x{}): {}", full_image.width(), full_image.height(), e);
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
+            return None;
+        }
         base64::engine::general_purpose::STANDARD.encode(&buf)
     };
 
@@ -800,9 +805,14 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     // 8. Encode cropped image to PNG base64
     let mut png_buf: Vec<u8> = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut png_buf);
-    cropped
-        .write_to(&mut cursor, image::ImageFormat::Png)
-        .ok()?;
+    if let Err(e) = cropped.write_to(&mut cursor, image::ImageFormat::Png) {
+        eprintln!("[TaskManager] Failed to encode cropped screenshot ({}x{}): {}", crop.w, crop.h, e);
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        return None;
+    }
 
     Some(base64::engine::general_purpose::STANDARD.encode(&png_buf))
 }

@@ -67,11 +67,7 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
         .focused(false)
         .visible(false);
 
-        // Windows: skip transparent/shadow — WebView2 transparent rendering is unreliable
-        #[cfg(not(target_os = "windows"))]
-        {
-            builder = builder.transparent(true).shadow(false);
-        }
+        builder = builder.transparent(true).shadow(false);
 
         builder
             .build()
