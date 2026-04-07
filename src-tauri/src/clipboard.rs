@@ -64,6 +64,8 @@ fn simulate_paste() -> Result<(), String> {
     let modifier = Key::Meta;
     #[cfg(target_os = "windows")]
     let modifier = Key::Control;
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    compile_error!("simulate_paste is only supported on macOS and Windows");
 
     enigo.key(modifier, Direction::Press)
         .map_err(|e| format!("Failed to press modifier: {}", e))?;
