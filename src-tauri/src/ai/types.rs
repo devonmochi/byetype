@@ -108,6 +108,8 @@ pub enum ChatContentPart {
     InputAudio { input_audio: AudioData },
     #[serde(rename = "image_url")]
     ImageUrl { image_url: ImageUrlData },
+    #[serde(rename = "input_image")]
+    InputImage { input_image: ImageData },
 }
 
 #[derive(Serialize)]
@@ -116,11 +118,20 @@ pub struct AudioData {
     pub audio_type: Option<String>,
     pub data: String,
     pub format: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<u32>,
 }
 
 #[derive(Serialize)]
 pub struct ImageUrlData {
     pub url: String,
+}
+
+#[derive(Serialize)]
+pub struct ImageData {
+    #[serde(rename = "type")]
+    pub image_type: String,
+    pub data: String,
 }
 
 #[derive(Deserialize)]
