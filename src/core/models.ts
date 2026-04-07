@@ -4,7 +4,7 @@ export interface ModelEntry {
   id: string
   provider: string
   model: string
-  protocol: 'gemini' | 'openai-compat' | 'qwen-omni' | 'mimo'
+  protocol: 'gemini' | 'openai-compat' | 'qwen-omni' | 'mimo' | 'longcat'
   baseUrl: string
   apiKey: string
   builtin: boolean
@@ -31,6 +31,17 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     model: 'qwen3.5-omni-flash',
     protocol: 'qwen-omni',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    builtin: true,
+    supportsAudio: true,
+    supportsText: true,
+    supportsVision: true,
+  },
+  {
+    id: 'builtin-longcat-omni',
+    provider: 'LongCat',
+    model: 'LongCat-Flash-Omni-2603',
+    protocol: 'longcat',
+    baseUrl: 'https://api.longcat.chat/openai/v1',
     builtin: true,
     supportsAudio: true,
     supportsText: true,
@@ -123,6 +134,7 @@ export function getAllModels(config: AppConfig): ModelEntry[] {
     else if (b.id === 'builtin-deepseek-chat') apiKey = config.models.builtinApiKeys.deepseek
     else if (b.protocol === 'qwen-omni') apiKey = config.models.builtinApiKeys.dashscope
     else if (b.protocol === 'mimo') apiKey = config.models.builtinApiKeys.mimo
+    else if (b.protocol === 'longcat') apiKey = config.models.builtinApiKeys.longcat
     return { ...b, apiKey }
   })
   const customs: ModelEntry[] = config.models.custom.map(c => ({

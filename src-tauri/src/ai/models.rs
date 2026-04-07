@@ -33,6 +33,16 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_vision: true,
     },
     BuiltinModel {
+        id: "builtin-longcat-omni",
+        provider: "LongCat",
+        model: "LongCat-Flash-Omni-2603",
+        protocol: "longcat",
+        base_url: "https://api.longcat.chat/openai/v1",
+        supports_audio: true,
+        supports_text: true,
+        supports_vision: true,
+    },
+    BuiltinModel {
         id: "builtin-gemini-3-flash",
         provider: "Google Gemini",
         model: "gemini-3-flash-preview",
@@ -121,6 +131,7 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
                 "openai-compat" => &config.models.builtin_api_keys.deepseek,
                 "qwen-omni" => &config.models.builtin_api_keys.dashscope,
                 "mimo" => &config.models.builtin_api_keys.mimo,
+                "longcat" => &config.models.builtin_api_keys.longcat,
                 _ => return Err(format!("Unknown protocol for builtin model: {}", model_id)),
             }
         };
