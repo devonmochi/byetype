@@ -710,10 +710,10 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         let mut cursor = POINT { x: 0, y: 0 };
         let target = if unsafe { GetCursorPos(&mut cursor) } != 0 {
             monitors.iter().find(|m| {
-                let mx = m.x();
-                let my = m.y();
-                let mw = m.width() as i32;
-                let mh = m.height() as i32;
+                let mx = m.x().unwrap_or(0);
+                let my = m.y().unwrap_or(0);
+                let mw = m.width().unwrap_or(0) as i32;
+                let mh = m.height().unwrap_or(0) as i32;
                 cursor.x >= mx && cursor.x < mx + mw && cursor.y >= my && cursor.y < my + mh
             }).unwrap_or(&monitors[0])
         } else {
