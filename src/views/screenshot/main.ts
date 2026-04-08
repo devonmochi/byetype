@@ -7,27 +7,42 @@ const sizeLabel = document.getElementById('size-label')!
 let startX = 0
 let startY = 0
 let dragging = false
-let armed = false // Block mouse events until overlay is fully ready
+let armed = false
+
+function log(msg: string) {
+  invoke('js_debug_log', { msg }).catch(() => {})
+}
 
 async function init() {
-  // Fetch the full screenshot from Rust
+  log('screenshot/main.ts init started')
   const base64: string | null = await invoke('get_screenshot_image')
   if (!base64) {
+    log('get_screenshot_image returned null, cancelling')
     await invoke('submit_screenshot_crop', { crop: null })
     return
   }
+  log(`get_screenshot_image returned base64, len=${base64.length}`)
   bg.src = `data:image/png;base64,${base64}`
   bg.onload = () => {
+    log('bg image loaded, arming in 300ms')
     overlay.style.display = 'none'
-    // Delay arming to skip any ghost mouse events from window creation/focus
     setTimeout(() => {
       armed = true
+      log('armed = true, ready for mouse events')
     }, 300)
+  }
+  bg.onerror = () => {
+    log('bg image FAILED to load')
+    invoke('submit_screenshot_crop', { crop: null })
   }
 }
 
 document.addEventListener('mousedown', (e: MouseEvent) => {
-  if (!armed || e.button !== 0) return
+  if (!armed || e.button !== 0) {
+    if (!armed) log(`mousedown ignored: armed=${armed}`)
+    return
+  }
+  log(`mousedown at (${e.clientX}, ${e.clientY})`)
   dragging = true
   startX = e.clientX
   startY = e.clientY
@@ -58,8 +73,14 @@ document.addEventListener('mousemove', (e: MouseEvent) => {
 })
 
 document.addEventListener('mouseup', async (e: MouseEvent) => {
-  if (!armed) return
-  if (!dragging) return
+  if (!armed) {
+    log(`mouseup ignored: armed=${armed}`)
+    return
+  }
+  if (!dragging) {
+    log('mouseup ignored: not dragging')
+    return
+  }
   dragging = false
 
   const x = Math.min(e.clientX, startX)
@@ -68,25 +89,25 @@ document.addEventListener('mouseup', async (e: MouseEvent) => {
   const h = Math.abs(e.clientY - startY)
 
   if (w < 5 || h < 5) {
-    // Too small -- treat as cancel
+    log(`selection too small (${w}x${h}), cancelling`)
     await invoke('submit_screenshot_crop', { crop: null })
     return
   }
 
   const dpr = window.devicePixelRatio || 1
-  await invoke('submit_screenshot_crop', {
-    crop: {
-      x: Math.round(x * dpr),
-      y: Math.round(y * dpr),
-      w: Math.round(w * dpr),
-      h: Math.round(h * dpr),
-    }
-  })
+  const crop = {
+    x: Math.round(x * dpr),
+    y: Math.round(y * dpr),
+    w: Math.round(w * dpr),
+    h: Math.round(h * dpr),
+  }
+  log(`submitting crop: x=${crop.x} y=${crop.y} w=${crop.w} h=${crop.h}`)
+  await invoke('submit_screenshot_crop', { crop })
 })
 
-// ESC to cancel
 document.addEventListener('keydown', async (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
+    log('ESC pressed, cancelling')
     await invoke('submit_screenshot_crop', { crop: null })
   }
 })

@@ -9,6 +9,7 @@ mod preview;
 mod shortcut;
 mod tray;
 mod updater;
+mod debug_log;
 
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -56,6 +57,7 @@ pub fn run() {
             task::submit_screenshot_crop,
             preview::set_preview_pinned,
             preview::close_preview_window,
+            debug_log::js_debug_log,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -70,6 +72,7 @@ pub fn run() {
             // Initialize TaskManager
             let data_dir = app.path().app_data_dir()
                 .expect("Failed to resolve app_data_dir");
+            debug_log::init(&data_dir);
             let prompts_dir = commands::resolve_prompts_dir_pub(&app_handle)
                 .expect("Failed to resolve prompts_dir");
             let task_manager: task::SharedTaskManager =

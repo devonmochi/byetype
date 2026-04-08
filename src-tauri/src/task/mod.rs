@@ -483,17 +483,26 @@ pub fn start_extraction(app: &AppHandle) -> Option<u32> {
 }
 
 async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
+    crate::debug_log::log(&format!("[Extract] Pipeline started, task_id={}", task_id));
+
     // Phase 0: Interactive screenshot capture (platform-specific)
     let image_base64 = match capture_screenshot(app, task_id).await {
-        Some(b64) => b64,
-        None => return, // User cancelled or capture failed
+        Some(b64) => {
+            crate::debug_log::log(&format!("[Extract] Screenshot captured, base64 len={}", b64.len()));
+            b64
+        }
+        None => {
+            crate::debug_log::log("[Extract] Screenshot returned None (cancelled or failed)");
+            return;
+        }
     };
 
     // Show bubble with extracting status
     if let Err(e) = crate::bubble::show(app, task_id) {
-        eprintln!("[TaskManager] Failed to show bubble: {}", e);
+        crate::debug_log::log(&format!("[Extract] Failed to show bubble: {}", e));
     }
     let _ = crate::bubble::update(app, task_id, "extracting");
+    crate::debug_log::log("[Extract] Bubble shown with extracting status");
 
     // Get config snapshot and prompts_dir
     let (config, prompts_dir, token) = {
@@ -555,6 +564,8 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
 
     match extract_result {
         Ok(text) => {
+            crate::debug_log::log(&format!("[Extract] AI returned text ({} chars)", text.len()));
+
             // Copy text to clipboard (without pasting)
             if let Ok(mut clipboard) = arboard::Clipboard::new() {
                 let _ = clipboard.set_text(&text);
@@ -562,7 +573,9 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
 
             // Show preview window
             if let Err(e) = crate::preview::show(app, &text) {
-                eprintln!("[TaskManager] Failed to show preview: {}", e);
+                crate::debug_log::log(&format!("[Extract] Failed to show preview: {}", e));
+            } else {
+                crate::debug_log::log("[Extract] Preview window shown");
             }
 
             finish_extract_pipeline(
@@ -570,7 +583,7 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
             );
         }
         Err(e) => {
-            eprintln!("[TaskManager] Extraction failed: {}", e);
+            crate::debug_log::log(&format!("[Extract] AI extraction failed: {}", e));
             finish_extract_pipeline(
                 app, task_id, Some(&image_base64), None, "failed", Some(e),
             );
@@ -695,6 +708,7 @@ async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<Strin
 #[cfg(target_os = "windows")]
 async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<String> {
     use tauri::{WebviewUrl, WebviewWindowBuilder};
+    crate::debug_log::log("[Screenshot] capture_screenshot_windows started");
 
     // 1. Capture the monitor where the cursor is (blocking, run on thread pool)
     let full_image = match tokio::task::spawn_blocking(|| {
@@ -726,9 +740,12 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     })
     .await
     {
-        Ok(Ok(img)) => img,
+        Ok(Ok(img)) => {
+            crate::debug_log::log(&format!("[Screenshot] xcap captured image {}x{}", img.width(), img.height()));
+            img
+        }
         Ok(Err(e)) => {
-            eprintln!("[TaskManager] xcap capture failed: {}", e);
+            crate::debug_log::log(&format!("[Screenshot] xcap capture failed: {}", e));
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -761,6 +778,7 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         }
         base64::engine::general_purpose::STANDARD.encode(&buf)
     };
+    crate::debug_log::log(&format!("[Screenshot] Full image encoded to base64, len={}", full_base64.len()));
 
     // 3. Store image state and create oneshot channel
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -771,7 +789,16 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         *image_state.lock().unwrap() = Some(full_base64);
     }
 
-    // 4. Create fullscreen overlay window
+    // 4. Close any stale overlay from a previous failed run
+    if let Some(old) = app.get_webview_window("screenshot-overlay") {
+        crate::debug_log::log("[Screenshot] Closing stale overlay window from previous run");
+        let _ = old.close();
+        // Small delay to let the window fully close
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+
+    // Create fullscreen overlay window
+    crate::debug_log::log("[Screenshot] Creating overlay window");
     let overlay = match WebviewWindowBuilder::new(
         app,
         "screenshot-overlay",
@@ -785,9 +812,12 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     .focused(true)
     .build()
     {
-        Ok(w) => w,
+        Ok(w) => {
+            crate::debug_log::log("[Screenshot] Overlay window created successfully");
+            w
+        }
         Err(e) => {
-            eprintln!("[TaskManager] Failed to create screenshot overlay: {}", e);
+            crate::debug_log::log(&format!("[Screenshot] Failed to create overlay: {}", e));
             cleanup_screenshot_state(app);
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
@@ -798,10 +828,24 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     };
 
     // 5. Wait for user selection or cancellation
+    crate::debug_log::log("[Screenshot] Waiting for user selection...");
     let crop = match rx.await {
-        Ok(Some(c)) => c,
-        _ => {
-            // User cancelled or channel dropped
+        Ok(Some(c)) => {
+            crate::debug_log::log(&format!("[Screenshot] User selected region: x={} y={} w={} h={}", c.x, c.y, c.w, c.h));
+            c
+        }
+        Ok(None) => {
+            crate::debug_log::log("[Screenshot] User cancelled (received None)");
+            let _ = overlay.close();
+            cleanup_screenshot_state(app);
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
+            return None;
+        }
+        Err(e) => {
+            crate::debug_log::log(&format!("[Screenshot] Channel error: {}", e));
             let _ = overlay.close();
             cleanup_screenshot_state(app);
             let state = app.state::<SharedTaskManager>();
@@ -815,6 +859,7 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     // 6. Close overlay window
     let _ = overlay.close();
     cleanup_screenshot_state(app);
+    crate::debug_log::log("[Screenshot] Overlay closed, cropping image");
 
     // 7. Crop the full image
     let cropped = image::DynamicImage::ImageRgba8(full_image)
@@ -832,7 +877,9 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         return None;
     }
 
-    Some(base64::engine::general_purpose::STANDARD.encode(&png_buf))
+    let result = base64::engine::general_purpose::STANDARD.encode(&png_buf);
+    crate::debug_log::log(&format!("[Screenshot] Cropped image encoded, base64 len={}", result.len()));
+    Some(result)
 }
 
 #[cfg(target_os = "windows")]
