@@ -28,7 +28,7 @@ async function init() {
     overlay.style.display = 'none'
     setTimeout(() => {
       armed = true
-      log('armed = true, ready for mouse events')
+      log('armed = true, ready for pointer events')
     }, 300)
   }
   bg.onerror = () => {
@@ -37,12 +37,15 @@ async function init() {
   }
 }
 
-document.addEventListener('mousedown', (e: MouseEvent) => {
+// Use Pointer Events + setPointerCapture to guarantee pointerup delivery
+document.addEventListener('pointerdown', (e: PointerEvent) => {
   if (!armed || e.button !== 0) {
-    if (!armed) log(`mousedown ignored: armed=${armed}`)
+    if (!armed) log(`pointerdown ignored: armed=${armed}`)
     return
   }
-  log(`mousedown at (${e.clientX}, ${e.clientY})`)
+  // Capture pointer to guarantee pointerup is delivered to this element
+  ;(e.target as Element).setPointerCapture(e.pointerId)
+  log(`pointerdown at (${e.clientX}, ${e.clientY}), captured pointerId=${e.pointerId}`)
   dragging = true
   startX = e.clientX
   startY = e.clientY
@@ -54,7 +57,7 @@ document.addEventListener('mousedown', (e: MouseEvent) => {
   overlay.style.display = 'none'
 })
 
-document.addEventListener('mousemove', (e: MouseEvent) => {
+document.addEventListener('pointermove', (e: PointerEvent) => {
   if (!dragging) return
   const x = Math.min(e.clientX, startX)
   const y = Math.min(e.clientY, startY)
@@ -72,16 +75,17 @@ document.addEventListener('mousemove', (e: MouseEvent) => {
   sizeLabel.style.display = 'block'
 })
 
-document.addEventListener('mouseup', async (e: MouseEvent) => {
+document.addEventListener('pointerup', async (e: PointerEvent) => {
   if (!armed) {
-    log(`mouseup ignored: armed=${armed}`)
+    log(`pointerup ignored: armed=${armed}`)
     return
   }
   if (!dragging) {
-    log('mouseup ignored: not dragging')
+    log('pointerup ignored: not dragging')
     return
   }
   dragging = false
+  log(`pointerup at (${e.clientX}, ${e.clientY})`)
 
   const x = Math.min(e.clientX, startX)
   const y = Math.min(e.clientY, startY)
@@ -103,6 +107,13 @@ document.addEventListener('mouseup', async (e: MouseEvent) => {
   }
   log(`submitting crop: x=${crop.x} y=${crop.y} w=${crop.w} h=${crop.h}`)
   await invoke('submit_screenshot_crop', { crop })
+})
+
+// Also handle lostpointercapture as a safety net
+document.addEventListener('lostpointercapture', () => {
+  if (dragging) {
+    log('lostpointercapture while dragging — pointer capture was lost')
+  }
 })
 
 document.addEventListener('keydown', async (e: KeyboardEvent) => {
