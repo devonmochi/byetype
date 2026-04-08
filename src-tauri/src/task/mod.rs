@@ -711,7 +711,8 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     crate::debug_log::log("[Screenshot] capture_screenshot_windows started");
 
     // 1. Capture the monitor where the cursor is (blocking, run on thread pool)
-    let full_image = match tokio::task::spawn_blocking(|| {
+    // Returns (image, monitor_x, monitor_y, monitor_w, monitor_h)
+    let (full_image, mon_x, mon_y, mon_w, mon_h) = match tokio::task::spawn_blocking(|| {
         use windows_sys::Win32::Foundation::POINT;
         use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
@@ -734,15 +735,20 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
             &monitors[0]
         };
 
-        target
-            .capture_image()
-            .map_err(|e| format!("capture_image failed: {}", e))
+        let mx = target.x().unwrap_or(0);
+        let my = target.y().unwrap_or(0);
+        let mw = target.width().unwrap_or(1920);
+        let mh = target.height().unwrap_or(1080);
+        let img = target.capture_image()
+            .map_err(|e| format!("capture_image failed: {}", e))?;
+        Ok((img, mx, my, mw, mh))
     })
     .await
     {
-        Ok(Ok(img)) => {
-            crate::debug_log::log(&format!("[Screenshot] xcap captured image {}x{}", img.width(), img.height()));
-            img
+        Ok(Ok(tuple)) => {
+            crate::debug_log::log(&format!("[Screenshot] xcap captured image {}x{}, monitor at ({},{}) size {}x{}",
+                tuple.0.width(), tuple.0.height(), tuple.1, tuple.2, tuple.3, tuple.4));
+            tuple
         }
         Ok(Err(e)) => {
             crate::debug_log::log(&format!("[Screenshot] xcap capture failed: {}", e));
@@ -797,15 +803,16 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
-    // Create fullscreen overlay window
-    crate::debug_log::log("[Screenshot] Creating overlay window");
+    // Create overlay window covering the target monitor (avoid fullscreen to prevent WebView2 mouse event loss)
+    crate::debug_log::log(&format!("[Screenshot] Creating overlay window at ({},{}) size {}x{}", mon_x, mon_y, mon_w, mon_h));
     let overlay = match WebviewWindowBuilder::new(
         app,
         "screenshot-overlay",
         WebviewUrl::App("screenshot.html".into()),
     )
     .title("")
-    .fullscreen(true)
+    .position(mon_x as f64, mon_y as f64)
+    .inner_size(mon_w as f64, mon_h as f64)
     .decorations(false)
     .always_on_top(true)
     .skip_taskbar(true)
