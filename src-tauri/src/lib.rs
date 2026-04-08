@@ -10,6 +10,8 @@ mod shortcut;
 mod tray;
 mod updater;
 mod debug_log;
+#[cfg(target_os = "windows")]
+mod screenshot_win32;
 
 use std::sync::{Arc, Mutex};
 use tauri::Manager;

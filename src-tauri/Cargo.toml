@@ -46,6 +46,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
   "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
 ] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 xcap = "0.9"

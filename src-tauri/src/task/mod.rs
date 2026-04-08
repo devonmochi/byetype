@@ -707,7 +707,6 @@ async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<Strin
 
 #[cfg(target_os = "windows")]
 async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<String> {
-    use tauri::{WebviewUrl, WebviewWindowBuilder};
     crate::debug_log::log("[Screenshot] capture_screenshot_windows started");
 
     // 1. Capture the monitor where the cursor is (blocking, run on thread pool)
@@ -764,87 +763,16 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         }
     };
 
-    // 2. Encode full image to PNG base64
-    let full_base64 = {
-        use image::ImageEncoder;
-        let mut buf: Vec<u8> = Vec::new();
-        let encoder = image::codecs::png::PngEncoder::new(&mut buf);
-        if let Err(e) = encoder.write_image(
-            full_image.as_raw(),
-            full_image.width(),
-            full_image.height(),
-            image::ExtendedColorType::Rgba8,
-        ) {
-            eprintln!("[TaskManager] Failed to encode full screenshot ({}x{}): {}", full_image.width(), full_image.height(), e);
-            let state = app.state::<SharedTaskManager>();
-            let mut mgr = state.lock().unwrap();
-            mgr.cancel_tokens.remove(&task_id);
-            mgr.active_count = mgr.active_count.saturating_sub(1);
-            return None;
-        }
-        base64::engine::general_purpose::STANDARD.encode(&buf)
-    };
-    crate::debug_log::log(&format!("[Screenshot] Full image encoded to base64, len={}", full_base64.len()));
-
-    // 3. Store image state and create oneshot channel
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    {
-        let sender_state = app.state::<ScreenshotSender>();
-        *sender_state.lock().unwrap() = Some(tx);
-        let image_state = app.state::<ScreenshotImageState>();
-        *image_state.lock().unwrap() = Some(full_base64);
-    }
-
-    // 4. Close any stale overlay from a previous failed run
-    if let Some(old) = app.get_webview_window("screenshot-overlay") {
-        crate::debug_log::log("[Screenshot] Closing stale overlay window from previous run");
-        let _ = old.close();
-        // Small delay to let the window fully close
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    }
-
-    // Create overlay window covering the target monitor (avoid fullscreen to prevent WebView2 mouse event loss)
-    crate::debug_log::log(&format!("[Screenshot] Creating overlay window at ({},{}) size {}x{}", mon_x, mon_y, mon_w, mon_h));
-    let overlay = match WebviewWindowBuilder::new(
-        app,
-        "screenshot-overlay",
-        WebviewUrl::App("screenshot.html".into()),
-    )
-    .title("")
-    .position(mon_x as f64, mon_y as f64)
-    .inner_size(mon_w as f64, mon_h as f64)
-    .decorations(false)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .focused(true)
-    .build()
-    {
-        Ok(w) => {
-            crate::debug_log::log("[Screenshot] Overlay window created successfully");
-            w
-        }
-        Err(e) => {
-            crate::debug_log::log(&format!("[Screenshot] Failed to create overlay: {}", e));
-            cleanup_screenshot_state(app);
-            let state = app.state::<SharedTaskManager>();
-            let mut mgr = state.lock().unwrap();
-            mgr.cancel_tokens.remove(&task_id);
-            mgr.active_count = mgr.active_count.saturating_sub(1);
-            return None;
-        }
-    };
-
-    // 5. Wait for user selection or cancellation
-    crate::debug_log::log("[Screenshot] Waiting for user selection...");
-    let crop = match rx.await {
+    // 2. Run native Win32 overlay for region selection (blocking)
+    let crop = match tokio::task::spawn_blocking(move || {
+        crate::screenshot_win32::select_region(mon_x, mon_y, mon_w as i32, mon_h as i32)
+    }).await {
         Ok(Some(c)) => {
             crate::debug_log::log(&format!("[Screenshot] User selected region: x={} y={} w={} h={}", c.x, c.y, c.w, c.h));
             c
         }
         Ok(None) => {
-            crate::debug_log::log("[Screenshot] User cancelled (received None)");
-            let _ = overlay.close();
-            cleanup_screenshot_state(app);
+            crate::debug_log::log("[Screenshot] User cancelled selection");
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -852,9 +780,7 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
             return None;
         }
         Err(e) => {
-            crate::debug_log::log(&format!("[Screenshot] Channel error: {}", e));
-            let _ = overlay.close();
-            cleanup_screenshot_state(app);
+            crate::debug_log::log(&format!("[Screenshot] Win32 selection panicked: {}", e));
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -863,12 +789,7 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         }
     };
 
-    // 6. Close overlay window
-    let _ = overlay.close();
-    cleanup_screenshot_state(app);
-    crate::debug_log::log("[Screenshot] Overlay closed, cropping image");
-
-    // 7. Crop the full image
+    // 3. Crop the full image
     let cropped = image::DynamicImage::ImageRgba8(full_image)
         .crop_imm(crop.x, crop.y, crop.w, crop.h);
 
