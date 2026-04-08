@@ -1,7 +1,17 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
 
 static PINNED: AtomicBool = AtomicBool::new(false);
+/// Epoch millis when the preview window was created — ignore blur within grace period
+static CREATED_AT: AtomicU64 = AtomicU64::new(0);
+const BLUR_GRACE_MS: u128 = 800;
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 #[tauri::command]
 pub fn set_preview_pinned(pinned: bool) {
@@ -49,14 +59,23 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         let _ = window_clone.show();
     });
 
-    // Close window on blur (focus lost) — only if not pinned
+    // Record creation time for blur grace period
+    CREATED_AT.store(now_ms(), Ordering::Relaxed);
+
+    // Close window on blur (focus lost) — only if not pinned and past grace period
     let app_handle = app.clone();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::Focused(false) = event {
-            if !PINNED.load(Ordering::Relaxed) {
-                if let Some(w) = app_handle.get_webview_window("preview") {
-                    let _ = w.close();
-                }
+            if PINNED.load(Ordering::Relaxed) {
+                return;
+            }
+            // Skip blur events during grace period (window may not have focus yet)
+            let age = now_ms().saturating_sub(CREATED_AT.load(Ordering::Relaxed));
+            if (age as u128) < BLUR_GRACE_MS {
+                return;
+            }
+            if let Some(w) = app_handle.get_webview_window("preview") {
+                let _ = w.close();
             }
         }
     });
