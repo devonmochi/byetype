@@ -210,9 +210,9 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
             cbClsExtra: 0,
             cbWndExtra: 0,
             hInstance: hinstance,
-            hIcon: 0,
-            hCursor: LoadCursorW(0, IDC_CROSS),
-            hbrBackground: 0,
+            hIcon: std::ptr::null_mut(),
+            hCursor: LoadCursorW(std::ptr::null_mut(), IDC_CROSS),
+            hbrBackground: std::ptr::null_mut(),
             lpszMenuName: std::ptr::null(),
             lpszClassName: class_name.as_ptr(),
         };
@@ -228,13 +228,13 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
             mon_y,
             mon_w,
             mon_h,
-            0,
-            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
             hinstance,
             std::ptr::null(),
         );
 
-        if hwnd == 0 {
+        if hwnd.is_null() {
             crate::debug_log::log("[Win32] CreateWindowExW failed");
             UnregisterClassW(class_name.as_ptr(), hinstance);
             return None;
@@ -247,7 +247,7 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
 
         // Message loop
         let mut msg = std::mem::zeroed::<MSG>();
-        while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
