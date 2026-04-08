@@ -1,6 +1,6 @@
 [package]
 name = "byetype"
-version = "1.9.7"
+version = "1.9.8"
 description = "ByeType - Markdown driven voice input"
 authors = ["devonmochi"]
 edition = "2021"
