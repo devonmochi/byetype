@@ -94,15 +94,26 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
             "clear-bubble",
             serde_json::json!({}),
         );
+
+        // Windows: GetCursorPos returns physical pixels, use PhysicalPosition
+        // macOS: CGEvent.location() returns logical points, use LogicalPosition
+        #[cfg(target_os = "windows")]
+        let _ = win.set_position(tauri::Position::Physical(
+            tauri::PhysicalPosition::new(x as i32, y as i32),
+        ));
+        #[cfg(not(target_os = "windows"))]
         let _ = win.set_position(tauri::Position::Logical(
             tauri::LogicalPosition::new(x, y),
         ));
+
+        // Show window BEFORE emitting events — on Windows, WebView2 may not
+        // process events while the window is hidden.
+        let _ = win.show();
         let _ = app.emit_to(
             &label,
             "show-bubble",
             serde_json::json!({ "taskNumber": task_id, "status": "recording" }),
         );
-        let _ = win.show();
     } else {
         eprintln!("[Bubble] Window {} not found in pool", label);
     }
