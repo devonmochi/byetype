@@ -7,6 +7,7 @@ const sizeLabel = document.getElementById('size-label')!
 let startX = 0
 let startY = 0
 let dragging = false
+let armed = false // Block mouse events until overlay is fully ready
 
 async function init() {
   // Fetch the full screenshot from Rust
@@ -16,14 +17,17 @@ async function init() {
     return
   }
   bg.src = `data:image/png;base64,${base64}`
-  // Hide the dark overlay once image loads — selection box-shadow provides dimming
   bg.onload = () => {
     overlay.style.display = 'none'
+    // Delay arming to skip any ghost mouse events from window creation/focus
+    setTimeout(() => {
+      armed = true
+    }, 300)
   }
 }
 
 document.addEventListener('mousedown', (e: MouseEvent) => {
-  if (e.button !== 0) return
+  if (!armed || e.button !== 0) return
   dragging = true
   startX = e.clientX
   startY = e.clientY
@@ -32,7 +36,7 @@ document.addEventListener('mousedown', (e: MouseEvent) => {
   selection.style.width = '0px'
   selection.style.height = '0px'
   selection.style.display = 'block'
-  overlay.style.display = 'none' // hide flat overlay, selection box-shadow takes over
+  overlay.style.display = 'none'
 })
 
 document.addEventListener('mousemove', (e: MouseEvent) => {
@@ -46,7 +50,6 @@ document.addEventListener('mousemove', (e: MouseEvent) => {
   selection.style.width = `${w}px`
   selection.style.height = `${h}px`
 
-  // Show size label near the selection
   const dpr = window.devicePixelRatio || 1
   sizeLabel.textContent = `${Math.round(w * dpr)} x ${Math.round(h * dpr)}`
   sizeLabel.style.left = `${x}px`
@@ -55,6 +58,7 @@ document.addEventListener('mousemove', (e: MouseEvent) => {
 })
 
 document.addEventListener('mouseup', async (e: MouseEvent) => {
+  if (!armed) return
   if (!dragging) return
   dragging = false
 
@@ -64,12 +68,11 @@ document.addEventListener('mouseup', async (e: MouseEvent) => {
   const h = Math.abs(e.clientY - startY)
 
   if (w < 5 || h < 5) {
-    // Too small — treat as cancel
+    // Too small -- treat as cancel
     await invoke('submit_screenshot_crop', { crop: null })
     return
   }
 
-  // Scale logical coords to physical pixels
   const dpr = window.devicePixelRatio || 1
   await invoke('submit_screenshot_crop', {
     crop: {
