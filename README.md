@@ -24,21 +24,6 @@ ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdo
 
 ## 🖥️ macOS / Windows
 
-### 快速预设
-
-ByeType 桌面版提供 4 种推荐模式，在「语音转写」页面顶部一键切换：
-
-| 预设 | 模型组合 | 说明 |
-|------|---------|------|
-| ⭐ 推荐 | Qwen 3.5 Omni Plus（转写+优化） | 国内直连，无需代理，效果好 |
-| 🚀 国内极速 | Qwen 3.5 Omni Flash（转写+优化） | 国内直连，无需代理，速度更快 |
-| ⚡ 效果最好 | Gemini 3 Flash（转写+优化） | 综合体验最佳，质量和速度均衡，需代理 |
-| 🚀 极速轻量 | Gemini 3.1 Flash Lite（转写+优化） | Gemini 3 Flash 的备选方案，需代理 |
-
-> **推荐使用 Qwen 3.5 Omni**，国内直连无需代理，效果不输 Gemini，速度更快，去阿里云百炼申请一个 DashScope API Key 即可。
->
-> 能用 Gemini 的用户也可以选择 Gemini 3 Flash，碰到配额限制时切换到 Flash Lite 即可。
-
 ![录音 → 转写 → 优化 → 自动粘贴](docs/images/demo.gif)
 
 ## 🏆 为什么选择 ByeType
@@ -164,6 +149,50 @@ ByeType 的核心特色是**提示词驱动的高可定制性** — 通过编辑
 
 > 💡 不知道怎么用？把这份文档发给你的 AI 助手（Claude、ChatGPT、Gemini 等），让它一步步教你。
 
+## 🤖 AI 模型配置
+
+所有模型在「设置 → 模型管理」中统一配置。
+
+### 预置模型
+
+| 模型 | API ID | 获取 Key | 特点 |
+|------|--------|---------|------|
+| Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
+| Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 国内直连，速度更快 |
+| LongCat Flash Omni | `LongCat-Flash-Omni-2603` | [LongCat](https://platform.longcat.chat/) | 国内直连，Qwen 的替代方案 |
+| MiMo v2 Omni | `mimo-v2-omni` | [小米 MiMo](https://api.xiaomimimo.com/) | 国内直连，Qwen 的替代方案 |
+| Gemini 3.0 Flash | `gemini-3-flash-preview` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理 |
+| Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite-preview` | 同上 | 更快速，适合低延迟场景，需代理 |
+
+> **OpenRouter 中转**：如果无法直接访问 Gemini，可通过 [OpenRouter](https://openrouter.ai/) 中转使用以下模型，无需代理：
+> - `qwen/qwen3.6-plus:free`（仅文本优化，不支持音频转写）
+> - `google/gemini-3-flash-preview`
+> - `google/gemini-3.1-flash-lite-preview`
+
+API Key 填写位置：设置 → 模型管理 → 对应模型卡片
+
+### 自定义模型
+
+在「设置 → 模型管理」底部点击「添加自定义模型」，支持以下协议：
+
+- **Gemini 协议**：兼容 Google Gemini API 及第三方中转站
+- **OpenAI 兼容协议**：兼容 OpenAI、Qwen、DeepSeek 等服务
+- **Qwen-Omni 协议**：阿里云百炼 Qwen Omni 系列模型专用
+- **Longcat 协议**：LongCat Omni 系列模型专用
+- **MiMo 协议**：小米 MiMo Omni 系列模型专用
+
+每个自定义模型需要填写：协议类型、模型能力（音频转写/文本处理）、Provider 名称、Base URL、Model ID、API Key。
+
+### 连通性测试
+
+在模型管理页面，每个模型旁有「测试」按钮，可验证 API 连通性并显示延迟。顶部「测试全部连通性」按钮可一键测试所有模型。
+
+### 文本优化模型（可选）
+
+文本优化是转写后的二次处理，用于优化格式和排版（如自动换行）。开启路径：设置 → 语音转写 → 文本优化 → 启用。
+
+在「优化模型」下拉框中选择任意支持文本处理的模型（预置或自定义均可）。
+
 ## 📦 安装
 
 从 [GitHub Releases](https://github.com/devonmochi/byetype/releases) 下载最新版本：
@@ -203,41 +232,6 @@ ByeType 的核心特色是**提示词驱动的高可定制性** — 通过编辑
 > 自动粘贴依赖辅助功能权限。如果文本没有自动粘贴，可手动按 Cmd+V（macOS）或 Ctrl+V（Windows）粘贴。
 
 **图像文字提取：** 按 **F6** → 框选屏幕区域 → AI 自动识别文字并复制到剪贴板 → 预览窗口展示结果。
-
-## 🤖 AI 模型配置
-
-所有模型在「设置 → 模型管理」中统一配置。
-
-### 预置模型
-
-| 模型 | API ID | 获取 Key | 特点 |
-|------|--------|---------|------|
-| Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
-| Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 国内直连，速度更快 |
-| Gemini 3.0 Flash | `gemini-3-flash-preview` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理 |
-| Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite-preview` | 同上 | 更快速，适合低延迟场景，需代理 |
-
-API Key 填写位置：设置 → 模型管理 → 对应模型卡片
-
-### 自定义模型
-
-在「设置 → 模型管理」底部点击「添加自定义模型」，支持两种协议：
-
-- **Gemini 协议**：兼容 Google Gemini API 及第三方中转站
-- **OpenAI 兼容协议**：兼容 OpenAI、Qwen、DeepSeek 等服务
-- **Qwen-Omni 协议**：阿里云百炼 Qwen Omni 系列模型专用
-
-每个自定义模型需要填写：协议类型、模型能力（音频转写/文本处理）、Provider 名称、Base URL、Model ID、API Key。
-
-### 连通性测试
-
-在模型管理页面，每个模型旁有「测试」按钮，可验证 API 连通性并显示延迟。顶部「测试全部连通性」按钮可一键测试所有模型。
-
-### 文本优化模型（可选）
-
-文本优化是转写后的二次处理，用于优化格式和排版（如自动换行）。开启路径：设置 → 语音转写 → 文本优化 → 启用。
-
-在「优化模型」下拉框中选择任意支持文本处理的模型（预置或自定义均可）。
 
 ## ⚙️ 功能详解
 
