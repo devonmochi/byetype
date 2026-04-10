@@ -156,7 +156,7 @@ export function GeneralTab({ config, onSave }: Props) {
             style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
           />
         </SettingRow>
-        <SettingRow label="识别快捷键" description={recordingExtract ? '请按下快捷键，ESC 取消' : '点击后按下新快捷键'}>
+        <SettingRow label="图像识别快捷键" description={recordingExtract ? '请按下快捷键，ESC 取消' : '点击后按下新快捷键'}>
           <input
             className={`kbd${recordingExtract ? ' recording' : ''}`}
             value={formatShortcutDisplay(config.general.extractShortcut)}
