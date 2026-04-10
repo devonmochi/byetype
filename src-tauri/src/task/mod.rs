@@ -483,26 +483,19 @@ pub fn start_extraction(app: &AppHandle) -> Option<u32> {
 }
 
 async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
-    crate::debug_log::log(&format!("[Extract] Pipeline started, task_id={}", task_id));
-
     // Phase 0: Interactive screenshot capture (platform-specific)
     let image_base64 = match capture_screenshot(app, task_id).await {
         Some(b64) => {
-            crate::debug_log::log(&format!("[Extract] Screenshot captured, base64 len={}", b64.len()));
             b64
         }
         None => {
-            crate::debug_log::log("[Extract] Screenshot returned None (cancelled or failed)");
             return;
         }
     };
 
     // Show bubble with extracting status
-    if let Err(e) = crate::bubble::show(app, task_id) {
-        crate::debug_log::log(&format!("[Extract] Failed to show bubble: {}", e));
-    }
+    let _ = crate::bubble::show(app, task_id);
     let _ = crate::bubble::update(app, task_id, "extracting");
-    crate::debug_log::log("[Extract] Bubble shown with extracting status");
 
     // Get config snapshot and prompts_dir
     let (config, prompts_dir, token) = {
@@ -564,7 +557,6 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
 
     match extract_result {
         Ok(text) => {
-            crate::debug_log::log(&format!("[Extract] AI returned text ({} chars)", text.len()));
 
             // Copy text to clipboard (without pasting)
             if let Ok(mut clipboard) = arboard::Clipboard::new() {
@@ -572,18 +564,13 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
             }
 
             // Show preview window
-            if let Err(e) = crate::preview::show(app, &text) {
-                crate::debug_log::log(&format!("[Extract] Failed to show preview: {}", e));
-            } else {
-                crate::debug_log::log("[Extract] Preview window shown");
-            }
+            let _ = crate::preview::show(app, &text);
 
             finish_extract_pipeline(
                 app, task_id, Some(&image_base64), Some(text), "completed", None,
             );
         }
         Err(e) => {
-            crate::debug_log::log(&format!("[Extract] AI extraction failed: {}", e));
             finish_extract_pipeline(
                 app, task_id, Some(&image_base64), None, "failed", Some(e),
             );
@@ -707,8 +694,6 @@ async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<Strin
 
 #[cfg(target_os = "windows")]
 async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<String> {
-    crate::debug_log::log("[Screenshot] capture_screenshot_windows started");
-
     // 1. Capture the monitor where the cursor is (blocking, run on thread pool)
     // Returns (image, monitor_x, monitor_y, monitor_w, monitor_h)
     let (full_image, mon_x, mon_y, mon_w, mon_h) = match tokio::task::spawn_blocking(|| {
@@ -745,12 +730,9 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     .await
     {
         Ok(Ok(tuple)) => {
-            crate::debug_log::log(&format!("[Screenshot] xcap captured image {}x{}, monitor at ({},{}) size {}x{}",
-                tuple.0.width(), tuple.0.height(), tuple.1, tuple.2, tuple.3, tuple.4));
             tuple
         }
         Ok(Err(e)) => {
-            crate::debug_log::log(&format!("[Screenshot] xcap capture failed: {}", e));
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -768,11 +750,9 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         crate::screenshot_win32::select_region(mon_x, mon_y, mon_w as i32, mon_h as i32)
     }).await {
         Ok(Some(c)) => {
-            crate::debug_log::log(&format!("[Screenshot] User selected region: x={} y={} w={} h={}", c.x, c.y, c.w, c.h));
             c
         }
         Ok(None) => {
-            crate::debug_log::log("[Screenshot] User cancelled selection");
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -780,7 +760,6 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
             return None;
         }
         Err(e) => {
-            crate::debug_log::log(&format!("[Screenshot] Win32 selection panicked: {}", e));
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -806,7 +785,6 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     }
 
     let result = base64::engine::general_purpose::STANDARD.encode(&png_buf);
-    crate::debug_log::log(&format!("[Screenshot] Cropped image encoded, base64 len={}", result.len()));
     Some(result)
 }
 

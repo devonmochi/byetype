@@ -9,43 +9,29 @@ let startY = 0
 let dragging = false
 let armed = false
 
-function log(msg: string) {
-  invoke('js_debug_log', { msg }).catch(() => {})
-}
-
 async function init() {
-  log('screenshot/main.ts init started')
   const base64: string | null = await invoke('get_screenshot_image')
   if (!base64) {
-    log('get_screenshot_image returned null, cancelling')
     await invoke('submit_screenshot_crop', { crop: null })
     return
   }
-  log(`get_screenshot_image returned base64, len=${base64.length}`)
   bg.src = `data:image/png;base64,${base64}`
   bg.onload = () => {
-    log('bg image loaded, arming in 300ms')
     overlay.style.display = 'none'
     setTimeout(() => {
       armed = true
-      log('armed = true, ready for pointer events')
     }, 300)
   }
   bg.onerror = () => {
-    log('bg image FAILED to load')
     invoke('submit_screenshot_crop', { crop: null })
   }
 }
 
 // Use Pointer Events + setPointerCapture to guarantee pointerup delivery
 document.addEventListener('pointerdown', (e: PointerEvent) => {
-  if (!armed || e.button !== 0) {
-    if (!armed) log(`pointerdown ignored: armed=${armed}`)
-    return
-  }
+  if (!armed || e.button !== 0) return
   // Capture pointer to guarantee pointerup is delivered to this element
   ;(e.target as Element).setPointerCapture(e.pointerId)
-  log(`pointerdown at (${e.clientX}, ${e.clientY}), captured pointerId=${e.pointerId}`)
   dragging = true
   startX = e.clientX
   startY = e.clientY
@@ -76,16 +62,9 @@ document.addEventListener('pointermove', (e: PointerEvent) => {
 })
 
 document.addEventListener('pointerup', async (e: PointerEvent) => {
-  if (!armed) {
-    log(`pointerup ignored: armed=${armed}`)
-    return
-  }
-  if (!dragging) {
-    log('pointerup ignored: not dragging')
-    return
-  }
+  if (!armed) return
+  if (!dragging) return
   dragging = false
-  log(`pointerup at (${e.clientX}, ${e.clientY})`)
 
   const x = Math.min(e.clientX, startX)
   const y = Math.min(e.clientY, startY)
@@ -93,7 +72,6 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
   const h = Math.abs(e.clientY - startY)
 
   if (w < 5 || h < 5) {
-    log(`selection too small (${w}x${h}), cancelling`)
     await invoke('submit_screenshot_crop', { crop: null })
     return
   }
@@ -105,20 +83,12 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
     w: Math.round(w * dpr),
     h: Math.round(h * dpr),
   }
-  log(`submitting crop: x=${crop.x} y=${crop.y} w=${crop.w} h=${crop.h}`)
   await invoke('submit_screenshot_crop', { crop })
 })
 
 // Also handle lostpointercapture as a safety net
-document.addEventListener('lostpointercapture', () => {
-  if (dragging) {
-    log('lostpointercapture while dragging — pointer capture was lost')
-  }
-})
-
 document.addEventListener('keydown', async (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    log('ESC pressed, cancelling')
     await invoke('submit_screenshot_crop', { crop: null })
   }
 })

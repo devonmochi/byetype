@@ -51,7 +51,6 @@ unsafe extern "system" fn wndproc(
                 state.cur_x = x;
                 state.cur_y = y;
             }
-            crate::debug_log::log(&format!("[Win32] LBUTTONDOWN at ({}, {}), SetCapture called", x, y));
             0
         }
         WM_MOUSEMOVE => {
@@ -77,7 +76,6 @@ unsafe extern "system" fn wndproc(
             let x = (lparam & 0xFFFF) as i16 as i32;
             let y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
             ReleaseCapture();
-            crate::debug_log::log(&format!("[Win32] LBUTTONUP at ({}, {})", x, y));
             if let Ok(mut state) = STATE.lock() {
                 if state.dragging {
                     state.dragging = false;
@@ -86,7 +84,6 @@ unsafe extern "system" fn wndproc(
                     let w = (state.start_x - x).unsigned_abs();
                     let h = (state.start_y - y).unsigned_abs();
                     if w > 5 && h > 5 {
-                        crate::debug_log::log(&format!("[Win32] Selection: x={} y={} w={} h={}", sx, sy, w, h));
                         state.result = Some(ScreenshotCrop {
                             x: sx as u32,
                             y: sy as u32,
@@ -94,7 +91,6 @@ unsafe extern "system" fn wndproc(
                             h,
                         });
                     } else {
-                        crate::debug_log::log(&format!("[Win32] Selection too small ({}x{}), ignoring", w, h));
                     }
                     state.done = true;
                 }
@@ -104,7 +100,6 @@ unsafe extern "system" fn wndproc(
         }
         WM_KEYDOWN => {
             if wparam == VK_ESCAPE as usize {
-                crate::debug_log::log("[Win32] ESC pressed, cancelling");
                 if let Ok(mut state) = STATE.lock() {
                     state.done = true;
                     state.result = None;
@@ -165,7 +160,6 @@ unsafe extern "system" fn wndproc(
         }
         WM_RBUTTONDOWN => {
             // Right click cancels
-            crate::debug_log::log("[Win32] Right click, cancelling");
             if let Ok(mut state) = STATE.lock() {
                 state.done = true;
                 state.result = None;
@@ -183,11 +177,6 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
     use windows_sys::Win32::UI::WindowsAndMessaging::*;
     use windows_sys::Win32::Graphics::Gdi::*;
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-
-    crate::debug_log::log(&format!(
-        "[Win32] select_region called: pos=({},{}) size={}x{}",
-        mon_x, mon_y, mon_w, mon_h
-    ));
 
     // Reset state
     if let Ok(mut state) = STATE.lock() {
@@ -235,7 +224,6 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
         );
 
         if hwnd.is_null() {
-            crate::debug_log::log("[Win32] CreateWindowExW failed");
             UnregisterClassW(class_name.as_ptr(), hinstance);
             return None;
         }
@@ -243,7 +231,6 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
         // Semi-transparent dark overlay (alpha ~80/255 ≈ 31%)
         SetLayeredWindowAttributes(hwnd, 0, 80, LWA_ALPHA);
         SetForegroundWindow(hwnd);
-        crate::debug_log::log("[Win32] Overlay window created and shown");
 
         // Message loop
         let mut msg = std::mem::zeroed::<MSG>();
@@ -261,9 +248,6 @@ pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<S
             None
         };
 
-        crate::debug_log::log(&format!("[Win32] select_region returning: {:?}",
-            result.as_ref().map(|c| format!("x={} y={} w={} h={}", c.x, c.y, c.w, c.h))
-        ));
         result
     }
 }
