@@ -108,7 +108,18 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
 
         // Show window BEFORE emitting events — on Windows, WebView2 may not
         // process events while the window is hidden.
-        let _ = win.show();
+        // Windows: use SW_SHOWNOACTIVATE to avoid stealing focus from the
+        // foreground application (e.g. chat input boxes).
+        #[cfg(target_os = "windows")]
+        {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWNOACTIVATE};
+            let hwnd = win.hwnd().unwrap().0 as isize;
+            unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE); }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = win.show();
+        }
         let _ = app.emit_to(
             &label,
             "show-bubble",
