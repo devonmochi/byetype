@@ -732,7 +732,7 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         Ok(Ok(tuple)) => {
             tuple
         }
-        Ok(Err(e)) => {
+        Ok(Err(_e)) => {
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);
@@ -759,7 +759,7 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
             mgr.active_count = mgr.active_count.saturating_sub(1);
             return None;
         }
-        Err(e) => {
+        Err(_e) => {
             let state = app.state::<SharedTaskManager>();
             let mut mgr = state.lock().unwrap();
             mgr.cancel_tokens.remove(&task_id);

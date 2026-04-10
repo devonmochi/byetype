@@ -175,7 +175,6 @@ unsafe extern "system" fn wndproc(
 /// Blocks until user completes selection or cancels.
 pub fn select_region(mon_x: i32, mon_y: i32, mon_w: i32, mon_h: i32) -> Option<ScreenshotCrop> {
     use windows_sys::Win32::UI::WindowsAndMessaging::*;
-    use windows_sys::Win32::Graphics::Gdi::*;
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 
     // Reset state

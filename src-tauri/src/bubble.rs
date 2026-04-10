@@ -113,7 +113,7 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWNOACTIVATE};
-            let hwnd = win.hwnd().unwrap().0 as isize;
+            let hwnd = win.hwnd().unwrap().0 as *mut std::ffi::c_void;
             unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE); }
         }
         #[cfg(not(target_os = "windows"))]
