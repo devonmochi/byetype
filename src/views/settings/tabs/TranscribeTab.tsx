@@ -10,7 +10,7 @@ interface PresetConfig {
   desc: string
   tag: string
   transcribeModelId: string
-  optimizeModelId: string
+  voiceTemplatesModelId: string
 }
 
 const PRESETS: PresetConfig[] = [
@@ -20,7 +20,7 @@ const PRESETS: PresetConfig[] = [
     desc: 'Qwen 3.5 Omni Plus 全能处理',
     tag: '无需代理',
     transcribeModelId: 'builtin-qwen-omni-plus',
-    optimizeModelId: 'builtin-qwen-omni-plus',
+    voiceTemplatesModelId: 'builtin-qwen-omni-plus',
   },
   {
     id: 'domestic-lite',
@@ -28,7 +28,7 @@ const PRESETS: PresetConfig[] = [
     desc: 'Qwen 3.5 Omni Flash 极速处理',
     tag: '无需代理',
     transcribeModelId: 'builtin-qwen-omni-flash',
-    optimizeModelId: 'builtin-qwen-omni-flash',
+    voiceTemplatesModelId: 'builtin-qwen-omni-flash',
   },
   {
     id: 'best',
@@ -36,7 +36,7 @@ const PRESETS: PresetConfig[] = [
     desc: 'Gemini 3 Flash 全能处理',
     tag: '需代理',
     transcribeModelId: 'builtin-gemini-3-flash',
-    optimizeModelId: 'builtin-gemini-3-flash',
+    voiceTemplatesModelId: 'builtin-gemini-3-flash',
   },
   {
     id: 'lite',
@@ -44,7 +44,7 @@ const PRESETS: PresetConfig[] = [
     desc: 'Gemini 3.1 Flash Lite 极速处理',
     tag: '需代理',
     transcribeModelId: 'builtin-gemini-3.1-flash-lite',
-    optimizeModelId: 'builtin-gemini-3.1-flash-lite',
+    voiceTemplatesModelId: 'builtin-gemini-3.1-flash-lite',
   },
 ]
 
@@ -54,14 +54,14 @@ interface Props {
 }
 
 export function TranscribeTab({ config, onSave }: Props) {
-  const { transcribe, optimize } = config
+  const { transcribe, voiceTemplates } = config
 
   const audioModels = getAudioModels(config)
   const textModels = getTextModels(config)
   const transcribeModel = findModel(config, transcribe.modelId)
-  const optimizeModel = findModel(config, optimize.modelId)
+  const voiceTemplatesModel = findModel(config, voiceTemplates.modelId)
   const isTranscribeGemini = transcribeModel?.protocol === 'gemini'
-  const isOptimizeGemini = optimizeModel?.protocol === 'gemini'
+  const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini'
 
   const updateTranscribe = (changes: Partial<AppConfig['transcribe']>) => {
     onSave({ ...config, transcribe: { ...transcribe, ...changes } })
@@ -71,26 +71,25 @@ export function TranscribeTab({ config, onSave }: Props) {
     updateTranscribe({ thinking: { ...transcribe.thinking, ...changes } })
   }
 
-  const updateOptimize = (changes: Partial<AppConfig['optimize']>) => {
-    onSave({ ...config, optimize: { ...optimize, ...changes } })
+  const updateVoiceTemplates = (changes: Partial<AppConfig['voiceTemplates']>) => {
+    onSave({ ...config, voiceTemplates: { ...voiceTemplates, ...changes } })
   }
 
-  const updateOptimizeThinking = (changes: Partial<ThinkingConfig>) => {
-    updateOptimize({ thinking: { ...optimize.thinking, ...changes } })
+  const updateVoiceTemplatesThinking = (changes: Partial<ThinkingConfig>) => {
+    updateVoiceTemplates({ thinking: { ...voiceTemplates.thinking, ...changes } })
   }
 
   const activePreset = PRESETS.find(
     p =>
       transcribe.modelId === p.transcribeModelId &&
-      optimize.modelId === p.optimizeModelId &&
-      optimize.enabled
+      voiceTemplates.modelId === p.voiceTemplatesModelId
   )
 
   const applyPreset = (preset: PresetConfig) => {
     onSave({
       ...config,
       transcribe: { ...transcribe, modelId: preset.transcribeModelId },
-      optimize: { ...optimize, enabled: true, modelId: preset.optimizeModelId },
+      voiceTemplates: { ...voiceTemplates, modelId: preset.voiceTemplatesModelId },
     })
   }
 
@@ -169,64 +168,53 @@ export function TranscribeTab({ config, onSave }: Props) {
         )}
       </SettingGroup>
 
-      {/* 区域二：文本优化 */}
-      <h3 className="section-title">文本优化</h3>
+      {/* 区域二：模板处理模型 */}
+      <h3 className="section-title">模板处理模型</h3>
 
-      <SettingGroup>
-        <SettingRow label="启用文本优化" description="转写后自动优化文本格式和表达">
-          <Toggle
-            checked={optimize.enabled}
-            onChange={checked => updateOptimize({ enabled: checked })}
-          />
-        </SettingRow>
-      </SettingGroup>
-
-      {optimize.enabled && (
-        <SettingGroup title="模型">
-          <SettingRow label="优化模型">
-            <select
-              className="select"
-              value={optimize.modelId}
-              onChange={e => updateOptimize({ modelId: e.target.value })}
-              style={{ width: 260 }}
-            >
-              <optgroup label="预置模型">
-                {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+      <SettingGroup title="模型">
+        <SettingRow label="处理模型" description="语音模板的第二步处理使用此模型">
+          <select
+            className="select"
+            value={voiceTemplates.modelId}
+            onChange={e => updateVoiceTemplates({ modelId: e.target.value })}
+            style={{ width: 260 }}
+          >
+            <optgroup label="预置模型">
+              {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
+            </optgroup>
+            {customText.length > 0 && (
+              <optgroup label="自定义模型">
+                {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
               </optgroup>
-              {customText.length > 0 && (
-                <optgroup label="自定义模型">
-                  {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
-                </optgroup>
-              )}
-            </select>
-          </SettingRow>
-          {isOptimizeGemini && (
-            <>
-              <SettingRow label="启用思考" description="让模型在优化前先进行推理">
-                <Toggle
-                  checked={optimize.thinking.enabled}
-                  onChange={checked => updateOptimizeThinking({ enabled: checked })}
-                />
+            )}
+          </select>
+        </SettingRow>
+        {isVoiceTemplatesGemini && (
+          <>
+            <SettingRow label="启用思考" description="让模型在处理前先进行推理">
+              <Toggle
+                checked={voiceTemplates.thinking.enabled}
+                onChange={checked => updateVoiceTemplatesThinking({ enabled: checked })}
+              />
+            </SettingRow>
+            {voiceTemplates.thinking.enabled && (
+              <SettingRow label="Thinking Level" description="思考深度级别">
+                <select
+                  className="select"
+                  value={voiceTemplates.thinking.level}
+                  onChange={e => updateVoiceTemplatesThinking({ level: e.target.value as ThinkingConfig['level'] })}
+                  style={{ width: 120 }}
+                >
+                  <option value="MINIMAL">MINIMAL</option>
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                </select>
               </SettingRow>
-              {optimize.thinking.enabled && (
-                <SettingRow label="Thinking Level" description="思考深度级别">
-                  <select
-                    className="select"
-                    value={optimize.thinking.level}
-                    onChange={e => updateOptimizeThinking({ level: e.target.value as ThinkingConfig['level'] })}
-                    style={{ width: 120 }}
-                  >
-                    <option value="MINIMAL">MINIMAL</option>
-                    <option value="LOW">LOW</option>
-                    <option value="MEDIUM">MEDIUM</option>
-                    <option value="HIGH">HIGH</option>
-                  </select>
-                </SettingRow>
-              )}
-            </>
-          )}
-        </SettingGroup>
-      )}
+            )}
+          </>
+        )}
+      </SettingGroup>
 
     </div>
   )

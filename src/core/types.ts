@@ -7,11 +7,17 @@ export interface AudioDevice {
 
 export interface GeneralConfig {
   shortcut: string
+  shortcut2: string
   launchAtLogin: boolean
   theme: ThemeMode
   maxRecordingSeconds: number
   microphone: string
   extractShortcut: string
+  extractShortcut2: string
+  shortcutTemplate: string
+  shortcut2Template: string
+  extractShortcutTemplate: string
+  extractShortcut2Template: string
 }
 
 export interface ThinkingConfig {
@@ -52,17 +58,23 @@ export interface TranscribeConfig {
   prompts: { agent: string; rules: string; vocabulary: string }
 }
 
-export interface OptimizeConfig {
-  enabled: boolean
+export interface TemplateEntry {
+  id: string
+  name: string
+  prompt: string
+}
+
+export interface VoiceTemplatesConfig {
   modelId: string
   thinking: ThinkingConfig
-  prompt: string
+  templates: TemplateEntry[]
 }
 
 export interface ExtractConfig {
   modelId?: string
   thinking?: ThinkingConfig
   prompt: string
+  templates: TemplateEntry[]
 }
 
 export interface AdvancedConfig {
@@ -78,7 +90,7 @@ export interface AppConfig {
   general: GeneralConfig
   models: ModelsConfig
   transcribe: TranscribeConfig
-  optimize: OptimizeConfig
+  voiceTemplates: VoiceTemplatesConfig
   extract: ExtractConfig
   advanced: AdvancedConfig
 }
