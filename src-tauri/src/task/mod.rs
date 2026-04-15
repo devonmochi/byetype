@@ -89,7 +89,7 @@ pub fn start_recording(app: &AppHandle) -> Option<u32> {
 }
 
 /// Called from shortcut.rs when recording STOPS successfully.
-pub fn process_recording(app: &AppHandle, task_id: u32, audio_base64: String) {
+pub fn process_recording(app: &AppHandle, task_id: u32, audio_base64: String, template_id: String) {
     let token = {
         let state = app.state::<SharedTaskManager>();
         let mgr = state.lock().unwrap();
@@ -101,7 +101,7 @@ pub fn process_recording(app: &AppHandle, task_id: u32, audio_base64: String) {
     };
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        run_pipeline(&app_handle, task_id, audio_base64, None, token).await;
+        run_pipeline(&app_handle, task_id, audio_base64, None, token, template_id).await;
     });
 }
 
@@ -175,6 +175,7 @@ pub fn cancel_task(app: &AppHandle, task_id: u32) {
 /// Retry a previously failed record.
 pub fn retry_record(app: &AppHandle, record_id: u64) {
     let config = app.state::<ConfigManager>().get();
+    let template_id = config.general.shortcut_template.clone();
 
     let (task_id, audio_base64, token) = {
         let state = app.state::<SharedTaskManager>();
@@ -209,7 +210,7 @@ pub fn retry_record(app: &AppHandle, record_id: u64) {
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        run_pipeline(&app_handle, task_id, audio_base64, Some(record_id), token).await;
+        run_pipeline(&app_handle, task_id, audio_base64, Some(record_id), token, template_id).await;
     });
 }
 
@@ -234,6 +235,7 @@ async fn run_pipeline(
     audio_base64: String,
     retry_record_id: Option<u64>,
     token: CancellationToken,
+    template_id: String,
 ) {
     // Get config snapshot and prompts_dir - release lock before any .await
     let (config, prompts_dir) = {
@@ -315,7 +317,7 @@ async fn run_pipeline(
     let final_text: String;
     let optimize_text: Option<String>;
 
-    if config.optimize.enabled {
+    if !template_id.is_empty() {
         let _ = crate::bubble::update(app, task_id, "optimizing");
         if let Some(rid) = retry_record_id {
             let _ = app.emit("retry-status", serde_json::json!({ "recordId": rid, "status": "optimizing" }));
@@ -326,6 +328,7 @@ async fn run_pipeline(
             let txt = transcribe_text.clone();
             let cfg = config.clone();
             let pd = prompts_dir.clone();
+            let tid = template_id.clone();
             tokio::select! {
                 result = ai::retry::with_retry(
                     || {
@@ -333,8 +336,9 @@ async fn run_pipeline(
                         let txt = txt.clone();
                         let cfg = cfg.clone();
                         let pd = pd.clone();
+                        let tid = tid.clone();
                         async move {
-                            ai::optimize(&client, &txt, &cfg, &pd).await
+                            ai::optimize(&client, &txt, &cfg, &pd, &tid).await
                         }
                     },
                     max_retries,
@@ -452,7 +456,7 @@ fn finish_pipeline(
 
 /// Called from shortcut.rs when user triggers the extract shortcut.
 /// Takes a screenshot via interactive selection, OCRs it, and copies text to clipboard.
-pub fn start_extraction(app: &AppHandle) -> Option<u32> {
+pub fn start_extraction(app: &AppHandle, template_id: String) -> Option<u32> {
     let config = app.state::<ConfigManager>().get();
     let task_id = {
         let state = app.state::<SharedTaskManager>();
@@ -477,12 +481,12 @@ pub fn start_extraction(app: &AppHandle) -> Option<u32> {
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        run_extract_pipeline(&app_handle, task_id).await;
+        run_extract_pipeline(&app_handle, task_id, template_id).await;
     });
     Some(task_id)
 }
 
-async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
+async fn run_extract_pipeline(app: &AppHandle, task_id: u32, template_id: String) {
     // Phase 0: Interactive screenshot capture (platform-specific)
     let image_base64 = match capture_screenshot(app, task_id).await {
         Some(b64) => {
@@ -531,6 +535,7 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
         let img = image_base64.clone();
         let cfg = config.clone();
         let pd = prompts_dir.clone();
+        let tid = template_id.clone();
         tokio::select! {
             result = ai::retry::with_retry(
                 || {
@@ -538,8 +543,9 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32) {
                     let img = img.clone();
                     let cfg = cfg.clone();
                     let pd = pd.clone();
+                    let tid = tid.clone();
                     async move {
-                        ai::extract_text(&client, &img, &cfg, &pd).await
+                        ai::extract_text(&client, &img, &cfg, &pd, &tid).await
                     }
                 },
                 max_retries,
