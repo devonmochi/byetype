@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::config::types::AppConfig;
+use crate::config::types::{AppConfig, TemplateEntry};
 
 pub fn load_prompt(file_path: &str) -> String {
     if file_path.is_empty() {
@@ -55,18 +55,55 @@ pub fn build_transcribe_prompt(config: &AppConfig, prompts_dir: &Path) -> String
 }
 
 pub fn load_optimize_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
-    let prompt_path = resolve_prompt_path(
-        &config.optimize.prompt,
-        &prompts_dir.join("text-optimize.md").to_string_lossy(),
+    let content = load_template_prompt(
+        &config.voice_templates.templates,
+        "voice-optimize",
+        prompts_dir,
     );
-
-    let content = load_prompt(&prompt_path);
     wrap_document("text-optimize", &content)
 }
 
-pub fn build_extract_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
-    let builtin = prompts_dir.join("text-extract.md").to_string_lossy().to_string();
-    let custom = &config.extract.prompt;
-    let path = resolve_prompt_path(custom, &builtin);
-    load_prompt(&path)
+pub fn build_extract_prompt(config: &AppConfig, prompts_dir: &Path, template_id: &str) -> String {
+    load_template_prompt(
+        &config.extract.templates,
+        template_id,
+        prompts_dir,
+    )
+}
+
+/// Map builtin template ID to builtin prompt filename
+fn builtin_prompt_filename(template_id: &str) -> Option<&str> {
+    match template_id {
+        "voice-optimize" => Some("text-optimize.md"),
+        "voice-translate" => Some("voice-translate.md"),
+        "image-extract" => Some("text-extract.md"),
+        "image-translate" => Some("image-translate.md"),
+        _ => None,
+    }
+}
+
+pub fn load_template_prompt(
+    templates: &[TemplateEntry],
+    template_id: &str,
+    prompts_dir: &Path,
+) -> String {
+    let template = templates.iter().find(|t| t.id == template_id);
+
+    // Prefer custom prompt path from template
+    if let Some(t) = template {
+        if !t.prompt.is_empty() {
+            let content = load_prompt(&t.prompt);
+            if !content.is_empty() {
+                return content;
+            }
+        }
+    }
+
+    // Fall back to builtin file
+    if let Some(filename) = builtin_prompt_filename(template_id) {
+        let builtin_path = prompts_dir.join(filename);
+        return load_prompt(&builtin_path.to_string_lossy());
+    }
+
+    String::new()
 }
