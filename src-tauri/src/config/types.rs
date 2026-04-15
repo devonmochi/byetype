@@ -6,7 +6,8 @@ pub struct AppConfig {
     pub general: GeneralConfig,
     pub models: ModelsConfig,
     pub transcribe: TranscribeConfig,
-    pub optimize: OptimizeConfig,
+    #[serde(alias = "optimize")]
+    pub voice_templates: VoiceTemplatesConfig,
     #[serde(default)]
     pub extract: ExtractConfig,
     pub advanced: AdvancedConfig,
@@ -28,6 +29,22 @@ fn default_extract_shortcut() -> String {
     "F6".to_string()
 }
 
+fn default_shortcut2() -> String {
+    "F5".to_string()
+}
+
+fn default_extract_shortcut2() -> String {
+    "F7".to_string()
+}
+
+fn default_shortcut_template() -> String {
+    "voice-optimize".to_string()
+}
+
+fn default_extract_template() -> String {
+    "image-extract".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralConfig {
@@ -40,6 +57,18 @@ pub struct GeneralConfig {
     pub microphone: String,
     #[serde(default = "default_extract_shortcut")]
     pub extract_shortcut: String,
+    #[serde(default = "default_shortcut2")]
+    pub shortcut2: String,
+    #[serde(default = "default_extract_shortcut2")]
+    pub extract_shortcut2: String,
+    #[serde(default = "default_shortcut_template")]
+    pub shortcut_template: String,
+    #[serde(default)]
+    pub shortcut2_template: String,
+    #[serde(default = "default_extract_template")]
+    pub extract_shortcut_template: String,
+    #[serde(default)]
+    pub extract_shortcut2_template: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,11 +136,28 @@ pub struct TranscribeConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OptimizeConfig {
-    pub enabled: bool,
+pub struct TemplateEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub prompt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceTemplatesConfig {
     pub model_id: String,
     pub thinking: ThinkingConfig,
-    pub prompt: String,
+    #[serde(default = "default_voice_templates")]
+    pub templates: Vec<TemplateEntry>,
+}
+
+fn default_voice_templates() -> Vec<TemplateEntry> {
+    vec![
+        TemplateEntry { id: "voice-optimize".to_string(), name: "文本优化".to_string(), prompt: String::new() },
+        TemplateEntry { id: "voice-translate".to_string(), name: "翻译".to_string(), prompt: String::new() },
+        TemplateEntry { id: "voice-custom".to_string(), name: "自定义".to_string(), prompt: String::new() },
+    ]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +166,16 @@ pub struct ExtractConfig {
     pub model_id: Option<String>,
     pub thinking: Option<ThinkingConfig>,
     pub prompt: String,
+    #[serde(default = "default_image_templates")]
+    pub templates: Vec<TemplateEntry>,
+}
+
+fn default_image_templates() -> Vec<TemplateEntry> {
+    vec![
+        TemplateEntry { id: "image-extract".to_string(), name: "文字识别".to_string(), prompt: String::new() },
+        TemplateEntry { id: "image-translate".to_string(), name: "翻译".to_string(), prompt: String::new() },
+        TemplateEntry { id: "image-custom".to_string(), name: "自定义".to_string(), prompt: String::new() },
+    ]
 }
 
 impl Default for ExtractConfig {
@@ -128,6 +184,7 @@ impl Default for ExtractConfig {
             model_id: None,
             thinking: None,
             prompt: String::new(),
+            templates: default_image_templates(),
         }
     }
 }
@@ -154,6 +211,12 @@ impl Default for AppConfig {
                 max_recording_seconds: 180,
                 microphone: "system-default".to_string(),
                 extract_shortcut: "F6".to_string(),
+                shortcut2: "F5".to_string(),
+                extract_shortcut2: "F7".to_string(),
+                shortcut_template: "voice-optimize".to_string(),
+                shortcut2_template: "voice-translate".to_string(),
+                extract_shortcut_template: "image-extract".to_string(),
+                extract_shortcut2_template: "image-translate".to_string(),
             },
             models: ModelsConfig {
                 builtin_api_keys: BuiltinApiKeys {
@@ -179,15 +242,14 @@ impl Default for AppConfig {
                     vocabulary: String::new(),
                 },
             },
-            optimize: OptimizeConfig {
-                enabled: false,
+            voice_templates: VoiceTemplatesConfig {
                 model_id: String::new(),
                 thinking: ThinkingConfig {
                     enabled: false,
                     budget: 1024,
                     level: "LOW".to_string(),
                 },
-                prompt: String::new(),
+                templates: default_voice_templates(),
             },
             extract: ExtractConfig::default(),
             advanced: AdvancedConfig {
