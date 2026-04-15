@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByeType 设置界面设计稿</title>
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --bg-secondary: #2c2c2e;
+    --bg-tertiary: #3a3a3c;
+    --text-primary: #f5f5f7;
+    --text-secondary: #98989d;
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --border: #38383a;
+    --radius: 10px;
+    --danger: #ff453a;
+    --success: #30d158;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: #000;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+
+  .app-window {
+    width: 780px;
+    background: var(--bg);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .titlebar {
+    height: 52px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+
+  .traffic-light {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+  .tl-red { background: #ff5f57; }
+  .tl-yellow { background: #febc2e; }
+  .tl-green { background: #28c840; }
+
+  .titlebar-text {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .layout {
+    display: flex;
+    min-height: 620px;
+  }
+
+  .sidebar {
+    width: 180px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    padding: 12px 8px;
+  }
+
+  .sidebar-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: all 0.15s;
+  }
+
+  .sidebar-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .sidebar-item.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .sidebar-group {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    padding: 14px 12px 4px;
+    opacity: 0.7;
+  }
+
+  .sidebar-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 12px;
+  }
+
+  .content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .content-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    letter-spacing: -0.3px;
+  }
+
+  .section {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    padding: 12px 16px 6px;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    min-height: 44px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .row:last-child { border-bottom: none; }
+
+  .row-label {
+    flex: 1;
+  }
+
+  .row-label .label {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .row-label .desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .row-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .kbd {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 14px;
+    font-size: 13px;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: var(--text-primary);
+    text-align: center;
+    min-width: 60px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .kbd:hover {
+    border-color: var(--accent);
+  }
+
+  .select-mock {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 28px 4px 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    position: relative;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2398989d'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    min-width: 100px;
+    transition: all 0.15s;
+  }
+
+  .select-mock:hover {
+    border-color: var(--accent);
+  }
+
+  /* Mode card styling */
+  .mode-group {
+    margin-bottom: 16px;
+  }
+
+  .mode-group-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    padding: 0 4px 8px;
+  }
+
+  .mode-cards {
+    display: flex;
+    gap: 10px;
+  }
+
+  .mode-card {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    transition: all 0.2s;
+  }
+
+  .mode-card:hover {
+    border-color: var(--accent);
+  }
+
+  .mode-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .mode-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .mode-icon.voice { background: rgba(10, 132, 255, 0.15); }
+  .mode-icon.image { background: rgba(48, 209, 88, 0.15); }
+
+  .mode-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .mode-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .mode-config {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mode-config-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .badge-voice {
+    background: rgba(10, 132, 255, 0.15);
+    color: var(--accent);
+  }
+
+  .badge-image {
+    background: rgba(48, 209, 88, 0.15);
+    color: var(--success);
+  }
+
+  /* Tab indicator */
+  .tab-bar {
+    display: none;
+  }
+
+  /* Template list in prompts tab */
+  .template-list {
+    margin-top: 16px;
+  }
+
+  .template-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .template-item-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .template-item-header:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .template-name-input {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+    transition: all 0.15s;
+  }
+
+  .template-name-input:hover {
+    border-color: var(--border);
+  }
+
+  .template-name-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--bg-tertiary);
+  }
+
+  .template-badge {
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .template-expand {
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+
+  .template-expand.open {
+    transform: rotate(90deg);
+  }
+
+  .template-editor {
+    border-top: 1px solid var(--border);
+    padding: 12px 14px;
+    background: var(--bg);
+  }
+
+  .editor-mock {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    min-height: 80px;
+    white-space: pre-wrap;
+  }
+
+  .btn-add {
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    width: 100%;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-add:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .view-label {
+    position: fixed;
+    top: 10px;
+    right: 20px;
+    background: var(--accent);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s;
+  }
+
+  .view-label:hover {
+    background: var(--accent-hover);
+  }
+
+  .view-container {
+    display: none;
+  }
+
+  .view-container.active {
+    display: block;
+  }
+
+  .annotation {
+    background: rgba(10, 132, 255, 0.08);
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    margin: 12px 0;
+    font-size: 12px;
+    color: var(--accent);
+    border-radius: 0 6px 6px 0;
+    line-height: 1.5;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* Nav tabs for switching views */
+  .view-nav {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding: 16px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    z-index: 99;
+  }
+
+  .view-nav-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .view-nav-btn:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .view-nav-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .main-content {
+    padding-top: 60px;
+  }
+
+  .page-title {
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 24px;
+    font-weight: 400;
+  }
+
+  /* Delete button */
+  .btn-delete {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .btn-delete:hover {
+    color: var(--danger);
+    background: rgba(255, 69, 58, 0.1);
+  }
+</style>
+</head>
+<body>
+
+<div class="view-nav">
+  <button class="view-nav-btn active" onclick="showView('general')">通用设置</button>
+  <button class="view-nav-btn" onclick="showView('voice-prompts')">转写提示词</button>
+  <button class="view-nav-btn" onclick="showView('image-prompts')">图像识别提示词</button>
+</div>
+
+<div class="main-content">
+
+<!-- ========== VIEW 1: 通用设置 ========== -->
+<div id="view-general" class="view-container active">
+  <p class="page-title">通用设置 — 快捷键与模式配置</p>
+
+  <div class="app-window">
+    <div class="titlebar">
+      <div class="traffic-light tl-red"></div>
+      <div class="traffic-light tl-yellow"></div>
+      <div class="traffic-light tl-green"></div>
+      <div class="titlebar-text">ByeType 设置</div>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-item active">通用设置</div>
+        <div class="sidebar-item">模型管理</div>
+        <div class="sidebar-group">语音转写</div>
+        <div class="sidebar-item">转写设置</div>
+        <div class="sidebar-item">转写提示词</div>
+        <div class="sidebar-group">图像识别</div>
+        <div class="sidebar-item">图像识别设置</div>
+        <div class="sidebar-item">图像识别提示词</div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-item">历史记录</div>
+        <div class="sidebar-item">关于</div>
+      </div>
+      <div class="content">
+        <h2 class="content-title">通用设置</h2>
+
+        <div class="section">
+          <div class="section-title">语音转录</div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">转录模式 I</div>
+              <div class="desc">语音转录并使用模板处理</div>
+            </div>
+            <div class="row-right">
+              <select class="select-mock">
+                <option>文本优化</option>
+                <option>翻译</option>
+                <option>自定义</option>
+                <option>无</option>
+              </select>
+              <div class="kbd">F4</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">转录模式 II</div>
+              <div class="desc">语音转录并使用模板处理</div>
+            </div>
+            <div class="row-right">
+              <select class="select-mock">
+                <option>翻译</option>
+                <option>文本优化</option>
+                <option>自定义</option>
+                <option>无</option>
+              </select>
+              <div class="kbd">F5</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">图像识别</div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">图像模式 I</div>
+              <div class="desc">截屏并使用模板识别处理</div>
+            </div>
+            <div class="row-right">
+              <select class="select-mock">
+                <option>文字识别</option>
+                <option>翻译</option>
+                <option>自定义</option>
+              </select>
+              <div class="kbd">F6</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">图像模式 II</div>
+              <div class="desc">截屏并使用模板识别处理</div>
+            </div>
+            <div class="row-right">
+              <select class="select-mock">
+                <option>翻译</option>
+                <option>文字识别</option>
+                <option>自定义</option>
+              </select>
+              <div class="kbd">F7</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="annotation">快捷键点击后按下新键位即可更改，4 个快捷键之间不能重复</div>
+
+        <div class="section">
+          <div class="section-title">其他</div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">最大录音时长</div>
+              <div class="desc">超时自动停止并处理，单位为秒</div>
+            </div>
+            <div class="row-right">
+              <div class="kbd" style="min-width:80px">180</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">开机自启</div>
+              <div class="desc">登录后自动启动 ByeType</div>
+            </div>
+            <div class="row-right">
+              <div style="width:40px;height:24px;background:var(--accent);border-radius:12px;position:relative">
+                <div style="width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:2px;right:2px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== VIEW 2: 转写提示词 ========== -->
+<div id="view-voice-prompts" class="view-container">
+  <p class="page-title">转写提示词 — 管理语音转录后的处理模板</p>
+
+  <div class="app-window">
+    <div class="titlebar">
+      <div class="traffic-light tl-red"></div>
+      <div class="traffic-light tl-yellow"></div>
+      <div class="traffic-light tl-green"></div>
+      <div class="titlebar-text">ByeType 设置</div>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-item">通用设置</div>
+        <div class="sidebar-item">模型管理</div>
+        <div class="sidebar-group">语音转写</div>
+        <div class="sidebar-item">转写设置</div>
+        <div class="sidebar-item active">转写提示词</div>
+        <div class="sidebar-group">图像识别</div>
+        <div class="sidebar-item">图像识别设置</div>
+        <div class="sidebar-item">图像识别提示词</div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-item">历史记录</div>
+        <div class="sidebar-item">关于</div>
+      </div>
+      <div class="content">
+        <h2 class="content-title">转写提示词</h2>
+
+        <div class="annotation">语音转录后的第二步处理模板。在「通用设置」中将模板绑定到快捷键。模板名称可自定义。</div>
+
+        <!-- Template: 文本优化 -->
+        <div class="template-item">
+          <div class="template-item-header">
+            <span class="template-expand">▶</span>
+            <input class="template-name-input" value="文本优化" />
+            <span class="template-badge">内置</span>
+          </div>
+        </div>
+
+        <!-- Template: 翻译 (expanded) -->
+        <div class="template-item">
+          <div class="template-item-header">
+            <span class="template-expand open">▶</span>
+            <input class="template-name-input" value="翻译" />
+            <span class="template-badge">内置</span>
+          </div>
+          <div class="template-editor">
+            <div class="editor-mock">You are a professional translator.
+
+Translate the following text into English.
+Keep the original meaning, tone, and formatting.
+Output only the translated text, nothing else.
+
+---
+{{text}}</div>
+          </div>
+        </div>
+
+        <!-- Template: 自定义 -->
+        <div class="template-item">
+          <div class="template-item-header">
+            <span class="template-expand">▶</span>
+            <input class="template-name-input" value="自定义" />
+            <span class="template-badge">用户</span>
+            <button class="btn-delete" title="删除">✕</button>
+          </div>
+        </div>
+
+        <button class="btn-add">+ 添加模板</button>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="section-title">模板处理模型配置（所有转写提示词共用）</div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">模型</div>
+            </div>
+            <div class="row-right">
+              <select class="select-mock" style="min-width:200px">
+                <option>gemini-2.5-flash</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-label">
+              <div class="label">Thinking</div>
+            </div>
+            <div class="row-right">
+              <div style="width:40px;height:24px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;position:relative">
+                <div style="width:20px;height:20px;background:var(--text-secondary);border-radius:50%;position:absolute;top:2px;left:2px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== VIEW 3: 图像识别提示词 ========== -->
+<div id="view-image-prompts" class="view-container">
+  <p class="page-title">图像识别提示词 — 管理截图识别的处理模板</p>
+
+  <div class="app-window">
+    <div class="titlebar">
+      <div class="traffic-light tl-red"></div>
+      <div class="traffic-light tl-yellow"></div>
+      <div class="traffic-light tl-green"></div>
+      <div class="titlebar-text">ByeType 设置</div>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-item">通用设置</div>
+        <div class="sidebar-item">模型管理</div>
+        <div class="sidebar-group">语音转写</div>
+        <div class="sidebar-item">转写设置</div>
+        <div class="sidebar-item">转写提示词</div>
+        <div class="sidebar-group">图像识别</div>
+        <div class="sidebar-item">图像识别设置</div>
+        <div class="sidebar-item active">图像识别提示词</div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-item">历史记录</div>
+        <div class="sidebar-item">关于</div>
+      </div>
+      <div class="content">
+        <h2 class="content-title">图像识别提示词</h2>
+
+        <div class="annotation">截图后的 AI 识别模板。不同模板使用不同的 prompt 指令。在「通用设置」中将模板绑定到快捷键。</div>
+
+        <!-- Template: 文字识别 -->
+        <div class="template-item">
+          <div class="template-item-header">
+            <span class="template-expand">▶</span>
+            <input class="template-name-input" value="文字识别" />
+            <span class="template-badge">内置</span>
+          </div>
+        </div>
+
+        <!-- Template: 翻译 (expanded) -->
+        <div class="template-item">
+          <div class="template-item-header">
+            <span class="template-expand open">▶</span>
+            <input class="template-name-input" value="翻译" />
+            <span class="template-badge">内置</span>
+          </div>
+          <div class="template-editor">
+            <div class="editor-mock">You are a professional translator with OCR ability.
+
+Extract all visible text from this image,
+then translate the text into English.
+Preserve the original layout and structure.
+Output only the translated text.</div>
+          </div>
+        </div>
+
+        <!-- Template: 自定义 -->
+        <div class="template-item">
+          <div class="template-item-header">
+            <span class="template-expand">▶</span>
+            <input class="template-name-input" value="自定义" />
+            <span class="template-badge">用户</span>
+            <button class="btn-delete" title="删除">✕</button>
+          </div>
+        </div>
+
+        <button class="btn-add">+ 添加模板</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function showView(name) {
+  document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.view-nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Toggle template expand/collapse
+document.querySelectorAll('.template-item-header').forEach(header => {
+  header.addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    const item = header.parentElement;
+    const editor = item.querySelector('.template-editor');
+    const arrow = header.querySelector('.template-expand');
+    if (editor) {
+      editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+      arrow.classList.toggle('open');
+    }
+  });
+});
+</script>
+</body>
+</html>
