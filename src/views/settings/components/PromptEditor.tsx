@@ -21,15 +21,45 @@ export interface PromptFileEntry {
 }
 
 function getConfigValue(config: AppConfig, configPath: string): string {
-  if (configPath === 'optimize.prompt') return config.optimize.prompt
+  if (configPath.startsWith('voiceTemplates.templates.')) {
+    const templateId = configPath.split('.')[2]
+    const template = config.voiceTemplates.templates.find(t => t.id === templateId)
+    return template?.prompt ?? ''
+  }
+  if (configPath.startsWith('extract.templates.')) {
+    const templateId = configPath.split('.')[2]
+    const template = config.extract.templates.find(t => t.id === templateId)
+    return template?.prompt ?? ''
+  }
   if (configPath === 'extract.prompt') return config.extract.prompt
   const key = configPath.split('.').pop() as keyof AppConfig['transcribe']['prompts']
   return config.transcribe.prompts[key]
 }
 
 function setConfigValue(config: AppConfig, configPath: string, value: string): AppConfig {
-  if (configPath === 'optimize.prompt') {
-    return { ...config, optimize: { ...config.optimize, prompt: value } }
+  if (configPath.startsWith('voiceTemplates.templates.')) {
+    const templateId = configPath.split('.')[2]
+    return {
+      ...config,
+      voiceTemplates: {
+        ...config.voiceTemplates,
+        templates: config.voiceTemplates.templates.map(t =>
+          t.id === templateId ? { ...t, prompt: value } : t
+        ),
+      },
+    }
+  }
+  if (configPath.startsWith('extract.templates.')) {
+    const templateId = configPath.split('.')[2]
+    return {
+      ...config,
+      extract: {
+        ...config.extract,
+        templates: config.extract.templates.map(t =>
+          t.id === templateId ? { ...t, prompt: value } : t
+        ),
+      },
+    }
   }
   if (configPath === 'extract.prompt') {
     return { ...config, extract: { ...config.extract, prompt: value } }
