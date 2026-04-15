@@ -54,16 +54,25 @@ pub fn save_config(
 ) -> Result<bool, String> {
     let old_config = config_manager.get();
     let old_shortcut = old_config.general.shortcut.clone();
+    let old_shortcut2 = old_config.general.shortcut2.clone();
     let old_extract_shortcut = old_config.general.extract_shortcut.clone();
+    let old_extract_shortcut2 = old_config.general.extract_shortcut2.clone();
+    let old_shortcut_template = old_config.general.shortcut_template.clone();
+    let old_shortcut2_template = old_config.general.shortcut2_template.clone();
+    let old_extract_shortcut_template = old_config.general.extract_shortcut_template.clone();
+    let old_extract_shortcut2_template = old_config.general.extract_shortcut2_template.clone();
     config_manager.update(config.clone())?;
 
-    if config.general.shortcut != old_shortcut || config.general.extract_shortcut != old_extract_shortcut {
-        let new_key = if config.general.shortcut.is_empty() {
-            "F4".to_string()
-        } else {
-            config.general.shortcut.clone()
-        };
-        crate::shortcut::register(&app, &new_key, (*recorder).clone())?;
+    let shortcuts_changed = config.general.shortcut != old_shortcut
+        || config.general.shortcut2 != old_shortcut2
+        || config.general.extract_shortcut != old_extract_shortcut
+        || config.general.extract_shortcut2 != old_extract_shortcut2
+        || config.general.shortcut_template != old_shortcut_template
+        || config.general.shortcut2_template != old_shortcut2_template
+        || config.general.extract_shortcut_template != old_extract_shortcut_template
+        || config.general.extract_shortcut2_template != old_extract_shortcut2_template;
+    if shortcuts_changed {
+        crate::shortcut::register(&app, (*recorder).clone())?;
     }
 
     Ok(true)

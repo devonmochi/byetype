@@ -21,7 +21,6 @@ use audio::recorder::AudioRecorder;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config_manager = ConfigManager::new(None);
-    let initial_shortcut = config_manager.get().general.shortcut.clone();
     let recorder = Arc::new(AudioRecorder::new());
 
     tauri::Builder::default()
@@ -81,15 +80,10 @@ pub fn run() {
             app.manage::<ScreenshotImageState>(Arc::new(Mutex::new(None)));
             app.manage(updater::UpdateState::new(None));
 
-            let shortcut_key = if initial_shortcut.is_empty() {
-                "F4".to_string()
-            } else {
-                initial_shortcut
-            };
             bubble::init(&app_handle)
                 .expect("Failed to pre-create bubble window");
 
-            shortcut::register(&app_handle, &shortcut_key, recorder.clone())
+            shortcut::register(&app_handle, recorder.clone())
                 .expect("Failed to register shortcut");
 
             // Settings window: hidden on startup

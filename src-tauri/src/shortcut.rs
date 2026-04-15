@@ -6,32 +6,62 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
 
-/// Register the global shortcut that toggles recording.
+/// Register all 4 global shortcuts (2 voice + 2 image), each bound to its own template_id.
 pub fn register(
     app: &AppHandle,
-    shortcut_key: &str,
     recorder: Arc<AudioRecorder>,
 ) -> Result<(), String> {
-    // Conflict check: recording shortcut vs extract shortcut
-    let extract_key = {
-        let cfg = app.state::<ConfigManager>().get();
-        if cfg.general.extract_shortcut.is_empty() {
-            "F6".to_string()
-        } else {
-            cfg.general.extract_shortcut.clone()
-        }
-    };
-    if shortcut_key == extract_key {
-        return Err("录音快捷键与提取快捷键冲突，请设置不同的快捷键".to_string());
-    }
+    let cfg = app.state::<ConfigManager>().get();
+    let keys = [
+        cfg.general.shortcut.clone(),
+        cfg.general.shortcut2.clone(),
+        cfg.general.extract_shortcut.clone(),
+        cfg.general.extract_shortcut2.clone(),
+    ];
 
-    let app_handle = app.clone();
-    // Track the current recording's task_id between start and stop
-    let current_task_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
-    let recording_gen: Arc<AtomicU32> = Arc::new(AtomicU32::new(0));
+    // Conflict detection: all 4 shortcuts must be unique
+    for i in 0..keys.len() {
+        for j in (i + 1)..keys.len() {
+            if !keys[i].is_empty() && keys[i] == keys[j] {
+                return Err(format!("快捷键 '{}' 重复，请设置不同的快捷键", keys[i]));
+            }
+        }
+    }
 
     app.global_shortcut().unregister_all()
         .map_err(|e| format!("Failed to unregister shortcuts: {}", e))?;
+
+    // Voice shortcut 1
+    if !cfg.general.shortcut.is_empty() {
+        register_voice_shortcut(app, &cfg.general.shortcut, cfg.general.shortcut_template.clone(), recorder.clone())?;
+    }
+    // Voice shortcut 2
+    if !cfg.general.shortcut2.is_empty() {
+        register_voice_shortcut(app, &cfg.general.shortcut2, cfg.general.shortcut2_template.clone(), recorder.clone())?;
+    }
+    // Image shortcut 1
+    let ek1 = if cfg.general.extract_shortcut.is_empty() { "F6".to_string() } else { cfg.general.extract_shortcut.clone() };
+    register_image_shortcut(app, &ek1, cfg.general.extract_shortcut_template.clone())?;
+    // Image shortcut 2
+    if !cfg.general.extract_shortcut2.is_empty() {
+        register_image_shortcut(app, &cfg.general.extract_shortcut2, cfg.general.extract_shortcut2_template.clone())?;
+    }
+
+    Ok(())
+}
+
+/// Register a single voice (recording-toggle) shortcut bound to the given template_id.
+fn register_voice_shortcut(
+    app: &AppHandle,
+    shortcut_key: &str,
+    template_id: String,
+    recorder: Arc<AudioRecorder>,
+) -> Result<(), String> {
+    let app_handle = app.clone();
+    let tmpl = template_id;
+    // Track the current recording's task_id between start and stop
+    let current_task_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+    let recording_gen: Arc<AtomicU32> = Arc::new(AtomicU32::new(0));
 
     app.global_shortcut()
         .on_shortcut(shortcut_key, move |_app, _shortcut, event| {
@@ -51,7 +81,7 @@ pub fn register(
                     Ok(base64_audio) => {
                         update_tray_icon(&app_handle, false);
                         if let Some(tid) = task_id {
-                            crate::task::process_recording(&app_handle, tid, base64_audio);
+                            crate::task::process_recording(&app_handle, tid, base64_audio, tmpl.clone());
                         }
                     }
                     Err(e) => {
@@ -86,6 +116,7 @@ pub fn register(
                             let t_app = app_handle.clone();
                             let t_task_id = current_task_id.clone();
                             let t_gen = recording_gen.clone();
+                            let t_tmpl = tmpl.clone();
                             std::thread::spawn(move || {
                                 std::thread::sleep(std::time::Duration::from_secs(max_secs as u64));
                                 // CAS: claim the right to stop — advance gen; fails if manually stopped or new recording started
@@ -95,7 +126,7 @@ pub fn register(
                                         Ok(base64_audio) => {
                                             update_tray_icon(&t_app, false);
                                             if let Some(tid) = task_id {
-                                                crate::task::process_recording(&t_app, tid, base64_audio);
+                                                crate::task::process_recording(&t_app, tid, base64_audio, t_tmpl.clone());
                                             }
                                         }
                                         Err(e) => {
@@ -122,28 +153,25 @@ pub fn register(
                 }
             }
         })
-        .map_err(|e| format!("Failed to register shortcut '{}': {}", shortcut_key, e))?;
+        .map_err(|e| format!("Failed to register voice shortcut '{}': {}", shortcut_key, e))?;
 
-    // Register extract shortcut (text extraction via screenshot + OCR)
-    let extract_key = {
-        let cfg = app.state::<ConfigManager>().get();
-        if cfg.general.extract_shortcut.is_empty() {
-            "F6".to_string()
-        } else {
-            cfg.general.extract_shortcut.clone()
-        }
-    };
+    Ok(())
+}
 
+/// Register a single image (screenshot + OCR extraction) shortcut bound to the given template_id.
+fn register_image_shortcut(
+    app: &AppHandle,
+    shortcut_key: &str,
+    template_id: String,
+) -> Result<(), String> {
     let extract_app = app.clone();
+    let tmpl = template_id;
     app.global_shortcut()
-        .on_shortcut(extract_key.as_str(), move |_app, _shortcut, event| {
-            if event.state != ShortcutState::Pressed {
-                return;
-            }
-            crate::task::start_extraction(&extract_app);
+        .on_shortcut(shortcut_key, move |_app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed { return; }
+            crate::task::start_extraction(&extract_app, tmpl.clone());
         })
-        .map_err(|e| format!("Failed to register extract shortcut '{}': {}", extract_key, e))?;
-
+        .map_err(|e| format!("Failed to register image shortcut '{}': {}", shortcut_key, e))?;
     Ok(())
 }
 
