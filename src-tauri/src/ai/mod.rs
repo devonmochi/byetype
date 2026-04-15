@@ -86,11 +86,12 @@ pub async fn extract_text(
     image_base64: &str,
     config: &AppConfig,
     prompts_dir: &Path,
+    template_id: &str,
 ) -> Result<String, String> {
     let model_id = config.extract.model_id.as_deref().unwrap_or(&config.transcribe.model_id);
     let resolved = models::resolve_model(config, model_id)?;
     let thinking = config.extract.thinking.as_ref().unwrap_or(&config.transcribe.thinking);
-    let system_prompt = prompt::build_extract_prompt(config, prompts_dir);
+    let system_prompt = prompt::build_extract_prompt(config, prompts_dir, template_id);
 
     match resolved.protocol.as_str() {
         "gemini" => {
@@ -158,17 +159,19 @@ pub async fn optimize(
     text: &str,
     config: &AppConfig,
     prompts_dir: &Path,
+    template_id: &str,
 ) -> Result<String, String> {
-    if !config.optimize.enabled {
-        return Ok(text.to_string());
-    }
-
-    let system_prompt = prompt::load_optimize_prompt(config, prompts_dir);
+    let system_prompt = prompt::load_template_prompt(
+        &config.voice_templates.templates,
+        template_id,
+        prompts_dir,
+    );
     if system_prompt.is_empty() {
         return Ok(text.to_string());
     }
+    let system_prompt = prompt::wrap_document("text-optimize", &system_prompt);
 
-    let resolved = models::resolve_model(config, &config.optimize.model_id)?;
+    let resolved = models::resolve_model(config, &config.voice_templates.model_id)?;
 
     match resolved.protocol.as_str() {
         "gemini" => {
@@ -179,7 +182,7 @@ pub async fn optimize(
                 &resolved.api_key,
                 &resolved.model,
                 &resolved.base_url,
-                &config.optimize.thinking,
+                &config.voice_templates.thinking,
             )
             .await
         }
