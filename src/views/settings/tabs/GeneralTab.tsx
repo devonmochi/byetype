@@ -26,7 +26,9 @@ interface Props {
 
 export function GeneralTab({ config, onSave }: Props) {
   const [recording, setRecording] = useState(false)
+  const [recording2, setRecording2] = useState(false)
   const [recordingExtract, setRecordingExtract] = useState(false)
+  const [recordingExtract2, setRecordingExtract2] = useState(false)
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [conflictMsg, setConflictMsg] = useState('')
 
@@ -70,8 +72,7 @@ export function GeneralTab({ config, onSave }: Props) {
   function createKeyHandler(
     setRec: (v: boolean) => void,
     onCapture: (combo: string) => void,
-    otherShortcut: string,
-    otherLabel: string,
+    others: { key: string; label: string }[],
   ) {
     return (e: React.KeyboardEvent) => {
       e.preventDefault()
@@ -91,8 +92,9 @@ export function GeneralTab({ config, onSave }: Props) {
       parts.push(key)
       const combo = parts.join('+')
 
-      if (combo === otherShortcut) {
-        setConflictMsg(`\u4E0E${otherLabel}\u51B2\u7A81`)
+      const conflict = others.find(o => o.key === combo)
+      if (conflict) {
+        setConflictMsg(`\u4E0E${conflict.label}\u51B2\u7A81`)
         setTimeout(() => setConflictMsg(''), 3000)
         setRec(false)
         return
@@ -106,15 +108,41 @@ export function GeneralTab({ config, onSave }: Props) {
   const handleKeyDown = createKeyHandler(
     setRecording,
     (combo) => update({ shortcut: combo }),
-    config.general.extractShortcut,
-    '\u8BC6\u522B\u5FEB\u6377\u952E',
+    [
+      { key: config.general.shortcut2, label: '转录模式 II' },
+      { key: config.general.extractShortcut, label: '图像模式 I' },
+      { key: config.general.extractShortcut2, label: '图像模式 II' },
+    ],
+  )
+
+  const handleKeyDown2 = createKeyHandler(
+    setRecording2,
+    (combo) => update({ shortcut2: combo }),
+    [
+      { key: config.general.shortcut, label: '转录模式 I' },
+      { key: config.general.extractShortcut, label: '图像模式 I' },
+      { key: config.general.extractShortcut2, label: '图像模式 II' },
+    ],
   )
 
   const handleExtractKeyDown = createKeyHandler(
     setRecordingExtract,
     (combo) => update({ extractShortcut: combo }),
-    config.general.shortcut,
-    '\u5F55\u97F3\u5FEB\u6377\u952E',
+    [
+      { key: config.general.shortcut, label: '转录模式 I' },
+      { key: config.general.shortcut2, label: '转录模式 II' },
+      { key: config.general.extractShortcut2, label: '图像模式 II' },
+    ],
+  )
+
+  const handleExtractKeyDown2 = createKeyHandler(
+    setRecordingExtract2,
+    (combo) => update({ extractShortcut2: combo }),
+    [
+      { key: config.general.shortcut, label: '转录模式 I' },
+      { key: config.general.shortcut2, label: '转录模式 II' },
+      { key: config.general.extractShortcut, label: '图像模式 I' },
+    ],
   )
 
   const themes: { value: ThemeMode; label: string; style: React.CSSProperties }[] = [
@@ -144,34 +172,113 @@ export function GeneralTab({ config, onSave }: Props) {
         </div>
       </SettingGroup>
 
-      <SettingGroup title="通用">
-        <SettingRow label="录音快捷键" description={recording ? '请按下快捷键，ESC 取消' : '点击后按下新快捷键'}>
-          <input
-            className={`kbd${recording ? ' recording' : ''}`}
-            value={formatShortcutDisplay(config.general.shortcut)}
-            onKeyDown={recording ? handleKeyDown : undefined}
-            onFocus={() => setRecording(true)}
-            onBlur={() => setRecording(false)}
-            readOnly
-            style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
-          />
-        </SettingRow>
-        <SettingRow label="图像识别快捷键" description={recordingExtract ? '请按下快捷键，ESC 取消' : '点击后按下新快捷键'}>
-          <input
-            className={`kbd${recordingExtract ? ' recording' : ''}`}
-            value={formatShortcutDisplay(config.general.extractShortcut)}
-            onKeyDown={recordingExtract ? handleExtractKeyDown : undefined}
-            onFocus={() => setRecordingExtract(true)}
-            onBlur={() => setRecordingExtract(false)}
-            readOnly
-            style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
-          />
-        </SettingRow>
-        {conflictMsg && (
-          <div style={{ color: '#ff3b30', fontSize: 12, padding: '4px 16px' }}>
-            {conflictMsg}
+      <SettingGroup title="语音转录">
+        <SettingRow label="转录模式 I" description="语音转录并使用模板处理">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select
+              className="select"
+              value={config.general.shortcutTemplate}
+              onChange={e => update({ shortcutTemplate: e.target.value })}
+              style={{ minWidth: 100 }}
+            >
+              <option value="">无</option>
+              {config.voiceTemplates.templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <input
+              className={`kbd${recording ? ' recording' : ''}`}
+              value={formatShortcutDisplay(config.general.shortcut)}
+              onKeyDown={recording ? handleKeyDown : undefined}
+              onFocus={() => setRecording(true)}
+              onBlur={() => setRecording(false)}
+              readOnly
+              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            />
           </div>
-        )}
+        </SettingRow>
+        <SettingRow label="转录模式 II" description="语音转录并使用模板处理">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select
+              className="select"
+              value={config.general.shortcut2Template}
+              onChange={e => update({ shortcut2Template: e.target.value })}
+              style={{ minWidth: 100 }}
+            >
+              <option value="">无</option>
+              {config.voiceTemplates.templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <input
+              className={`kbd${recording2 ? ' recording' : ''}`}
+              value={formatShortcutDisplay(config.general.shortcut2)}
+              onKeyDown={recording2 ? handleKeyDown2 : undefined}
+              onFocus={() => setRecording2(true)}
+              onBlur={() => setRecording2(false)}
+              readOnly
+              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            />
+          </div>
+        </SettingRow>
+      </SettingGroup>
+
+      <SettingGroup title="图像识别">
+        <SettingRow label="图像模式 I" description="截屏并使用模板识别处理">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select
+              className="select"
+              value={config.general.extractShortcutTemplate}
+              onChange={e => update({ extractShortcutTemplate: e.target.value })}
+              style={{ minWidth: 100 }}
+            >
+              {config.extract.templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <input
+              className={`kbd${recordingExtract ? ' recording' : ''}`}
+              value={formatShortcutDisplay(config.general.extractShortcut)}
+              onKeyDown={recordingExtract ? handleExtractKeyDown : undefined}
+              onFocus={() => setRecordingExtract(true)}
+              onBlur={() => setRecordingExtract(false)}
+              readOnly
+              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            />
+          </div>
+        </SettingRow>
+        <SettingRow label="图像模式 II" description="截屏并使用模板识别处理">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select
+              className="select"
+              value={config.general.extractShortcut2Template}
+              onChange={e => update({ extractShortcut2Template: e.target.value })}
+              style={{ minWidth: 100 }}
+            >
+              {config.extract.templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <input
+              className={`kbd${recordingExtract2 ? ' recording' : ''}`}
+              value={formatShortcutDisplay(config.general.extractShortcut2)}
+              onKeyDown={recordingExtract2 ? handleExtractKeyDown2 : undefined}
+              onFocus={() => setRecordingExtract2(true)}
+              onBlur={() => setRecordingExtract2(false)}
+              readOnly
+              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            />
+          </div>
+        </SettingRow>
+      </SettingGroup>
+
+      {conflictMsg && (
+        <div style={{ color: '#ff3b30', fontSize: 12, padding: '4px 16px' }}>
+          {conflictMsg}
+        </div>
+      )}
+
+      <SettingGroup title="其他">
         <SettingRow label="最大录音时长" description="超时自动停止并处理，单位为秒">
           <input
             type="number"
