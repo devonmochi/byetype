@@ -12,21 +12,26 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
-    pub fn new(config_dir: Option<PathBuf>) -> Self {
-        let dir = config_dir.unwrap_or_else(Self::default_config_dir);
-        fs::create_dir_all(&dir).ok();
-        let config_path = dir.join("config.json");
+    pub fn new(config_dir: PathBuf) -> Self {
+        fs::create_dir_all(&config_dir).ok();
+        let config_path = config_dir.join("config.json");
+
+        // 迁移：旧版 config.json 在 dirs::config_dir()/byetype/，新版统一到 app_data_dir
+        if !config_path.exists() {
+            let old_dir = dirs::config_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("byetype");
+            let old_path = old_dir.join("config.json");
+            if old_path.exists() {
+                fs::copy(&old_path, &config_path).ok();
+            }
+        }
+
         let config = Self::load(&config_path);
         Self {
             config_path,
             config: Mutex::new(config),
         }
-    }
-
-    fn default_config_dir() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("byetype")
     }
 
     fn load(path: &PathBuf) -> AppConfig {

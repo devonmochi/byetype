@@ -63,16 +63,16 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // Initialize ConfigManager (uses default dirs::config_dir()/byetype/)
-            let config_manager = ConfigManager::new(None);
+            // Initialize ConfigManager (unified to app_data_dir)
+            let data_dir = app.path().app_data_dir()
+                .expect("Failed to resolve app_data_dir");
+            let config_manager = ConfigManager::new(data_dir.clone());
             app.manage(config_manager);
 
             tray::create(&app_handle)
                 .expect("Failed to create system tray");
 
             // Initialize TaskManager
-            let data_dir = app.path().app_data_dir()
-                .expect("Failed to resolve app_data_dir");
             let prompts_dir = commands::resolve_prompts_dir_pub(&app_handle)
                 .expect("Failed to resolve prompts_dir");
             let task_manager: task::SharedTaskManager =
