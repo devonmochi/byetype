@@ -30,11 +30,11 @@ fn default_extract_shortcut() -> String {
 }
 
 fn default_shortcut2() -> String {
-    "F5".to_string()
+    String::new()
 }
 
 fn default_extract_shortcut2() -> String {
-    "F7".to_string()
+    String::new()
 }
 
 fn default_shortcut_template() -> String {
@@ -154,7 +154,7 @@ pub struct VoiceTemplatesConfig {
 
 fn default_voice_templates() -> Vec<TemplateEntry> {
     vec![
-        TemplateEntry { id: "voice-optimize".to_string(), name: "文本优化".to_string(), prompt: String::new() },
+        TemplateEntry { id: "voice-optimize".to_string(), name: "自动换行".to_string(), prompt: String::new() },
         TemplateEntry { id: "voice-translate".to_string(), name: "翻译".to_string(), prompt: String::new() },
         TemplateEntry { id: "voice-custom".to_string(), name: "自定义".to_string(), prompt: String::new() },
     ]
@@ -211,8 +211,8 @@ impl Default for AppConfig {
                 max_recording_seconds: 180,
                 microphone: "system-default".to_string(),
                 extract_shortcut: "F6".to_string(),
-                shortcut2: "F5".to_string(),
-                extract_shortcut2: "F7".to_string(),
+                shortcut2: String::new(),
+                extract_shortcut2: String::new(),
                 shortcut_template: "voice-optimize".to_string(),
                 shortcut2_template: "voice-translate".to_string(),
                 extract_shortcut_template: "image-extract".to_string(),

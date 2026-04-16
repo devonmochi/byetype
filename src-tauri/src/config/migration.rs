@@ -92,7 +92,7 @@ fn migrate_optimize_to_voice_templates(raw: &mut Value) {
 
     // Build voice templates list
     let templates = serde_json::json!([
-        { "id": "voice-optimize", "name": "文本优化", "prompt": custom_prompt },
+        { "id": "voice-optimize", "name": "自动换行", "prompt": custom_prompt },
         { "id": "voice-translate", "name": "翻译", "prompt": "" },
         { "id": "voice-custom", "name": "自定义", "prompt": "" },
     ]);
@@ -110,9 +110,9 @@ fn migrate_optimize_to_voice_templates(raw: &mut Value) {
         } else {
             general["shortcutTemplate"] = serde_json::json!("");
         }
-        general["shortcut2"] = serde_json::json!("F5");
+        general["shortcut2"] = serde_json::json!("");
         general["shortcut2Template"] = serde_json::json!("voice-translate");
-        general["extractShortcut2"] = serde_json::json!("F7");
+        general["extractShortcut2"] = serde_json::json!("");
         general["extractShortcutTemplate"] = serde_json::json!("image-extract");
         general["extractShortcut2Template"] = serde_json::json!("image-translate");
     }

@@ -99,7 +99,7 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
       <h2 className="content-title">转写提示词</h2>
       <PromptEditor config={config} onSave={onSave} promptFiles={TRANSCRIBE_PROMPT_FILES} />
 
-      <h2 className="content-title" style={{ marginTop: 24 }}>语音模板列表</h2>
+      <h2 className="content-title" style={{ marginTop: 24 }}>文本优化提示词</h2>
       <div>
         {templates.map(template => {
           const isBuiltin = BUILTIN_VOICE_TEMPLATE_IDS.includes(template.id)

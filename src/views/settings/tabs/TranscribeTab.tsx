@@ -168,11 +168,11 @@ export function TranscribeTab({ config, onSave }: Props) {
         )}
       </SettingGroup>
 
-      {/* 区域二：模板处理模型 */}
-      <h3 className="section-title">模板处理模型</h3>
+      {/* 区域二：文本优化模型 */}
+      <h3 className="section-title">文本优化模型</h3>
 
       <SettingGroup title="模型">
-        <SettingRow label="处理模型" description="语音模板的第二步处理使用此模型">
+        <SettingRow label="处理模型" description="转写后的文本优化处理使用此模型">
           <select
             className="select"
             value={voiceTemplates.modelId}

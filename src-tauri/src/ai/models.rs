@@ -73,16 +73,6 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_vision: true,
     },
     BuiltinModel {
-        id: "builtin-or-qwen3.6-plus-free",
-        provider: "OpenRouter",
-        model: "qwen/qwen3.6-plus:free",
-        protocol: "openai-compat",
-        base_url: "https://openrouter.ai/api/v1",
-        supports_audio: false,
-        supports_text: true,
-        supports_vision: true,
-    },
-    BuiltinModel {
         id: "builtin-or-gemini-3-flash",
         provider: "OpenRouter",
         model: "google/gemini-3-flash-preview",

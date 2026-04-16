@@ -81,17 +81,6 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-or-qwen3.6-plus-free',
-    provider: 'OpenRouter',
-    model: 'qwen/qwen3.6-plus:free',
-    protocol: 'openai-compat',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    builtin: true,
-    supportsAudio: false,
-    supportsText: true,
-    supportsVision: true,
-  },
-  {
     id: 'builtin-or-gemini-3-flash',
     provider: 'OpenRouter',
     model: 'google/gemini-3-flash-preview',

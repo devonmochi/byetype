@@ -173,8 +173,9 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="语音转录">
-        <SettingRow label="转录模式 I" description="语音转录并使用模板处理">
+        <SettingRow label="转录模式 I">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
             <select
               className="select"
               value={config.general.shortcutTemplate}
@@ -197,8 +198,9 @@ export function GeneralTab({ config, onSave }: Props) {
             />
           </div>
         </SettingRow>
-        <SettingRow label="转录模式 II" description="语音转录并使用模板处理">
+        <SettingRow label="转录模式 II">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
             <select
               className="select"
               value={config.general.shortcut2Template}
@@ -224,8 +226,9 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="图像识别">
-        <SettingRow label="图像模式 I" description="截屏并使用模板识别处理">
+        <SettingRow label="图像模式 I">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
             <select
               className="select"
               value={config.general.extractShortcutTemplate}
@@ -247,8 +250,9 @@ export function GeneralTab({ config, onSave }: Props) {
             />
           </div>
         </SettingRow>
-        <SettingRow label="图像模式 II" description="截屏并使用模板识别处理">
+        <SettingRow label="图像模式 II">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
             <select
               className="select"
               value={config.general.extractShortcut2Template}

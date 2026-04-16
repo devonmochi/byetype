@@ -12,6 +12,7 @@ import {
   writePromptFile,
   selectFile,
 } from '../../../lib/tauri-api'
+import { ask } from '@tauri-apps/plugin-dialog'
 
 export interface PromptFileEntry {
   key: string
@@ -253,7 +254,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }
 
   const handleResetToBuiltin = async () => {
-    if (!window.confirm('确定要重置为内置提示词吗？当前的修改将被覆盖。')) return
+    const yes = await ask('确定要重置为内置提示词吗？当前的修改将被覆盖。', { title: 'ByeType', kind: 'warning' })
+    if (!yes) return
     await flushSave()
     const builtinPath = await copyBuiltinPrompt(activePrompt.builtinFilename, true)
     const newConfig = setConfigValue(config, activePrompt.configPath, builtinPath)
