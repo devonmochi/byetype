@@ -7,7 +7,7 @@ let currentTaskId: number = 0
 
 const shapeMap: Record<string, () => string> = {
   recording: () =>
-    `<div class="s-recording">●</div>`,
+    `<div class="s-recording"><span class="rec-dot"></span></div>`,
   transcribing: () =>
     `<div class="s-transcribing">Thinking...<span class="cancel-btn">\u2715</span></div>`,
   optimizing: () =>

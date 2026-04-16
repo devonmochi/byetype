@@ -20,7 +20,6 @@ use audio::recorder::AudioRecorder;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let config_manager = ConfigManager::new(None);
     let recorder = Arc::new(AudioRecorder::new());
 
     tauri::Builder::default()
@@ -31,7 +30,6 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .manage(config_manager)
         .manage(recorder.clone())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
@@ -64,6 +62,10 @@ pub fn run() {
             // Keep app as menu bar accessory (no Dock icon)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Initialize ConfigManager (uses default dirs::config_dir()/byetype/)
+            let config_manager = ConfigManager::new(None);
+            app.manage(config_manager);
 
             tray::create(&app_handle)
                 .expect("Failed to create system tray");
