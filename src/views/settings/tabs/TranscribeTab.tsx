@@ -4,50 +4,6 @@ import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
 
-interface PresetConfig {
-  id: string
-  title: string
-  desc: string
-  tag: string
-  transcribeModelId: string
-  voiceTemplatesModelId: string
-}
-
-const PRESETS: PresetConfig[] = [
-  {
-    id: 'domestic-best',
-    title: '⚡ 效果最好',
-    desc: 'Qwen 3.5 Omni Plus 全能处理',
-    tag: '无需代理',
-    transcribeModelId: 'builtin-qwen-omni-plus',
-    voiceTemplatesModelId: 'builtin-qwen-omni-plus',
-  },
-  {
-    id: 'domestic-lite',
-    title: '🚀 极速轻量',
-    desc: 'Qwen 3.5 Omni Flash 极速处理',
-    tag: '无需代理',
-    transcribeModelId: 'builtin-qwen-omni-flash',
-    voiceTemplatesModelId: 'builtin-qwen-omni-flash',
-  },
-  {
-    id: 'best',
-    title: '⚡ 效果最好',
-    desc: 'Gemini 3 Flash 全能处理',
-    tag: '需代理',
-    transcribeModelId: 'builtin-gemini-3-flash',
-    voiceTemplatesModelId: 'builtin-gemini-3-flash',
-  },
-  {
-    id: 'lite',
-    title: '🚀 极速轻量',
-    desc: 'Gemini 3.1 Flash Lite 极速处理',
-    tag: '需代理',
-    transcribeModelId: 'builtin-gemini-3.1-flash-lite',
-    voiceTemplatesModelId: 'builtin-gemini-3.1-flash-lite',
-  },
-]
-
 interface Props {
   config: AppConfig
   onSave: (config: AppConfig) => void
@@ -82,20 +38,6 @@ export function TranscribeTab({ config, onSave }: Props) {
     updateVoiceTemplates({ thinking: { ...voiceTemplates.thinking, ...changes } })
   }
 
-  const activePreset = PRESETS.find(
-    p =>
-      transcribe.modelId === p.transcribeModelId &&
-      voiceTemplates.modelId === p.voiceTemplatesModelId
-  )
-
-  const applyPreset = (preset: PresetConfig) => {
-    onSave({
-      ...config,
-      transcribe: { ...transcribe, modelId: preset.transcribeModelId },
-      voiceTemplates: { ...voiceTemplates, modelId: preset.voiceTemplatesModelId },
-    })
-  }
-
   const builtinAudio = audioModels.filter(m => m.builtin)
   const customAudio = audioModels.filter(m => !m.builtin)
   const builtinText = textModels.filter(m => m.builtin)
@@ -104,26 +46,6 @@ export function TranscribeTab({ config, onSave }: Props) {
   return (
     <div>
       <h2 className="content-title">转写设置</h2>
-
-      <div className="preset-section">
-        <div className="preset-section-title">快速预设</div>
-        <div className="preset-cards">
-          {PRESETS.map(preset => (
-            <div
-              key={preset.id}
-              className={`preset-card${activePreset?.id === preset.id ? ' active' : ''}`}
-              onClick={() => applyPreset(preset)}
-            >
-              {activePreset?.id === preset.id && (
-                <span className="preset-card-badge">✓ 当前</span>
-              )}
-              <div className="preset-card-title">{preset.title}</div>
-              <div className="preset-card-desc">{preset.desc}</div>
-              <div className="preset-card-tag">{preset.tag}</div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* 区域一：转写模型 */}
       <SettingGroup title="模型">

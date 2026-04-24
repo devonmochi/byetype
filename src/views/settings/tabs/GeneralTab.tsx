@@ -11,8 +11,8 @@ import { Toggle } from '../components/Toggle'
 import { EditableLabel } from '../components/EditableLabel'
 
 const DEFAULT_LABELS = {
-  shortcut: '语音输入一',
-  shortcut2: '语音输入二',
+  shortcut: '语音输入 1',
+  shortcut2: '语音输入 2',
   extractShortcut: '截图取词',
   extractShortcut2: '截图翻译',
 } as const
