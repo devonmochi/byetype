@@ -69,6 +69,14 @@ pub struct GeneralConfig {
     pub extract_shortcut_template: String,
     #[serde(default)]
     pub extract_shortcut2_template: String,
+    #[serde(default)]
+    pub shortcut_label: Option<String>,
+    #[serde(default)]
+    pub shortcut2_label: Option<String>,
+    #[serde(default)]
+    pub extract_shortcut_label: Option<String>,
+    #[serde(default)]
+    pub extract_shortcut2_label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,6 +225,10 @@ impl Default for AppConfig {
                 shortcut2_template: "voice-translate".to_string(),
                 extract_shortcut_template: "image-extract".to_string(),
                 extract_shortcut2_template: "image-translate".to_string(),
+                shortcut_label: None,
+                shortcut2_label: None,
+                extract_shortcut_label: None,
+                extract_shortcut2_label: None,
             },
             models: ModelsConfig {
                 builtin_api_keys: BuiltinApiKeys {

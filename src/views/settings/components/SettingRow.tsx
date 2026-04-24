@@ -1,7 +1,7 @@
 import React from 'react'
 
 interface SettingRowProps {
-  label: string
+  label: React.ReactNode
   description?: string
   children: React.ReactNode
 }

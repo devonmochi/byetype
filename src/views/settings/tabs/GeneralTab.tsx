@@ -8,6 +8,14 @@ import {
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
+import { EditableLabel } from '../components/EditableLabel'
+
+const DEFAULT_LABELS = {
+  shortcut: '语音输入一',
+  shortcut2: '语音输入二',
+  extractShortcut: '截图取词',
+  extractShortcut2: '截图翻译',
+} as const
 
 const IS_MACOS = navigator.platform.toUpperCase().includes('MAC')
 
@@ -69,6 +77,13 @@ export function GeneralTab({ config, onSave }: Props) {
     onSave({ ...config, advanced: { ...config.advanced, ...changes } })
   }
 
+  const labelOf = {
+    shortcut: config.general.shortcutLabel?.trim() || DEFAULT_LABELS.shortcut,
+    shortcut2: config.general.shortcut2Label?.trim() || DEFAULT_LABELS.shortcut2,
+    extractShortcut: config.general.extractShortcutLabel?.trim() || DEFAULT_LABELS.extractShortcut,
+    extractShortcut2: config.general.extractShortcut2Label?.trim() || DEFAULT_LABELS.extractShortcut2,
+  }
+
   function createKeyHandler(
     setRec: (v: boolean) => void,
     onCapture: (combo: string) => void,
@@ -109,9 +124,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecording,
     (combo) => update({ shortcut: combo }),
     [
-      { key: config.general.shortcut2, label: '转录模式 II' },
-      { key: config.general.extractShortcut, label: '图像模式 I' },
-      { key: config.general.extractShortcut2, label: '图像模式 II' },
+      { key: config.general.shortcut2, label: labelOf.shortcut2 },
+      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
+      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
     ],
   )
 
@@ -119,9 +134,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecording2,
     (combo) => update({ shortcut2: combo }),
     [
-      { key: config.general.shortcut, label: '转录模式 I' },
-      { key: config.general.extractShortcut, label: '图像模式 I' },
-      { key: config.general.extractShortcut2, label: '图像模式 II' },
+      { key: config.general.shortcut, label: labelOf.shortcut },
+      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
+      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
     ],
   )
 
@@ -129,9 +144,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecordingExtract,
     (combo) => update({ extractShortcut: combo }),
     [
-      { key: config.general.shortcut, label: '转录模式 I' },
-      { key: config.general.shortcut2, label: '转录模式 II' },
-      { key: config.general.extractShortcut2, label: '图像模式 II' },
+      { key: config.general.shortcut, label: labelOf.shortcut },
+      { key: config.general.shortcut2, label: labelOf.shortcut2 },
+      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
     ],
   )
 
@@ -139,9 +154,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecordingExtract2,
     (combo) => update({ extractShortcut2: combo }),
     [
-      { key: config.general.shortcut, label: '转录模式 I' },
-      { key: config.general.shortcut2, label: '转录模式 II' },
-      { key: config.general.extractShortcut, label: '图像模式 I' },
+      { key: config.general.shortcut, label: labelOf.shortcut },
+      { key: config.general.shortcut2, label: labelOf.shortcut2 },
+      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
     ],
   )
 
@@ -172,10 +187,16 @@ export function GeneralTab({ config, onSave }: Props) {
         </div>
       </SettingGroup>
 
-      <SettingGroup title="语音转录">
-        <SettingRow label="转录模式 I">
+      <SettingGroup title="语音输入">
+        <SettingRow label={
+          <EditableLabel
+            value={labelOf.shortcut}
+            defaultValue={DEFAULT_LABELS.shortcut}
+            onChange={next => update({ shortcutLabel: next })}
+          />
+        }>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
             <select
               className="select"
               value={config.general.shortcutTemplate}
@@ -198,9 +219,15 @@ export function GeneralTab({ config, onSave }: Props) {
             />
           </div>
         </SettingRow>
-        <SettingRow label="转录模式 II">
+        <SettingRow label={
+          <EditableLabel
+            value={labelOf.shortcut2}
+            defaultValue={DEFAULT_LABELS.shortcut2}
+            onChange={next => update({ shortcut2Label: next })}
+          />
+        }>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
             <select
               className="select"
               value={config.general.shortcut2Template}
@@ -226,9 +253,15 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="图像识别">
-        <SettingRow label="图像模式 I">
+        <SettingRow label={
+          <EditableLabel
+            value={labelOf.extractShortcut}
+            defaultValue={DEFAULT_LABELS.extractShortcut}
+            onChange={next => update({ extractShortcutLabel: next })}
+          />
+        }>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
             <select
               className="select"
               value={config.general.extractShortcutTemplate}
@@ -250,9 +283,15 @@ export function GeneralTab({ config, onSave }: Props) {
             />
           </div>
         </SettingRow>
-        <SettingRow label="图像模式 II">
+        <SettingRow label={
+          <EditableLabel
+            value={labelOf.extractShortcut2}
+            defaultValue={DEFAULT_LABELS.extractShortcut2}
+            onChange={next => update({ extractShortcut2Label: next })}
+          />
+        }>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>处理模板</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
             <select
               className="select"
               value={config.general.extractShortcut2Template}

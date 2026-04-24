@@ -909,3 +909,31 @@
   color: var(--text-tertiary);
   margin-top: 4px;
 }
+
+.setting-row-label-editable {
+  cursor: text;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.setting-row-label-editable:hover {
+  background: var(--bg-secondary);
+}
+.setting-row-label-input {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -2px -5px;
+  max-width: 160px;
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+.setting-row-label-input:focus {
+  border-color: var(--accent);
+}

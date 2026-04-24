@@ -18,6 +18,10 @@ export interface GeneralConfig {
   shortcut2Template: string
   extractShortcutTemplate: string
   extractShortcut2Template: string
+  shortcutLabel?: string
+  shortcut2Label?: string
+  extractShortcutLabel?: string
+  extractShortcut2Label?: string
 }
 
 export interface ThinkingConfig {
