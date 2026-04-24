@@ -4,11 +4,20 @@ pub mod gemini;
 pub mod openai_compat;
 pub mod mimo;
 pub mod longcat;
+pub mod deepseek;
 pub mod prompt;
 pub mod models;
 
 use crate::config::types::AppConfig;
 use std::path::Path;
+
+/// 判断 resolved model 是否走 DeepSeek 官方 API。
+/// 条件:协议是 openai-compat 且 base_url 指向 api.deepseek.com。
+/// 这样 OpenRouter 上的 `deepseek/*` 模型仍走标准 openai-compat 路径(不传 thinking)。
+fn is_deepseek(resolved: &models::ResolvedModel) -> bool {
+    resolved.protocol == "openai-compat"
+        && resolved.base_url.contains("api.deepseek.com")
+}
 
 /// Transcribe audio using the configured provider.
 pub async fn transcribe(
@@ -19,6 +28,18 @@ pub async fn transcribe(
 ) -> Result<String, String> {
     let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
     let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir);
+
+    if is_deepseek(&resolved) {
+        return deepseek::transcribe(
+            client,
+            audio_base64,
+            &system_prompt,
+            &resolved.api_key,
+            &resolved.model,
+            &resolved.base_url,
+        )
+        .await;
+    }
 
     match resolved.protocol.as_str() {
         "gemini" => {
@@ -92,6 +113,18 @@ pub async fn extract_text(
     let resolved = models::resolve_model(config, model_id)?;
     let thinking = config.extract.thinking.as_ref().unwrap_or(&config.transcribe.thinking);
     let system_prompt = prompt::build_extract_prompt(config, prompts_dir, template_id);
+
+    if is_deepseek(&resolved) {
+        return deepseek::extract_text(
+            client,
+            image_base64,
+            &system_prompt,
+            &resolved.api_key,
+            &resolved.model,
+            &resolved.base_url,
+        )
+        .await;
+    }
 
     match resolved.protocol.as_str() {
         "gemini" => {
@@ -172,6 +205,19 @@ pub async fn optimize(
     let system_prompt = prompt::wrap_document("text-optimize", &system_prompt);
 
     let resolved = models::resolve_model(config, &config.voice_templates.model_id)?;
+
+    if is_deepseek(&resolved) {
+        return deepseek::optimize(
+            client,
+            text,
+            &system_prompt,
+            &resolved.api_key,
+            &resolved.model,
+            &resolved.base_url,
+            &config.voice_templates.thinking,
+        )
+        .await;
+    }
 
     match resolved.protocol.as_str() {
         "gemini" => {
