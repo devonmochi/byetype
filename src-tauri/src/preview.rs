@@ -82,3 +82,40 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
 
     Ok(())
 }
+
+/// 预热:提前创建一个隐藏的预览窗口,让 React bundle 后台加载。
+///
+/// 幂等 —— 若 preview 窗口已存在则直接返回。调用发生在 AI 调用开始时,
+/// 利用 AI 等待时间掩盖 webview 冷启动开销。失败只打 log,不中断主流程
+/// (后续 show() 会走创建分支,退化到旧行为)。
+pub fn prewarm(app: &AppHandle) {
+    // 幂等检查必须在主线程调度前做,避免重复分派
+    if app.get_webview_window("preview").is_some() {
+        return;
+    }
+    let app_cloned = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        // 主线程上再次检查,防止调度延迟期间被重复派发
+        if app_cloned.get_webview_window("preview").is_some() {
+            return;
+        }
+        let result = WebviewWindowBuilder::new(
+            &app_cloned,
+            "preview",
+            WebviewUrl::App("preview.html".into()),
+        )
+        .title("ByeType Preview")
+        .inner_size(400.0, 300.0) // 占位尺寸,show() 时再按文本调整
+        .resizable(true)
+        .decorations(false)
+        .always_on_top(true)
+        .center()
+        .visible(false)
+        .build();
+        if let Err(e) = result {
+            eprintln!("[preview] prewarm failed: {}", e);
+        }
+    }) {
+        eprintln!("[preview] prewarm dispatch failed: {}", e);
+    }
+}
