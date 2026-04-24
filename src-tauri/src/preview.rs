@@ -119,3 +119,10 @@ pub fn prewarm(app: &AppHandle) {
         eprintln!("[preview] prewarm dispatch failed: {}", e);
     }
 }
+
+/// 供失败路径调用:若存在 preview 窗口(可能是预热残留)则关闭。
+pub fn close_if_exists(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("preview") {
+        let _ = window.close();
+    }
+}
