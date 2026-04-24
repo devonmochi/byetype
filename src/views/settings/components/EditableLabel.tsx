@@ -15,15 +15,16 @@ export function EditableLabel({ value, defaultValue, onChange }: EditableLabelPr
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (editing) {
-      setDraft(value)
-      requestAnimationFrame(() => {
-        inputRef.current?.focus()
-        const len = inputRef.current?.value.length ?? 0
-        inputRef.current?.setSelectionRange(len, len)
-      })
-    }
-  }, [editing, value])
+    if (!editing) return
+    setDraft(value)
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      const len = value.length
+      inputRef.current?.setSelectionRange(len, len)
+    })
+    // 仅在进入编辑时初始化 draft；外部 value 在编辑期间发生变化不应覆盖用户草稿。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
 
   const commit = () => {
     const trimmed = draft.trim()
@@ -46,7 +47,7 @@ export function EditableLabel({ value, defaultValue, onChange }: EditableLabelPr
         ref={inputRef}
         className="setting-row-label setting-row-label-input"
         value={draft}
-        maxLength={20}
+        maxLength={12}
         onChange={e => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={e => {
@@ -66,7 +67,15 @@ export function EditableLabel({ value, defaultValue, onChange }: EditableLabelPr
     <div
       className="setting-row-label setting-row-label-editable"
       title="点击重命名（清空恢复默认）"
+      role="button"
+      tabIndex={0}
       onClick={() => setEditing(true)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setEditing(true)
+        }
+      }}
     >
       {value}
     </div>
