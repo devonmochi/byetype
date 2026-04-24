@@ -14,7 +14,7 @@ use std::path::Path;
 /// 判断 resolved model 是否走 DeepSeek 官方 API。
 /// 条件:协议是 openai-compat 且 base_url 指向 api.deepseek.com。
 /// 这样 OpenRouter 上的 `deepseek/*` 模型仍走标准 openai-compat 路径(不传 thinking)。
-fn is_deepseek(resolved: &models::ResolvedModel) -> bool {
+pub(crate) fn is_deepseek(resolved: &models::ResolvedModel) -> bool {
     resolved.protocol == "openai-compat"
         && resolved.base_url.contains("api.deepseek.com")
 }
