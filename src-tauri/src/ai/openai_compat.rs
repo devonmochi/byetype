@@ -37,6 +37,7 @@ pub async fn transcribe(
         max_tokens: None,
         stream_options: None,
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -101,6 +102,7 @@ pub async fn optimize(
         max_tokens: None,
         stream_options: None,
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -173,6 +175,7 @@ pub async fn extract_text(
         max_tokens: None,
         stream_options: None,
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -239,6 +242,7 @@ pub async fn qwen_omni_extract_text(
         max_tokens: None,
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -286,6 +290,7 @@ pub async fn test_connectivity(
         max_tokens: None,
         stream_options: None,
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -373,6 +378,7 @@ pub async fn qwen_omni_transcribe(
         max_tokens: None,
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -430,6 +436,7 @@ pub async fn qwen_omni_optimize(
         max_tokens: None,
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -477,6 +484,7 @@ pub async fn qwen_omni_test_connectivity(
         max_tokens: Some(32),
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
+        reasoning_effort: None,
     };
 
     let resp = client
