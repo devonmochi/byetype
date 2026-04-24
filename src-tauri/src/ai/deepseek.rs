@@ -5,7 +5,7 @@ use super::types::*;
 
 /// 根据 ThinkingConfig 构造 DeepSeek 的 thinking 和 reasoning_effort 参数。
 /// - enabled=false → thinking:disabled,不发 reasoning_effort
-/// - enabled=true  → thinking:enabled,reasoning_effort = level 的小写(官方会把 low/medium 映射到 high)
+/// - enabled=true  → thinking:enabled;reasoning_effort 映射:LOW/MINIMAL → low,MEDIUM → medium,HIGH/其他 → high(官方会把 low/medium 映射到 high)
 fn build_thinking_params(thinking: &ThinkingConfig) -> (Option<ThinkingParam>, Option<String>) {
     if !thinking.enabled {
         return (
