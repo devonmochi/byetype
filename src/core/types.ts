@@ -68,6 +68,8 @@ export interface VoiceTemplatesConfig {
   modelId: string
   thinking: ThinkingConfig
   templates: TemplateEntry[]
+  /** DeepSeek 专用 reasoning_effort,取值 'high' | 'max'。仅在选中 DeepSeek 模型且 thinking.enabled=true 时生效 */
+  deepseekReasoningEffort?: 'high' | 'max'
 }
 
 export interface ExtractConfig {

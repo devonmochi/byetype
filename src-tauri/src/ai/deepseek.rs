@@ -3,26 +3,24 @@ use reqwest::Client;
 use crate::config::types::ThinkingConfig;
 use super::types::*;
 
-/// 根据 ThinkingConfig 构造 DeepSeek 的 thinking 和 reasoning_effort 参数。
+/// 根据 ThinkingConfig 与可选的 reasoning_effort 配置构造 DeepSeek 的请求参数。
 /// - enabled=false → thinking:disabled,不发 reasoning_effort
-/// - enabled=true  → thinking:enabled;reasoning_effort 映射:LOW/MINIMAL → low,MEDIUM → medium,HIGH/其他 → high(官方会把 low/medium 映射到 high)
-fn build_thinking_params(thinking: &ThinkingConfig) -> (Option<ThinkingParam>, Option<String>) {
+/// - enabled=true  → thinking:enabled,reasoning_effort 直接使用配置值(默认 "high")。
+///   官方仅支持 "high" / "max" 两档,非法值由调用方保证。
+fn build_thinking_params(
+    thinking: &ThinkingConfig,
+    reasoning_effort: Option<&str>,
+) -> (Option<ThinkingParam>, Option<String>) {
     if !thinking.enabled {
         return (
             Some(ThinkingParam { thinking_type: "disabled".to_string() }),
             None,
         );
     }
-    let effort = match thinking.level.as_str() {
-        "LOW" => "low",
-        "MEDIUM" => "medium",
-        "HIGH" => "high",
-        "MINIMAL" => "low",
-        _ => "high",
-    };
+    let effort = reasoning_effort.unwrap_or("high").to_string();
     (
         Some(ThinkingParam { thinking_type: "enabled".to_string() }),
-        Some(effort.to_string()),
+        Some(effort),
     )
 }
 
@@ -34,10 +32,11 @@ pub async fn optimize(
     model: &str,
     base_url: &str,
     thinking: &ThinkingConfig,
+    reasoning_effort: Option<&str>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
     let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
-    let (thinking_param, reasoning_effort) = build_thinking_params(thinking);
+    let (thinking_param, reasoning_effort) = build_thinking_params(thinking, reasoning_effort);
 
     let request = ChatCompletionRequest {
         model: model.to_string(),

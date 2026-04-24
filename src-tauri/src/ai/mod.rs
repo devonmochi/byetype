@@ -215,6 +215,7 @@ pub async fn optimize(
             &resolved.model,
             &resolved.base_url,
             &config.voice_templates.thinking,
+            config.voice_templates.deepseek_reasoning_effort.as_deref(),
         )
         .await;
     }
