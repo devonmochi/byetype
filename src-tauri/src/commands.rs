@@ -242,6 +242,21 @@ pub async fn test_model_connectivity(
     let client = reqwest::Client::new();
     let start = std::time::Instant::now();
 
+    if ai::is_deepseek(&resolved) {
+        let result = ai::deepseek::test_connectivity(
+            &client,
+            &resolved.api_key,
+            &resolved.model,
+            &resolved.base_url,
+        )
+        .await;
+        let latency = start.elapsed().as_millis() as u64;
+        return match result {
+            Ok(()) => Ok(ConnectivityResult { success: true, latency_ms: latency, error: None }),
+            Err(e) => Ok(ConnectivityResult { success: false, latency_ms: latency, error: Some(e) }),
+        };
+    }
+
     let result = match resolved.protocol.as_str() {
         "gemini" => {
             ai::gemini::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await

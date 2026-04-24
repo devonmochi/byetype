@@ -158,6 +158,10 @@ pub struct VoiceTemplatesConfig {
     pub thinking: ThinkingConfig,
     #[serde(default = "default_voice_templates")]
     pub templates: Vec<TemplateEntry>,
+    /// DeepSeek 专用:reasoning_effort,取值 "high" / "max"。
+    /// 仅在 model_id 指向 DeepSeek 且 thinking.enabled=true 时生效。
+    #[serde(default)]
+    pub deepseek_reasoning_effort: Option<String>,
 }
 
 fn default_voice_templates() -> Vec<TemplateEntry> {
@@ -262,6 +266,7 @@ impl Default for AppConfig {
                     level: "LOW".to_string(),
                 },
                 templates: default_voice_templates(),
+                deepseek_reasoning_effort: None,
             },
             extract: ExtractConfig::default(),
             advanced: AdvancedConfig {

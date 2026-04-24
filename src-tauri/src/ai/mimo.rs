@@ -37,6 +37,7 @@ pub async fn transcribe(
         max_tokens: None,
         stream_options: None,
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -101,6 +102,7 @@ pub async fn optimize(
         max_tokens: None,
         stream_options: None,
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -172,6 +174,7 @@ pub async fn extract_text(
         max_tokens: None,
         stream_options: None,
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
+        reasoning_effort: None,
     };
 
     let resp = client
@@ -226,6 +229,7 @@ pub async fn test_connectivity(
         max_tokens: None,
         stream_options: None,
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
+        reasoning_effort: None,
     };
 
     let resp = client

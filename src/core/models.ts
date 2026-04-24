@@ -70,9 +70,9 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-mimo-v2-omni',
+    id: 'builtin-mimo-v2.5',
     provider: 'XiaoMi',
-    model: 'mimo-v2-omni',
+    model: 'mimo-v2.5',
     protocol: 'mimo',
     baseUrl: 'https://api.xiaomimimo.com/v1',
     builtin: true,
@@ -103,11 +103,22 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-deepseek-chat',
+    id: 'builtin-deepseek-v4-flash',
     provider: 'DeepSeek',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     protocol: 'openai-compat',
-    baseUrl: 'https://api.deepseek.com/v1',
+    baseUrl: 'https://api.deepseek.com',
+    builtin: true,
+    supportsAudio: false,
+    supportsText: true,
+    supportsVision: false,
+  },
+  {
+    id: 'builtin-deepseek-v4-pro',
+    provider: 'DeepSeek',
+    model: 'deepseek-v4-pro',
+    protocol: 'openai-compat',
+    baseUrl: 'https://api.deepseek.com',
     builtin: true,
     supportsAudio: false,
     supportsText: true,
@@ -120,7 +131,7 @@ export function getAllModels(config: AppConfig): ModelEntry[] {
     let apiKey = ''
     if (b.id.startsWith('builtin-or-')) apiKey = config.models.builtinApiKeys.openrouter
     else if (b.protocol === 'gemini') apiKey = config.models.builtinApiKeys.gemini
-    else if (b.id === 'builtin-deepseek-chat') apiKey = config.models.builtinApiKeys.deepseek
+    else if (b.id.startsWith('builtin-deepseek-')) apiKey = config.models.builtinApiKeys.deepseek
     else if (b.protocol === 'qwen-omni') apiKey = config.models.builtinApiKeys.dashscope
     else if (b.protocol === 'mimo') apiKey = config.models.builtinApiKeys.mimo
     else if (b.protocol === 'longcat') apiKey = config.models.builtinApiKeys.longcat

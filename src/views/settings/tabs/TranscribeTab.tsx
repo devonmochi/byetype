@@ -62,6 +62,9 @@ export function TranscribeTab({ config, onSave }: Props) {
   const voiceTemplatesModel = findModel(config, voiceTemplates.modelId)
   const isTranscribeGemini = transcribeModel?.protocol === 'gemini'
   const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini'
+  const isVoiceTemplatesDeepSeek =
+    voiceTemplatesModel?.protocol === 'openai-compat' &&
+    voiceTemplatesModel?.baseUrl?.includes('api.deepseek.com')
 
   const updateTranscribe = (changes: Partial<AppConfig['transcribe']>) => {
     onSave({ ...config, transcribe: { ...transcribe, ...changes } })
@@ -209,6 +212,29 @@ export function TranscribeTab({ config, onSave }: Props) {
                   <option value="LOW">LOW</option>
                   <option value="MEDIUM">MEDIUM</option>
                   <option value="HIGH">HIGH</option>
+                </select>
+              </SettingRow>
+            )}
+          </>
+        )}
+        {isVoiceTemplatesDeepSeek && (
+          <>
+            <SettingRow label="启用思考" description="DeepSeek V4 默认开启思考,关闭可显著提速">
+              <Toggle
+                checked={voiceTemplates.thinking.enabled}
+                onChange={checked => updateVoiceTemplatesThinking({ enabled: checked })}
+              />
+            </SettingRow>
+            {voiceTemplates.thinking.enabled && (
+              <SettingRow label="Reasoning Effort" description="DeepSeek 思考强度,max 更深更慢">
+                <select
+                  className="select"
+                  value={voiceTemplates.deepseekReasoningEffort ?? 'high'}
+                  onChange={e => updateVoiceTemplates({ deepseekReasoningEffort: e.target.value as 'high' | 'max' })}
+                  style={{ width: 120 }}
+                >
+                  <option value="high">high</option>
+                  <option value="max">max</option>
                 </select>
               </SettingRow>
             )}

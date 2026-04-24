@@ -160,9 +160,11 @@ ByeType 的核心特色是**提示词驱动的高可定制性** — 通过编辑
 | Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
 | Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 国内直连，速度更快 |
 | LongCat Flash Omni | `LongCat-Flash-Omni-2603` | [LongCat](https://platform.longcat.chat/) | 国内直连，Qwen 的替代方案 |
-| MiMo v2 Omni | `mimo-v2-omni` | [小米 MiMo](https://api.xiaomimimo.com/) | 国内直连，Qwen 的替代方案 |
+| MiMo v2.5 | `mimo-v2.5` | [小米 MiMo](https://api.xiaomimimo.com/) | 国内直连，Qwen 的替代方案 |
 | Gemini 3.0 Flash | `gemini-3-flash-preview` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理 |
 | Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite-preview` | 同上 | 更快速，适合低延迟场景，需代理 |
+| DeepSeek V4 Flash | `deepseek-v4-flash` | [DeepSeek](https://platform.deepseek.com/) | 仅文本优化，速度快、成本低 |
+| DeepSeek V4 Pro | `deepseek-v4-pro` | 同上 | 仅文本优化，质量更高 |
 
 > **OpenRouter 中转**：如果无法直接访问 Gemini，可通过 [OpenRouter](https://openrouter.ai/) 中转使用以下模型，无需代理：
 > - `google/gemini-3-flash-preview`

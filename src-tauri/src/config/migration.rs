@@ -74,6 +74,10 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
         migrated = true;
     }
 
+    if migrate_legacy_model_ids(raw) {
+        migrated = true;
+    }
+
     migrated
 }
 
@@ -139,5 +143,78 @@ fn model_name_to_builtin_id(model_name: &str) -> String {
         "gemini-3-flash-preview" => "builtin-gemini-3-flash".to_string(),
         "gemini-3.1-flash-lite-preview" => "builtin-gemini-3.1-flash-lite".to_string(),
         _ => "builtin-gemini-3-flash".to_string(),
+    }
+}
+
+/// 迁移旧 model_id 引用:
+/// - builtin-deepseek-chat → builtin-deepseek-v4-flash
+/// - builtin-mimo-v2-omni  → builtin-mimo-v2.5
+fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
+    let mappings: &[(&str, &str)] = &[
+        ("builtin-deepseek-chat", "builtin-deepseek-v4-flash"),
+        ("builtin-mimo-v2-omni", "builtin-mimo-v2.5"),
+    ];
+
+    let targets = ["transcribe", "extract", "voiceTemplates"];
+    let mut changed = false;
+
+    for section in targets {
+        let Some(obj) = raw.get_mut(section) else { continue };
+        let Some(mid) = obj.get("modelId") else { continue };
+        let Some(current) = mid.as_str() else { continue };
+        for (old, new) in mappings {
+            if current == *old {
+                obj["modelId"] = Value::String((*new).to_string());
+                changed = true;
+                break;
+            }
+        }
+    }
+
+    changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn migrates_transcribe_mimo_omni() {
+        let mut raw = json!({ "transcribe": { "modelId": "builtin-mimo-v2-omni" } });
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-mimo-v2.5");
+    }
+
+    #[test]
+    fn migrates_extract_deepseek_chat() {
+        let mut raw = json!({ "extract": { "modelId": "builtin-deepseek-chat" } });
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["extract"]["modelId"], "builtin-deepseek-v4-flash");
+    }
+
+    #[test]
+    fn migrates_voice_templates_mimo_omni() {
+        let mut raw = json!({ "voiceTemplates": { "modelId": "builtin-mimo-v2-omni" } });
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-mimo-v2.5");
+    }
+
+    #[test]
+    fn no_change_when_ids_current() {
+        let mut raw = json!({
+            "transcribe": { "modelId": "builtin-gemini-3-flash" },
+            "extract": { "modelId": "builtin-deepseek-v4-flash" },
+        });
+        assert!(!migrate_legacy_model_ids(&mut raw));
+    }
+
+    #[test]
+    fn no_panic_when_sections_missing_or_no_modelid() {
+        let mut raw = json!({ "transcribe": {}, "other": 42 });
+        assert!(!migrate_legacy_model_ids(&mut raw));
+
+        let mut raw2 = json!({});
+        assert!(!migrate_legacy_model_ids(&mut raw2));
     }
 }
