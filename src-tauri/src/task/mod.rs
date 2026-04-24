@@ -501,6 +501,9 @@ async fn run_extract_pipeline(app: &AppHandle, task_id: u32, template_id: String
     let _ = crate::bubble::show(app, task_id);
     let _ = crate::bubble::update(app, task_id, "extracting");
 
+    // 预热预览窗口,与 AI 调用并行,掩盖 webview 冷启动开销
+    crate::preview::prewarm(app);
+
     // Get config snapshot and prompts_dir
     let (config, prompts_dir, token) = {
         let state = app.state::<SharedTaskManager>();
@@ -606,6 +609,11 @@ fn finish_extract_pipeline(
     let bubble_delay = if status == "completed" { 1500 } else { 3000 };
     let _ = crate::bubble::update(app, task_id, status);
     let _ = crate::bubble::hide(app, task_id, bubble_delay);
+
+    // 失败路径:关闭可能残留的预热隐藏窗口(成功路径由 show() 自己复用,不清理)
+    if status != "completed" {
+        crate::preview::close_if_exists(app);
+    }
 
     // Save history
     if let Err(e) = mgr.history.add_extract_record(

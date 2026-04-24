@@ -5,6 +5,8 @@ static PINNED: AtomicBool = AtomicBool::new(false);
 /// Epoch millis when the preview window was created — ignore blur within grace period
 static CREATED_AT: AtomicU64 = AtomicU64::new(0);
 const BLUR_GRACE_MS: u128 = 800;
+/// blur 监听器是否已注册(整个进程生命周期内只注册一次,避免复用窗口时叠加)
+static BLUR_HANDLER_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -26,59 +28,122 @@ pub fn close_preview_window(app: AppHandle) {
 }
 
 pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
-    // Reset pinned state for each new preview
+    // 每次新预览重置 pinned 状态
     PINNED.store(false, Ordering::Relaxed);
 
-    // Close existing preview window if any
-    if let Some(window) = app.get_webview_window("preview") {
-        let _ = window.close();
-    }
-
-    // Calculate window size based on text
+    // 按文本计算尺寸
     let line_count = text.lines().count().max(3).min(20);
     let max_line_len = text.lines().map(|l| l.len()).max().unwrap_or(40);
     let width = (max_line_len as f64 * 8.0 + 80.0).clamp(320.0, 600.0);
     let height = (line_count as f64 * 22.0 + 140.0).clamp(180.0, 460.0);
 
-    let window = WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
+    // 优先复用已预热的窗口;否则新建
+    let window = if let Some(existing) = app.get_webview_window("preview") {
+        // 复用:按文本调整尺寸
+        let _ = existing.set_size(tauri::LogicalSize::new(width, height));
+        let _ = existing.center();
+        existing
+    } else {
+        // 回退:新建窗口(退化到旧行为)
+        WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
+            .title("ByeType Preview")
+            .inner_size(width, height)
+            .resizable(true)
+            .decorations(false)
+            .always_on_top(true)
+            .center()
+            .visible(false)
+            .build()
+            .map_err(|e| format!("Create preview window failed: {}", e))?
+    };
+
+    // 注册 ready 握手:若前端尚未 emit preview-ready,等到就 emit 文本并 show
+    let text_clone = text.to_string();
+    let window_for_ready = window.clone();
+    window.once("preview-ready", move |_| {
+        let _ = window_for_ready.emit("preview-text", &text_clone);
+        let _ = window_for_ready.show();
+    });
+
+    // 同时立即 emit 一次:若窗口是预热的且 React 已 mount,此次 emit 会立刻生效,实现「瞬时显示」
+    let _ = window.emit("preview-text", text);
+    let _ = window.show();
+
+    // 记录创建时间用于 blur 宽限期
+    CREATED_AT.store(now_ms(), Ordering::Relaxed);
+
+    // blur 关闭事件:首次 show 注册一次,后续复用窗口跳过(避免监听器叠加)
+    if BLUR_HANDLER_REGISTERED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        let app_handle = app.clone();
+        window.on_window_event(move |event| {
+            match event {
+                tauri::WindowEvent::Focused(false) => {
+                    if PINNED.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let age = now_ms().saturating_sub(CREATED_AT.load(Ordering::Relaxed));
+                    if (age as u128) < BLUR_GRACE_MS {
+                        return;
+                    }
+                    if let Some(w) = app_handle.get_webview_window("preview") {
+                        let _ = w.close();
+                    }
+                }
+                tauri::WindowEvent::Destroyed => {
+                    // 窗口被销毁后,下次 show 需要重新注册监听器
+                    BLUR_HANDLER_REGISTERED.store(false, Ordering::SeqCst);
+                }
+                _ => {}
+            }
+        });
+    }
+
+    Ok(())
+}
+
+/// 预热:提前创建一个隐藏的预览窗口,让 React bundle 后台加载。
+///
+/// 幂等 —— 若 preview 窗口已存在则直接返回。调用发生在 AI 调用开始时,
+/// 利用 AI 等待时间掩盖 webview 冷启动开销。失败只打 log,不中断主流程
+/// (后续 show() 会走创建分支,退化到旧行为)。
+pub fn prewarm(app: &AppHandle) {
+    // 幂等检查必须在主线程调度前做,避免重复分派
+    if app.get_webview_window("preview").is_some() {
+        return;
+    }
+    let app_cloned = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        // 主线程上再次检查,防止调度延迟期间被重复派发
+        if app_cloned.get_webview_window("preview").is_some() {
+            return;
+        }
+        let result = WebviewWindowBuilder::new(
+            &app_cloned,
+            "preview",
+            WebviewUrl::App("preview.html".into()),
+        )
         .title("ByeType Preview")
-        .inner_size(width, height)
+        .inner_size(400.0, 300.0) // 占位尺寸,show() 时再按文本调整
         .resizable(true)
         .decorations(false)
         .always_on_top(true)
         .center()
         .visible(false)
-        .build()
-        .map_err(|e| format!("Create preview window failed: {}", e))?;
-
-    // Send text to frontend once it's ready
-    let text_clone = text.to_string();
-    let window_clone = window.clone();
-    window.once("preview-ready", move |_| {
-        let _ = window_clone.emit("preview-text", &text_clone);
-        let _ = window_clone.show();
-    });
-
-    // Record creation time for blur grace period
-    CREATED_AT.store(now_ms(), Ordering::Relaxed);
-
-    // Close window on blur (focus lost) — only if not pinned and past grace period
-    let app_handle = app.clone();
-    window.on_window_event(move |event| {
-        if let tauri::WindowEvent::Focused(false) = event {
-            if PINNED.load(Ordering::Relaxed) {
-                return;
-            }
-            // Skip blur events during grace period (window may not have focus yet)
-            let age = now_ms().saturating_sub(CREATED_AT.load(Ordering::Relaxed));
-            if (age as u128) < BLUR_GRACE_MS {
-                return;
-            }
-            if let Some(w) = app_handle.get_webview_window("preview") {
-                let _ = w.close();
-            }
+        .build();
+        if let Err(e) = result {
+            eprintln!("[preview] prewarm failed: {}", e);
         }
-    });
+    }) {
+        eprintln!("[preview] prewarm dispatch failed: {}", e);
+    }
+}
 
-    Ok(())
+/// 供失败路径调用:若存在 preview 窗口(可能是预热残留)则关闭。
+pub fn close_if_exists(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("preview") {
+        let _ = window.close();
+    }
 }
