@@ -1,6 +1,7 @@
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::SampleFormat;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use super::encoder;
 
@@ -20,6 +21,7 @@ struct ActiveRecording {
 pub struct AudioRecorder {
     state: Mutex<RecordingState>,
     active: Mutex<Option<ActiveRecording>>,
+    start_instant: Mutex<Option<Instant>>,
 }
 
 // SAFETY: All fields are protected by Mutex. cpal::Stream is !Send/!Sync only
@@ -33,11 +35,16 @@ impl AudioRecorder {
         Self {
             state: Mutex::new(RecordingState::Idle),
             active: Mutex::new(None),
+            start_instant: Mutex::new(None),
         }
     }
 
     pub fn is_recording(&self) -> bool {
         *self.state.lock().unwrap() == RecordingState::Recording
+    }
+
+    pub fn elapsed_since_start(&self) -> Option<std::time::Duration> {
+        self.start_instant.lock().unwrap().as_ref().map(|t| t.elapsed())
     }
 
     pub fn start(&self, device_name: &str) -> Result<(), String> {
@@ -92,6 +99,7 @@ impl AudioRecorder {
         stream.play().map_err(|e| format!("Failed to start stream: {}", e))?;
 
         *state = RecordingState::Recording;
+        *self.start_instant.lock().unwrap() = Some(Instant::now());
         let mut active = self.active.lock().unwrap();
         *active = Some(ActiveRecording { stream, samples, sample_rate, channels });
 
@@ -117,6 +125,7 @@ impl AudioRecorder {
             let samples = recording.samples.lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
             *state = RecordingState::Idle;
+            *self.start_instant.lock().unwrap() = None;
             (samples.clone(), recording.sample_rate, recording.channels)
         };
 
@@ -207,5 +216,11 @@ mod tests {
         let input = vec![0.1, 0.2, 0.3];
         let output = resample(&input, 16_000, 16_000);
         assert_eq!(output, input);
+    }
+
+    #[test]
+    fn test_elapsed_since_start_is_none_when_idle() {
+        let recorder = AudioRecorder::new();
+        assert!(recorder.elapsed_since_start().is_none());
     }
 }
