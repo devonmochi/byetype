@@ -151,6 +151,25 @@ impl AudioRecorder {
         let flac_bytes = encoder::encode_flac(&pcm)?;
         Ok(encoder::audio_to_base64(&flac_bytes))
     }
+
+    pub fn cancel(&self) -> Result<(), String> {
+        let mut state = self.state.lock().unwrap();
+        if *state != RecordingState::Recording {
+            return Err("Not recording".to_string());
+        }
+
+        let mut active_guard = self.active.lock().unwrap();
+        if let Some(recording) = active_guard.take() {
+            // Mirror stop()'s stream shutdown to release the mic and clear the
+            // macOS orange indicator. Samples are dropped without encoding.
+            let _ = recording.stream.pause();
+            drop(recording.stream);
+        }
+
+        *state = RecordingState::Idle;
+        *self.start_instant.lock().unwrap() = None;
+        Ok(())
+    }
 }
 
 /// Mix interleaved multi-channel samples to mono by averaging.
@@ -222,5 +241,11 @@ mod tests {
     fn test_elapsed_since_start_is_none_when_idle() {
         let recorder = AudioRecorder::new();
         assert!(recorder.elapsed_since_start().is_none());
+    }
+
+    #[test]
+    fn test_cancel_when_not_recording_returns_error() {
+        let recorder = AudioRecorder::new();
+        assert!(recorder.cancel().is_err());
     }
 }
