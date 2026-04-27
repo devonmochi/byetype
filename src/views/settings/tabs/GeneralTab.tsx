@@ -250,6 +250,12 @@ export function GeneralTab({ config, onSave }: Props) {
             />
           </div>
         </SettingRow>
+        <SettingRow label="按住说话模式" description="开启后按住快捷键期间录音，松开立即识别">
+          <Toggle
+            checked={!!config.general.pttMode}
+            onChange={checked => update({ pttMode: checked })}
+          />
+        </SettingRow>
       </SettingGroup>
 
       <SettingGroup title="图像识别">
