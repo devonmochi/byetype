@@ -77,6 +77,8 @@ pub struct GeneralConfig {
     pub extract_shortcut_label: Option<String>,
     #[serde(default)]
     pub extract_shortcut2_label: Option<String>,
+    #[serde(default)]
+    pub ptt_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,6 +235,7 @@ impl Default for AppConfig {
                 shortcut2_label: None,
                 extract_shortcut_label: None,
                 extract_shortcut2_label: None,
+                ptt_mode: false,
             },
             models: ModelsConfig {
                 builtin_api_keys: BuiltinApiKeys {
