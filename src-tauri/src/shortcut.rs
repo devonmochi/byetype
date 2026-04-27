@@ -1,10 +1,14 @@
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
+
+/// PTT 模式下，按住时间小于此阈值视为误触，丢弃录音。
+const PTT_MIN_DURATION_MS: u64 = 300;
 
 /// Register all 4 global shortcuts (2 voice + 2 image), each bound to its own template_id.
 pub fn register(
@@ -50,7 +54,9 @@ pub fn register(
     Ok(())
 }
 
-/// Register a single voice (recording-toggle) shortcut bound to the given template_id.
+/// Register a single voice (recording) shortcut bound to the given template_id.
+/// Supports both Toggle mode (default) and Push-to-Talk mode based on config.general.ptt_mode
+/// at event time — switching mode does NOT require re-registering the shortcut.
 fn register_voice_shortcut(
     app: &AppHandle,
     shortcut_key: &str,
@@ -65,97 +71,194 @@ fn register_voice_shortcut(
 
     app.global_shortcut()
         .on_shortcut(shortcut_key, move |_app, _shortcut, event| {
-            if event.state != ShortcutState::Pressed {
-                return;
-            }
+            let ptt = app_handle.state::<ConfigManager>().get().general.ptt_mode;
 
-            if recorder.is_recording() {
-                // CAS: claim the right to stop — advance gen to invalidate timer
-                let gen = recording_gen.load(Ordering::SeqCst);
-                if recording_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_err() {
-                    return; // Timer already stopped it
-                }
-
-                let task_id = current_task_id.lock().unwrap().take();
-                match recorder.stop() {
-                    Ok(base64_audio) => {
-                        update_tray_icon(&app_handle, false);
-                        if let Some(tid) = task_id {
-                            crate::task::process_recording(&app_handle, tid, base64_audio, tmpl.clone());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Stop recording error: {}", e);
-                        if let Some(tid) = task_id {
-                            crate::task::cancel_recording(&app_handle, tid);
-                        }
-                        update_tray_icon(&app_handle, false);
-                        let _ = app_handle.emit("recording-error", serde_json::json!({
-                            "message": e
-                        }));
-                    }
-                }
+            if ptt {
+                handle_ptt_event(
+                    &app_handle,
+                    event.state,
+                    &recorder,
+                    &current_task_id,
+                    &recording_gen,
+                    &tmpl,
+                );
             } else {
-                let mic = app_handle.state::<ConfigManager>().get()
-                    .general.microphone.clone();
-                match recorder.start(&mic) {
-                    Ok(()) => {
-                        // Bump generation to mark a new recording session
-                        let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;
-
-                        update_tray_icon(&app_handle, true);
-                        let tid = crate::task::start_recording(&app_handle);
-                        *current_task_id.lock().unwrap() = tid;
-
-                        // Read config for max recording duration
-                        let max_secs = app_handle.state::<ConfigManager>().get()
-                            .general.max_recording_seconds;
-
-                        if max_secs > 0 {
-                            let t_recorder = recorder.clone();
-                            let t_app = app_handle.clone();
-                            let t_task_id = current_task_id.clone();
-                            let t_gen = recording_gen.clone();
-                            let t_tmpl = tmpl.clone();
-                            std::thread::spawn(move || {
-                                std::thread::sleep(std::time::Duration::from_secs(max_secs as u64));
-                                // CAS: claim the right to stop — advance gen; fails if manually stopped or new recording started
-                                if t_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                                    let task_id = t_task_id.lock().unwrap().take();
-                                    match t_recorder.stop() {
-                                        Ok(base64_audio) => {
-                                            update_tray_icon(&t_app, false);
-                                            if let Some(tid) = task_id {
-                                                crate::task::process_recording(&t_app, tid, base64_audio, t_tmpl.clone());
-                                            }
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Auto-stop recording error: {}", e);
-                                            if let Some(tid) = task_id {
-                                                crate::task::cancel_recording(&t_app, tid);
-                                            }
-                                            update_tray_icon(&t_app, false);
-                                            let _ = t_app.emit("recording-error", serde_json::json!({
-                                                "message": e
-                                            }));
-                                        }
-                                    }
-                                }
-                            });
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Start recording error: {}", e);
-                        let _ = app_handle.emit("recording-error", serde_json::json!({
-                            "message": e
-                        }));
-                    }
-                }
+                handle_toggle_event(
+                    &app_handle,
+                    event.state,
+                    &recorder,
+                    &current_task_id,
+                    &recording_gen,
+                    &tmpl,
+                );
             }
         })
         .map_err(|e| format!("Failed to register voice shortcut '{}': {}", shortcut_key, e))?;
 
     Ok(())
+}
+
+/// Toggle mode: press once to start, press again to stop + transcribe.
+/// Original behavior — kept identical to pre-PTT code path.
+fn handle_toggle_event(
+    app_handle: &AppHandle,
+    state: ShortcutState,
+    recorder: &Arc<AudioRecorder>,
+    current_task_id: &Arc<Mutex<Option<u32>>>,
+    recording_gen: &Arc<AtomicU32>,
+    tmpl: &str,
+) {
+    if state != ShortcutState::Pressed {
+        return;
+    }
+
+    if recorder.is_recording() {
+        // CAS: claim the right to stop — advance gen to invalidate timer
+        let gen = recording_gen.load(Ordering::SeqCst);
+        if recording_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+            return; // Timer already stopped it
+        }
+
+        let task_id = current_task_id.lock().unwrap().take();
+        match recorder.stop() {
+            Ok(base64_audio) => {
+                update_tray_icon(app_handle, false);
+                if let Some(tid) = task_id {
+                    crate::task::process_recording(app_handle, tid, base64_audio, tmpl.to_string());
+                }
+            }
+            Err(e) => {
+                eprintln!("Stop recording error: {}", e);
+                if let Some(tid) = task_id {
+                    crate::task::cancel_recording(app_handle, tid);
+                }
+                update_tray_icon(app_handle, false);
+                let _ = app_handle.emit("recording-error", serde_json::json!({
+                    "message": e
+                }));
+            }
+        }
+    } else {
+        start_voice_recording(app_handle, recorder, current_task_id, recording_gen, tmpl);
+    }
+}
+
+/// PTT mode: press to start, release to stop + transcribe (or cancel if too short).
+fn handle_ptt_event(
+    app_handle: &AppHandle,
+    state: ShortcutState,
+    recorder: &Arc<AudioRecorder>,
+    current_task_id: &Arc<Mutex<Option<u32>>>,
+    recording_gen: &Arc<AtomicU32>,
+    tmpl: &str,
+) {
+    match state {
+        ShortcutState::Pressed => {
+            // Debounce: some platforms repeat Pressed events while held.
+            if recorder.is_recording() {
+                return;
+            }
+            start_voice_recording(app_handle, recorder, current_task_id, recording_gen, tmpl);
+        }
+        ShortcutState::Released => {
+            // CAS: race against auto-timeout timer.
+            let gen = recording_gen.load(Ordering::SeqCst);
+            if recording_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+                return; // Auto-timeout already stopped it.
+            }
+
+            let task_id = current_task_id.lock().unwrap().take();
+            let elapsed = recorder.elapsed_since_start().unwrap_or(Duration::ZERO);
+
+            if elapsed < Duration::from_millis(PTT_MIN_DURATION_MS) {
+                // Too short — discard recording, no transcription.
+                let _ = recorder.cancel();
+                update_tray_icon(app_handle, false);
+                if let Some(tid) = task_id {
+                    crate::task::cancel_recording(app_handle, tid);
+                }
+            } else {
+                match recorder.stop() {
+                    Ok(base64_audio) => {
+                        update_tray_icon(app_handle, false);
+                        if let Some(tid) = task_id {
+                            crate::task::process_recording(app_handle, tid, base64_audio, tmpl.to_string());
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("PTT stop recording error: {}", e);
+                        if let Some(tid) = task_id {
+                            crate::task::cancel_recording(app_handle, tid);
+                        }
+                        update_tray_icon(app_handle, false);
+                        let _ = app_handle.emit("recording-error", serde_json::json!({
+                            "message": e
+                        }));
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Shared start logic for both Toggle and PTT modes.
+/// Starts the recorder, allocates a task_id, shows the bubble, and spawns the
+/// max-duration auto-stop timer (which races with manual stop via `recording_gen` CAS).
+fn start_voice_recording(
+    app_handle: &AppHandle,
+    recorder: &Arc<AudioRecorder>,
+    current_task_id: &Arc<Mutex<Option<u32>>>,
+    recording_gen: &Arc<AtomicU32>,
+    tmpl: &str,
+) {
+    let mic = app_handle.state::<ConfigManager>().get().general.microphone.clone();
+    match recorder.start(&mic) {
+        Ok(()) => {
+            let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;
+            update_tray_icon(app_handle, true);
+            let tid = crate::task::start_recording(app_handle);
+            *current_task_id.lock().unwrap() = tid;
+
+            let max_secs = app_handle.state::<ConfigManager>().get().general.max_recording_seconds;
+            if max_secs > 0 {
+                let t_recorder = recorder.clone();
+                let t_app = app_handle.clone();
+                let t_task_id = current_task_id.clone();
+                let t_gen = recording_gen.clone();
+                let t_tmpl = tmpl.to_string();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(max_secs as u64));
+                    if t_gen.compare_exchange(gen, gen + 1, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+                        let task_id = t_task_id.lock().unwrap().take();
+                        match t_recorder.stop() {
+                            Ok(base64_audio) => {
+                                update_tray_icon(&t_app, false);
+                                if let Some(tid) = task_id {
+                                    crate::task::process_recording(&t_app, tid, base64_audio, t_tmpl.clone());
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Auto-stop recording error: {}", e);
+                                if let Some(tid) = task_id {
+                                    crate::task::cancel_recording(&t_app, tid);
+                                }
+                                update_tray_icon(&t_app, false);
+                                let _ = t_app.emit("recording-error", serde_json::json!({
+                                    "message": e
+                                }));
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        Err(e) => {
+            eprintln!("Start recording error: {}", e);
+            let _ = app_handle.emit("recording-error", serde_json::json!({
+                "message": e
+            }));
+        }
+    }
 }
 
 /// Register a single image (screenshot + OCR extraction) shortcut bound to the given template_id.
