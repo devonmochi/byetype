@@ -22,6 +22,7 @@ export interface GeneralConfig {
   shortcut2Label?: string
   extractShortcutLabel?: string
   extractShortcut2Label?: string
+  pttMode?: boolean
 }
 
 export interface ThinkingConfig {
