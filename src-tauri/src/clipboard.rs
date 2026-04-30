@@ -1,5 +1,59 @@
 use arboard::Clipboard;
 
+use std::borrow::Cow;
+
+/// 剪贴板原内容快照，用于 paste_text 完成后还原。
+/// 仅支持 arboard 能稳定读写的两种类型；文件引用 / 富文本 / 空 → None。
+enum ClipboardSnapshot {
+    Text(String),
+    Image(arboard::ImageData<'static>),
+    None,
+}
+
+fn snapshot_clipboard() -> ClipboardSnapshot {
+    let mut clipboard = match Clipboard::new() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[clipboard] snapshot: failed to open clipboard: {}", e);
+            return ClipboardSnapshot::None;
+        }
+    };
+
+    if let Ok(text) = clipboard.get_text() {
+        return ClipboardSnapshot::Text(text);
+    }
+
+    match clipboard.get_image() {
+        Ok(img) => ClipboardSnapshot::Image(arboard::ImageData {
+            width: img.width,
+            height: img.height,
+            bytes: Cow::Owned(img.bytes.into_owned()),
+        }),
+        Err(_) => ClipboardSnapshot::None,
+    }
+}
+
+fn restore_clipboard(snapshot: ClipboardSnapshot) {
+    if matches!(snapshot, ClipboardSnapshot::None) {
+        return;
+    }
+    let mut clipboard = match Clipboard::new() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[clipboard] restore: failed to open clipboard: {}", e);
+            return;
+        }
+    };
+    let result = match snapshot {
+        ClipboardSnapshot::Text(s) => clipboard.set_text(s).map_err(|e| format!("set_text: {}", e)),
+        ClipboardSnapshot::Image(i) => clipboard.set_image(i).map_err(|e| format!("set_image: {}", e)),
+        ClipboardSnapshot::None => Ok(()),
+    };
+    if let Err(e) = result {
+        eprintln!("[clipboard] restore failed: {}", e);
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod macos {
     use core_graphics::event::{CGEvent, CGEventFlags, CGKeyCode, CGEventTapLocation};
