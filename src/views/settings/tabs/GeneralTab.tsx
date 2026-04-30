@@ -256,6 +256,15 @@ export function GeneralTab({ config, onSave }: Props) {
             onChange={checked => update({ pttMode: checked })}
           />
         </SettingRow>
+        <SettingRow
+          label="覆盖剪贴板"
+          description="开启后识别结果会写入剪贴板，覆盖你之前复制的内容；关闭后识别完成会自动还原原剪贴板"
+        >
+          <Toggle
+            checked={config.general.overwriteClipboard !== false}
+            onChange={checked => update({ overwriteClipboard: checked })}
+          />
+        </SettingRow>
       </SettingGroup>
 
       <SettingGroup title="图像识别">
