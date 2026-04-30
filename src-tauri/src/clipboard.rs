@@ -186,3 +186,41 @@ pub fn paste_text(text: &str, overwrite_clipboard: bool) -> Result<(), String> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn clipboard_available() -> bool {
+        Clipboard::new().is_ok()
+    }
+
+    #[test]
+    fn snapshot_then_restore_text_roundtrip() {
+        if !clipboard_available() {
+            eprintln!("clipboard unavailable, skipping");
+            return;
+        }
+        let mut cb = Clipboard::new().unwrap();
+        cb.set_text("hello-original").unwrap();
+
+        let snap = snapshot_clipboard();
+        assert!(matches!(snap, ClipboardSnapshot::Text(ref s) if s == "hello-original"));
+
+        // 模拟覆盖
+        cb.set_text("voice-result").unwrap();
+        assert_eq!(Clipboard::new().unwrap().get_text().unwrap(), "voice-result");
+
+        restore_clipboard(snap);
+        assert_eq!(Clipboard::new().unwrap().get_text().unwrap(), "hello-original");
+    }
+
+    #[test]
+    fn snapshot_returns_none_when_only_unsupported_present() {
+        if !clipboard_available() {
+            eprintln!("clipboard unavailable, skipping");
+            return;
+        }
+        let _ = snapshot_clipboard();
+    }
+}
