@@ -23,6 +23,7 @@ export interface GeneralConfig {
   extractShortcutLabel?: string
   extractShortcut2Label?: string
   pttMode?: boolean
+  overwriteClipboard?: boolean
 }
 
 export interface ThinkingConfig {
