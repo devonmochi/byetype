@@ -379,7 +379,7 @@ async fn run_pipeline(
     }
 
     // Phase 3: Paste result
-    if let Err(e) = crate::clipboard::paste_text(&final_text) {
+    if let Err(e) = crate::clipboard::paste_text(&final_text, config.general.overwrite_clipboard) {
         eprintln!("[TaskManager] Paste failed: {}", e);
     }
 

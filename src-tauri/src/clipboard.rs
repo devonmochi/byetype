@@ -151,7 +151,14 @@ mod windows {
     }
 }
 
-pub fn paste_text(text: &str) -> Result<(), String> {
+pub fn paste_text(text: &str, overwrite_clipboard: bool) -> Result<(), String> {
+    // OFF 模式：先快照原剪贴板，主流程结束后还原。
+    let backup = if !overwrite_clipboard {
+        snapshot_clipboard()
+    } else {
+        ClipboardSnapshot::None
+    };
+
     let mut clipboard = Clipboard::new()
         .map_err(|e| format!("Failed to access clipboard: {}", e))?;
     clipboard.set_text(text)
@@ -169,6 +176,12 @@ pub fn paste_text(text: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         windows::simulate_paste()?;
+    }
+
+    // 仅当备份非 None 时才执行还原；让目标应用先读完粘贴内容。
+    if !matches!(backup, ClipboardSnapshot::None) {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        restore_clipboard(backup);
     }
 
     Ok(())
