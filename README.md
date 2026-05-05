@@ -3,7 +3,7 @@
 **告别打字，用说的。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20iOS-brightgreen?style=flat-square)](#-安装)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20iOS-brightgreen?style=flat-square)](https://github.com/devonmochi/byetype/releases)
 
 ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdown 格式的提示词，你可以自定义识别规则、专有词汇和文本优化策略，让语音输入最大限度匹配你的行业术语和个人习惯。
 
@@ -152,46 +152,6 @@ fn main() {
 > **OpenRouter 中转**：如果无法直接访问 Gemini，可通过 [OpenRouter](https://openrouter.ai/) 中转使用以下模型，无需代理：
 > - `google/gemini-3-flash-preview`
 > - `google/gemini-3.1-flash-lite-preview`
-
-## 📦 安装
-
-从 [GitHub Releases](https://github.com/devonmochi/byetype/releases) 下载最新版本：
-
-| 平台 | 下载 | 说明 |
-|------|------|------|
-| macOS | `.dmg` | 支持 Apple Silicon 和 Intel |
-| Windows | `.msi` / `.exe` | 支持 Windows 10+ |
-
-### macOS 权限设置
-
-首次运行需要授予以下权限：
-
-1. **🔒 安全性设置**：首次打开时 macOS 会提示"无法验证开发者"，前往「系统设置 → 隐私与安全性」，找到 ByeType 点击「仍要打开」
-2. **🎤 麦克风权限**：前往「系统设置 → 隐私与安全性 → 麦克风」，允许 ByeType 访问麦克风
-3. **♿ 辅助功能权限**：前往「系统设置 → 隐私与安全性 → 辅助功能」，允许 ByeType（用于全局快捷键和自动粘贴）
-
-### Windows 权限设置
-
-1. **🎤 麦克风权限**：前往「设置 → 隐私和安全性 → 麦克风」，允许 ByeType 访问麦克风
-2. **🛡️ 防火墙提示**：首次运行时 Windows Defender 可能弹出网络访问提示，选择「允许访问」
-
-## 🚀 快速上手
-
-从安装完成到第一次成功转录：
-
-1. 打开 ByeType，菜单栏（macOS）或系统托盘（Windows）出现 ByeType 图标
-2. 点击托盘图标 →「设置」→ 左侧栏「模型管理」
-3. 在预置模型卡片中填写 API Key（获取方式见 [AI 模型配置](#-ai-模型配置)）
-4. 点击左侧栏「语音转写」，选择转写模型
-5. 关闭设置窗口，将光标放到任意文本输入框
-6. 按 **F4** 开始录音 — 屏幕上出现红色圆形气泡
-7. 说话完毕后再按 **F4** 停止录音
-8. 等待转写 — 气泡变为紫色显示 "Thinking..."
-9. 完成 — 气泡变绿，文本自动粘贴到光标位置
-
-> 自动粘贴依赖辅助功能权限。如果文本没有自动粘贴，可手动按 Cmd+V（macOS）或 Ctrl+V（Windows）粘贴。
-
-**图像文字提取：** 按 **F6** → 框选屏幕区域 → AI 自动识别文字并复制到剪贴板 → 预览窗口展示结果。
 
 ## ⚙️ 功能详解
 
@@ -373,18 +333,6 @@ ByeType 的转写行为由提示词文件和输出风格共同控制，这是实
 
 自动粘贴依赖辅助功能权限。检查「系统设置 → 隐私与安全性 → 辅助功能」是否已授权 ByeType。文本仍会复制到剪贴板，可手动 Cmd+V 粘贴。
 </details>
-
-## 🔧 从源码构建
-
-环境要求：[Node.js](https://nodejs.org/) >= 20、[Rust](https://www.rust-lang.org/tools/install) >= 1.70、[Tauri CLI](https://v2.tauri.app/start/prerequisites/) v2
-
-```bash
-git clone https://github.com/devonmochi/byetype.git
-cd byetype
-npm install
-npm run tauri dev      # 开发模式
-npm run tauri build    # 生产构建
-```
 
 ## 🏗️ 技术栈
 
