@@ -100,6 +100,8 @@ export default function App() {
     let unlisten: (() => void) | null = null
     listen<string>('preview-text', (event) => {
       setText(event.payload)
+      // 通知后端文本已应用,后端收到后才会 window.show(),避免窗口先弹出旧 state
+      emit('preview-text-applied', {})
     }).then((fn) => {
       unlisten = fn
       emit('preview-ready', {})

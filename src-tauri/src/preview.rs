@@ -57,17 +57,49 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
             .map_err(|e| format!("Create preview window failed: {}", e))?
     };
 
-    // 注册 ready 握手:若前端尚未 emit preview-ready,等到就 emit 文本并 show
-    let text_clone = text.to_string();
+    // 显示策略:为避免「窗口先弹出再被新文本覆盖」造成首次内容闪错,
+    // 必须等前端 setText 完成后再 window.show()。
+    //
+    // 两条触发路径:
+    //   A. 冷启动:前端 mount 后 emit `preview-ready`,后端再 emit text;
+    //      前端 setText 后 emit `preview-text-applied`,后端收到后才 show。
+    //   B. 热复用:前端 listener 已注册,后端立即 emit text 即可被收到;
+    //      同样靠 `preview-text-applied` 回执触发 show。
+    //
+    // 兜底:若 200ms 内未收到回执(前端崩溃/异常),强制 show,避免窗口永远不可见。
+    let text_clone_for_ready = text.to_string();
     let window_for_ready = window.clone();
     window.once("preview-ready", move |_| {
-        let _ = window_for_ready.emit("preview-text", &text_clone);
-        let _ = window_for_ready.show();
+        let _ = window_for_ready.emit("preview-text", &text_clone_for_ready);
     });
 
-    // 同时立即 emit 一次:若窗口是预热的且 React 已 mount,此次 emit 会立刻生效,实现「瞬时显示」
+    let window_for_applied = window.clone();
+    let shown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let shown_for_applied = shown.clone();
+    window.once("preview-text-applied", move |_| {
+        if shown_for_applied
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            let _ = window_for_applied.show();
+        }
+    });
+
+    // 立即 emit 一次:若窗口是预热的且 React 已 mount,此次 emit 会被前端立刻接收
     let _ = window.emit("preview-text", text);
-    let _ = window.show();
+
+    // 兜底超时:防止前端无回执时窗口永远不可见
+    let window_for_fallback = window.clone();
+    let shown_for_fallback = shown.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        if shown_for_fallback
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            let _ = window_for_fallback.show();
+        }
+    });
 
     // 记录创建时间用于 blur 宽限期
     CREATED_AT.store(now_ms(), Ordering::Relaxed);
