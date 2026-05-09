@@ -18,7 +18,7 @@ ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdo
 | 快捷指令 | 模型 | 安装 |
 |---------|------|------|
 | ByeType LongCat | LongCat Flash Omni（国内直连） | [添加到快捷指令](https://www.icloud.com/shortcuts/32e44afb36734dedab1ad61d863481e3) |
-| ByeType Gemini | Gemini 3 Flash | [添加到快捷指令](https://www.icloud.com/shortcuts/0d88271d332c457c81c122e37657b09a) |
+| ByeType Gemini | Gemini 3 Flash | [添加到快捷指令](https://www.icloud.com/shortcuts/85403a4e55a0487c985109f944f46ae8) |
 
 > 安装后需要在快捷指令中填写你自己的 API Key和规则词汇等，和桌面版共用同一个 Key。
 
