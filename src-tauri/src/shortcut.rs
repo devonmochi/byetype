@@ -211,10 +211,15 @@ fn start_voice_recording(
     recording_gen: &Arc<AtomicU32>,
     tmpl: &str,
 ) {
+    // Allocate the new generation BEFORE starting the recorder, so that any
+    // Release event arriving while `recorder.start()` is still in progress
+    // will see the up-to-date generation when it does its CAS — preventing
+    // the race where Release loads a stale `gen` (the value from before this
+    // Press) and its CAS succeeds with the wrong version, dropping the recording.
+    let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;
     let mic = app_handle.state::<ConfigManager>().get().general.microphone.clone();
     match recorder.start(&mic) {
         Ok(()) => {
-            let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;
             update_tray_icon(app_handle, true);
             let tid = crate::task::start_recording(app_handle);
             *current_task_id.lock().unwrap() = tid;
@@ -253,6 +258,10 @@ fn start_voice_recording(
             }
         }
         Err(e) => {
+            // Bump generation again to invalidate the just-allocated `gen` —
+            // any in-flight Release racing with this failed Press will then
+            // see a fresh value and its CAS will fail cleanly.
+            recording_gen.fetch_add(1, Ordering::SeqCst);
             eprintln!("Start recording error: {}", e);
             let _ = app_handle.emit("recording-error", serde_json::json!({
                 "message": e
