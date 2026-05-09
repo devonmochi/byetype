@@ -33,6 +33,7 @@ Thumbs.db
 .superpowers/
 docs/superpowers/
 docs/post*.md
+docs/plans/
 
 # Dev artifacts
 generate_icons.py
