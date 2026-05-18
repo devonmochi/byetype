@@ -88,12 +88,19 @@ pub struct ChatCompletionRequest {
     pub thinking: Option<ThinkingParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<OpenRouterReasoning>,
 }
 
 #[derive(Serialize)]
 pub struct ThinkingParam {
     #[serde(rename = "type")]
     pub thinking_type: String,
+}
+
+#[derive(Serialize)]
+pub struct OpenRouterReasoning {
+    pub effort: String,
 }
 
 #[derive(Serialize)]
