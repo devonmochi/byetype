@@ -16,8 +16,10 @@ export function TranscribeTab({ config, onSave }: Props) {
   const textModels = getTextModels(config)
   const transcribeModel = findModel(config, transcribe.modelId)
   const voiceTemplatesModel = findModel(config, voiceTemplates.modelId)
-  const isTranscribeGemini = transcribeModel?.protocol === 'gemini'
-  const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini'
+  const isOpenRouter = (m: ReturnType<typeof findModel>) =>
+    m?.protocol === 'openai-compat' && (m?.baseUrl?.includes('openrouter.ai') ?? false)
+  const isTranscribeGemini = transcribeModel?.protocol === 'gemini' || isOpenRouter(transcribeModel)
+  const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini' || isOpenRouter(voiceTemplatesModel)
   const isVoiceTemplatesDeepSeek =
     voiceTemplatesModel?.protocol === 'openai-compat' &&
     voiceTemplatesModel?.baseUrl?.includes('api.deepseek.com')

@@ -88,6 +88,7 @@ pub async fn transcribe(
             .await
         }
         _ => {
+            let bare_base64 = resolved.base_url.contains("openrouter.ai");
             openai_compat::transcribe(
                 client,
                 audio_base64,
@@ -95,6 +96,8 @@ pub async fn transcribe(
                 &resolved.api_key,
                 &resolved.model,
                 &resolved.base_url,
+                bare_base64,
+                Some(&config.transcribe.thinking),
             )
             .await
         }
@@ -180,6 +183,7 @@ pub async fn extract_text(
                 &resolved.api_key,
                 &resolved.model,
                 &resolved.base_url,
+                Some(thinking),
             )
             .await
         }
@@ -274,6 +278,7 @@ pub async fn optimize(
                 &resolved.api_key,
                 &resolved.model,
                 &resolved.base_url,
+                Some(&config.voice_templates.thinking),
             )
             .await
         }

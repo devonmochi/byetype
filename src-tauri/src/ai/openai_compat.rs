@@ -1,6 +1,26 @@
 use reqwest::Client;
 
 use super::types::*;
+use crate::config::types::ThinkingConfig;
+
+fn is_openrouter(base_url: &str) -> bool {
+    base_url.contains("openrouter.ai")
+}
+
+/// OpenRouter 没有真正的 "关闭思考" 开关; thinking.enabled=false 时映射到 effort=minimal,
+/// 这是 Gemini 3 系列最低的思考档位,最接近 "尽量不思考" 的语义。
+fn openrouter_reasoning(thinking: Option<&ThinkingConfig>) -> Option<OpenRouterReasoning> {
+    // OpenRouter 的 effort 取值要小写: minimal / low / medium / high。
+    // ByeType 的 ThinkingConfig.level 在前端以大写存储 (MINIMAL/LOW/MEDIUM/HIGH),需要转小写。
+    let effort = match thinking {
+        Some(cfg) if cfg.enabled => {
+            let lvl = cfg.level.trim().to_lowercase();
+            if lvl.is_empty() { "medium".to_string() } else { lvl }
+        }
+        _ => "minimal".to_string(),
+    };
+    Some(OpenRouterReasoning { effort })
+}
 
 pub async fn transcribe(
     client: &Client,
@@ -9,8 +29,16 @@ pub async fn transcribe(
     api_key: &str,
     model: &str,
     base_url: &str,
+    bare_base64: bool,
+    thinking: Option<&ThinkingConfig>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let data = if bare_base64 {
+        audio_base64.to_string()
+    } else {
+        format!("data:;base64,{}", audio_base64)
+    };
 
     let request = ChatCompletionRequest {
         model: model.to_string(),
@@ -24,7 +52,7 @@ pub async fn transcribe(
                 content: ChatContent::Parts(vec![ChatContentPart::InputAudio {
                     input_audio: AudioData {
                         audio_type: None,
-                        data: format!("data:;base64,{}", audio_base64),
+                        data,
                         format: "flac".to_string(),
                         sample_rate: None,
                     },
@@ -38,11 +66,18 @@ pub async fn transcribe(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
+        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
     };
 
-    let resp = client
+    let mut req = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Authorization", format!("Bearer {}", api_key));
+    if is_openrouter(base_url) {
+        req = req
+            .header("HTTP-Referer", "https://github.com/devonmochi/byetype")
+            .header("X-Title", "ByeType");
+    }
+    let resp = req
         .json(&request)
         .send()
         .await
@@ -79,6 +114,7 @@ pub async fn optimize(
     api_key: &str,
     model: &str,
     base_url: &str,
+    thinking: Option<&ThinkingConfig>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
@@ -103,11 +139,18 @@ pub async fn optimize(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
+        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
     };
 
-    let resp = client
+    let mut req = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Authorization", format!("Bearer {}", api_key));
+    if is_openrouter(base_url) {
+        req = req
+            .header("HTTP-Referer", "https://github.com/devonmochi/byetype")
+            .header("X-Title", "ByeType");
+    }
+    let resp = req
         .json(&request)
         .send()
         .await
@@ -150,6 +193,7 @@ pub async fn extract_text(
     api_key: &str,
     model: &str,
     base_url: &str,
+    thinking: Option<&ThinkingConfig>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
@@ -176,11 +220,18 @@ pub async fn extract_text(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
+        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
     };
 
-    let resp = client
+    let mut req = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Authorization", format!("Bearer {}", api_key));
+    if is_openrouter(base_url) {
+        req = req
+            .header("HTTP-Referer", "https://github.com/devonmochi/byetype")
+            .header("X-Title", "ByeType");
+    }
+    let resp = req
         .json(&request)
         .send()
         .await
@@ -243,6 +294,7 @@ pub async fn qwen_omni_extract_text(
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
         reasoning_effort: None,
+        reasoning: None,
     };
 
     let resp = client
@@ -291,6 +343,7 @@ pub async fn test_connectivity(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
+        reasoning: None,
     };
 
     let resp = client
@@ -379,6 +432,7 @@ pub async fn qwen_omni_transcribe(
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
         reasoning_effort: None,
+        reasoning: None,
     };
 
     let resp = client
@@ -437,6 +491,7 @@ pub async fn qwen_omni_optimize(
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
         reasoning_effort: None,
+        reasoning: None,
     };
 
     let resp = client
@@ -485,6 +540,7 @@ pub async fn qwen_omni_test_connectivity(
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
         thinking: None,
         reasoning_effort: None,
+        reasoning: None,
     };
 
     let resp = client
