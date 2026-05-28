@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -99,8 +100,9 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | null = null
     listen<string>('preview-text', (event) => {
-      setText(event.payload)
-      // 通知后端文本已应用,后端收到后才会 window.show(),避免窗口先弹出旧 state
+      // flushSync 强制 React 在本行返回前把 DOM commit 完成,
+      // 保证后端收到 applied 回执 → window.show() 时,屏幕已是新文本而非旧 state。
+      flushSync(() => setText(event.payload))
       emit('preview-text-applied', {})
     }).then((fn) => {
       unlisten = fn
