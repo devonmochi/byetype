@@ -37,6 +37,18 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
     let width = (max_line_len as f64 * 8.0 + 80.0).clamp(320.0, 600.0);
     let height = (line_count as f64 * 22.0 + 140.0).clamp(180.0, 460.0);
 
+    // 显示策略:为避免「窗口先弹出再被新文本覆盖」造成首次内容闪错,
+    // 必须等前端 setText 完成后再 window.show()。前端用 flushSync 保证
+    // setText commit 完成后才发 `preview-text-applied` 回执。
+    //
+    // 两条触发路径:
+    //   A. 冷启动(新建窗口):前端 mount 后 emit `preview-ready`,后端再 emit text。
+    //      preview-ready once handler 只在新建分支注册,避免热复用时累积。
+    //   B. 热复用:前端 listener 已注册,后端立即 emit text 即可被收到。
+    //
+    // 兜底:若 200ms 内未收到回执(前端崩溃/异常),强制 show,避免窗口永远不可见。
+    let shown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
     // 优先复用已预热的窗口;否则新建
     let window = if let Some(existing) = app.get_webview_window("preview") {
         // 复用:按文本调整尺寸
@@ -44,8 +56,9 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         let _ = existing.center();
         existing
     } else {
-        // 回退:新建窗口(退化到旧行为)
-        WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
+        // 新建路径:注册一次 preview-ready,等 React mount 后回推 text。
+        // 复用路径不注册——React 已 mount,不会再发 preview-ready,注册了只会累积泄漏。
+        let built = WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
             .title("ByeType Preview")
             .inner_size(width, height)
             .resizable(true)
@@ -54,27 +67,16 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
             .center()
             .visible(false)
             .build()
-            .map_err(|e| format!("Create preview window failed: {}", e))?
+            .map_err(|e| format!("Create preview window failed: {}", e))?;
+        let text_for_ready = text.to_string();
+        let window_for_ready = built.clone();
+        built.once("preview-ready", move |_| {
+            let _ = window_for_ready.emit("preview-text", &text_for_ready);
+        });
+        built
     };
 
-    // 显示策略:为避免「窗口先弹出再被新文本覆盖」造成首次内容闪错,
-    // 必须等前端 setText 完成后再 window.show()。
-    //
-    // 两条触发路径:
-    //   A. 冷启动:前端 mount 后 emit `preview-ready`,后端再 emit text;
-    //      前端 setText 后 emit `preview-text-applied`,后端收到后才 show。
-    //   B. 热复用:前端 listener 已注册,后端立即 emit text 即可被收到;
-    //      同样靠 `preview-text-applied` 回执触发 show。
-    //
-    // 兜底:若 200ms 内未收到回执(前端崩溃/异常),强制 show,避免窗口永远不可见。
-    let text_clone_for_ready = text.to_string();
-    let window_for_ready = window.clone();
-    window.once("preview-ready", move |_| {
-        let _ = window_for_ready.emit("preview-text", &text_clone_for_ready);
-    });
-
     let window_for_applied = window.clone();
-    let shown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let shown_for_applied = shown.clone();
     window.once("preview-text-applied", move |_| {
         if shown_for_applied
@@ -85,7 +87,8 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         }
     });
 
-    // 立即 emit 一次:若窗口是预热的且 React 已 mount,此次 emit 会被前端立刻接收
+    // 立即 emit 一次:若窗口是预热的且 React 已 mount,此次 emit 会被前端立刻接收。
+    // 冷启动场景前端 listener 还没注册,这次 emit 会丢失——由 preview-ready 路径兜底。
     let _ = window.emit("preview-text", text);
 
     // 兜底超时:防止前端无回执时窗口永远不可见
