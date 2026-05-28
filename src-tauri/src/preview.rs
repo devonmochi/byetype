@@ -1,6 +1,9 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
 
+/// 光标与预览窗口之间的边距(逻辑像素/物理像素,取决于平台 set_position 分支)。
+const CURSOR_OFFSET: f64 = 12.0;
+
 static PINNED: AtomicBool = AtomicBool::new(false);
 /// Epoch millis when the preview window was created — ignore blur within grace period
 static CREATED_AT: AtomicU64 = AtomicU64::new(0);
@@ -53,7 +56,6 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
     let window = if let Some(existing) = app.get_webview_window("preview") {
         // 复用:按文本调整尺寸
         let _ = existing.set_size(tauri::LogicalSize::new(width, height));
-        let _ = existing.center();
         existing
     } else {
         // 新建路径:注册一次 preview-ready,等 React mount 后回推 text。
@@ -64,7 +66,6 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
             .resizable(true)
             .decorations(false)
             .always_on_top(true)
-            .center()
             .visible(false)
             .build()
             .map_err(|e| format!("Create preview window failed: {}", e))?;
@@ -75,6 +76,9 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         });
         built
     };
+
+    // 定位到光标右下,超出屏幕则反向贴边——必须在 show() 之前完成
+    position_near_cursor(&window, width, height);
 
     let window_for_applied = window.clone();
     let shown_for_applied = shown.clone();
@@ -181,4 +185,119 @@ pub fn close_if_exists(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("preview") {
         let _ = window.close();
     }
+}
+
+/// 把窗口定位到光标右下偏移处,超出屏幕则反向贴边到左/上侧,
+/// 保证窗口完整可见。读不到光标/屏幕信息时回退到 center()。
+///
+/// 坐标系约定:
+/// - macOS: 光标 (CGEvent) 与 Monitor API 都用逻辑点,直接走 LogicalPosition。
+/// - Windows: 光标 (GetCursorPos) 与 Monitor API 都用物理像素,走 PhysicalPosition。
+/// 全程不做平台间换算,避免 DPI 误差。
+fn position_near_cursor(window: &tauri::WebviewWindow, width: f64, height: f64) {
+    let monitors = match window.available_monitors() {
+        Ok(m) if !m.is_empty() => m,
+        _ => { let _ = window.center(); return; }
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let cursor = match macos_cursor() {
+            Some(c) => c,
+            None => { let _ = window.center(); return; }
+        };
+        // macOS: 光标与 monitor 都用逻辑点比较
+        let monitor = monitors.iter().find(|m| {
+            let s = m.scale_factor();
+            let l = m.position().x as f64 / s;
+            let t = m.position().y as f64 / s;
+            let r = l + m.size().width as f64 / s;
+            let b = t + m.size().height as f64 / s;
+            cursor.0 >= l && cursor.0 < r && cursor.1 >= t && cursor.1 < b
+        }).unwrap_or(&monitors[0]);
+
+        let s = monitor.scale_factor();
+        let l = monitor.position().x as f64 / s;
+        let t = monitor.position().y as f64 / s;
+        let r = l + monitor.size().width as f64 / s;
+        let b = t + monitor.size().height as f64 / s;
+
+        let (x, y) = pick_pos(cursor.0, cursor.1, width, height, l, t, r, b, CURSOR_OFFSET);
+        let _ = window.set_position(tauri::Position::Logical(
+            tauri::LogicalPosition::new(x, y),
+        ));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let cursor = match windows_cursor() {
+            Some(c) => c,
+            None => { let _ = window.center(); return; }
+        };
+        // Windows: 光标与 monitor 都用物理像素;窗口尺寸是逻辑,需按 monitor scale 转物理
+        let monitor = monitors.iter().find(|m| {
+            let pos = m.position();
+            let size = m.size();
+            cursor.0 >= pos.x as f64
+                && cursor.0 < (pos.x + size.width as i32) as f64
+                && cursor.1 >= pos.y as f64
+                && cursor.1 < (pos.y + size.height as i32) as f64
+        }).unwrap_or(&monitors[0]);
+
+        let s = monitor.scale_factor();
+        let pw = width * s;
+        let ph = height * s;
+        let l = monitor.position().x as f64;
+        let t = monitor.position().y as f64;
+        let r = l + monitor.size().width as f64;
+        let b = t + monitor.size().height as f64;
+        let offset = CURSOR_OFFSET * s;
+
+        let (x, y) = pick_pos(cursor.0, cursor.1, pw, ph, l, t, r, b, offset);
+        let _ = window.set_position(tauri::Position::Physical(
+            tauri::PhysicalPosition::new(x as i32, y as i32),
+        ));
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = window.center();
+    }
+}
+
+/// 选位:光标右下放得下就右下,否则反向(左上),最后 clamp 到屏内兜底。
+#[allow(clippy::too_many_arguments)]
+fn pick_pos(
+    cx: f64, cy: f64, w: f64, h: f64,
+    l: f64, t: f64, r: f64, b: f64,
+    offset: f64,
+) -> (f64, f64) {
+    let mut x = cx + offset;
+    let mut y = cy + offset;
+    if x + w > r { x = cx - offset - w; }
+    if y + h > b { y = cy - offset - h; }
+    if x < l { x = l; }
+    if y < t { y = t; }
+    if x + w > r { x = r - w; }
+    if y + h > b { y = b - h; }
+    (x, y)
+}
+
+#[cfg(target_os = "macos")]
+fn macos_cursor() -> Option<(f64, f64)> {
+    use core_graphics::event::CGEvent;
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).ok()?;
+    let event = CGEvent::new(source).ok()?;
+    let p = event.location();
+    Some((p.x, p.y))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_cursor() -> Option<(f64, f64)> {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut p = POINT { x: 0, y: 0 };
+    if unsafe { GetCursorPos(&mut p) } == 0 { return None; }
+    Some((p.x as f64, p.y as f64))
 }
