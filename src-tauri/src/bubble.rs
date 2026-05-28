@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, Emitter, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Emitter, WebviewUrl, WebviewWindowBuilder, WebviewWindow};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 const BUBBLE_WIDTH: f64 = 140.0;
@@ -84,8 +84,6 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     SHOW_GEN[idx].fetch_add(1, Ordering::SeqCst);
 
     let (cx, cy) = cursor_position();
-    let x = cx + OFFSET_X;
-    let y = cy + OFFSET_Y;
 
     if let Some(win) = app.get_webview_window(&label) {
         // Clear old content first to prevent flash of stale state
@@ -95,16 +93,8 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
             serde_json::json!({}),
         );
 
-        // Windows: GetCursorPos returns physical pixels, use PhysicalPosition
-        // macOS: CGEvent.location() returns logical points, use LogicalPosition
-        #[cfg(target_os = "windows")]
-        let _ = win.set_position(tauri::Position::Physical(
-            tauri::PhysicalPosition::new(x as i32, y as i32),
-        ));
-        #[cfg(not(target_os = "windows"))]
-        let _ = win.set_position(tauri::Position::Logical(
-            tauri::LogicalPosition::new(x, y),
-        ));
+        // 光标右下偏移,超出屏幕则反向贴边
+        position_near_cursor(&win, cx, cy);
 
         // Show window BEFORE emitting events — on Windows, WebView2 may not
         // process events while the window is hidden.
@@ -140,6 +130,101 @@ pub fn update(app: &AppHandle, task_id: u32, status: &str) -> Result<(), String>
         serde_json::json!({ "taskNumber": task_id, "status": status }),
     )
     .map_err(|e| format!("Failed to update bubble: {}", e))
+}
+
+/// 把 bubble 定位到光标右下偏移处,超出屏幕则反向贴边。
+///
+/// 坐标系约定:
+/// - macOS: 光标 (CGEvent) 与 Monitor API 都用逻辑点 → LogicalPosition。
+/// - Windows: 光标 (GetCursorPos) 与 Monitor API 都用物理像素 → PhysicalPosition。
+fn position_near_cursor(win: &WebviewWindow, cx: f64, cy: f64) {
+    let monitors = match win.available_monitors() {
+        Ok(m) if !m.is_empty() => m,
+        _ => {
+            // 兜底:沿用旧的纯偏移逻辑
+            #[cfg(target_os = "windows")]
+            { let _ = win.set_position(tauri::Position::Physical(
+                tauri::PhysicalPosition::new((cx + OFFSET_X) as i32, (cy + OFFSET_Y) as i32))); }
+            #[cfg(not(target_os = "windows"))]
+            { let _ = win.set_position(tauri::Position::Logical(
+                tauri::LogicalPosition::new(cx + OFFSET_X, cy + OFFSET_Y))); }
+            return;
+        }
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let monitor = monitors.iter().find(|m| {
+            let s = m.scale_factor();
+            let l = m.position().x as f64 / s;
+            let t = m.position().y as f64 / s;
+            let r = l + m.size().width as f64 / s;
+            let b = t + m.size().height as f64 / s;
+            cx >= l && cx < r && cy >= t && cy < b
+        }).unwrap_or(&monitors[0]);
+        let s = monitor.scale_factor();
+        let l = monitor.position().x as f64 / s;
+        let t = monitor.position().y as f64 / s;
+        let r = l + monitor.size().width as f64 / s;
+        let b = t + monitor.size().height as f64 / s;
+
+        let (x, y) = pick_pos(cx, cy, BUBBLE_WIDTH, BUBBLE_HEIGHT, l, t, r, b, OFFSET_X, OFFSET_Y);
+        let _ = win.set_position(tauri::Position::Logical(
+            tauri::LogicalPosition::new(x, y),
+        ));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let monitor = monitors.iter().find(|m| {
+            let pos = m.position();
+            let size = m.size();
+            cx >= pos.x as f64
+                && cx < (pos.x + size.width as i32) as f64
+                && cy >= pos.y as f64
+                && cy < (pos.y + size.height as i32) as f64
+        }).unwrap_or(&monitors[0]);
+        let s = monitor.scale_factor();
+        // bubble 尺寸是逻辑像素,Windows 比较时需转物理
+        let pw = BUBBLE_WIDTH * s;
+        let ph = BUBBLE_HEIGHT * s;
+        let l = monitor.position().x as f64;
+        let t = monitor.position().y as f64;
+        let r = l + monitor.size().width as f64;
+        let b = t + monitor.size().height as f64;
+        let off_x = OFFSET_X * s;
+        let off_y = OFFSET_Y * s;
+
+        let (x, y) = pick_pos(cx, cy, pw, ph, l, t, r, b, off_x, off_y);
+        let _ = win.set_position(tauri::Position::Physical(
+            tauri::PhysicalPosition::new(x as i32, y as i32),
+        ));
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = win.set_position(tauri::Position::Logical(
+            tauri::LogicalPosition::new(cx + OFFSET_X, cy + OFFSET_Y),
+        ));
+    }
+}
+
+/// 选位:光标右下放得下就右下,否则反向(左上),最后 clamp 到屏内兜底。
+#[allow(clippy::too_many_arguments)]
+fn pick_pos(
+    cx: f64, cy: f64, w: f64, h: f64,
+    l: f64, t: f64, r: f64, b: f64,
+    off_x: f64, off_y: f64,
+) -> (f64, f64) {
+    let mut x = cx + off_x;
+    let mut y = cy + off_y;
+    if x + w > r { x = cx - off_x - w; }
+    if y + h > b { y = cy - off_y - h; }
+    if x < l { x = l; }
+    if y < t { y = t; }
+    if x + w > r { x = r - w; }
+    if y + h > b { y = b - h; }
+    (x, y)
 }
 
 pub fn hide(app: &AppHandle, task_id: u32, delay_ms: u64) -> Result<(), String> {
