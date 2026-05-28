@@ -97,6 +97,29 @@ jobs:
           args: ${{ matrix.args }}
           updaterJsonKeepUniversal: true
 
+      - name: Rename macOS DMG to user-friendly name
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 把 aarch64/x64 改成更直观的 macos-arm64/macos-intel,
+          # 让非开发者用户能一眼看出该下哪个。
+          # 只 rename .dmg(用户直接下载的);.app.tar.gz 保持原名,
+          # 它由 updater 读取 latest.json 的 URL 引用,改名会破坏自动更新。
+          TAG="$GITHUB_REF_NAME"
+          VERSION="${TAG#v}"
+          if [[ "${{ matrix.args }}" == *"aarch64"* ]]; then
+            OLD="ByeType_${VERSION}_aarch64.dmg"
+            NEW="ByeType_${VERSION}_macos-arm64.dmg"
+          else
+            OLD="ByeType_${VERSION}_x64.dmg"
+            NEW="ByeType_${VERSION}_macos-intel.dmg"
+          fi
+          gh release download "$TAG" --pattern "$OLD" --output "$NEW"
+          gh release upload "$TAG" "$NEW" --clobber
+          gh release delete-asset "$TAG" "$OLD" --yes
+
       - name: Upload platform latest.json
         shell: bash
         run: |
