@@ -10,6 +10,9 @@ static CREATED_AT: AtomicU64 = AtomicU64::new(0);
 const BLUR_GRACE_MS: u128 = 800;
 /// blur 监听器是否已注册(整个进程生命周期内只注册一次,避免复用窗口时叠加)
 static BLUR_HANDLER_REGISTERED: AtomicBool = AtomicBool::new(false);
+/// 前端 React 是否已完成 mount 并注册 preview-text listener。
+/// prewarm 可能只创建了 WebviewWindow，但 listener 还没 ready；此时不能按热复用处理。
+static PREVIEW_READY: AtomicBool = AtomicBool::new(false);
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -52,14 +55,28 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
     // 兜底:若 200ms 内未收到回执(前端崩溃/异常),强制 show,避免窗口永远不可见。
     let shown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    // 优先复用已预热的窗口;否则新建
+    // 优先复用已预热的窗口;否则新建。
+    // 注意:prewarm 可能只完成了 WebviewWindow 创建，React 还没 mount 完成。
+    // 因此「窗口存在」不等于「前端 listener 已 ready」。
     let window = if let Some(existing) = app.get_webview_window("preview") {
         // 复用:按文本调整尺寸
         let _ = existing.set_size(tauri::LogicalSize::new(width, height));
+
+        if !PREVIEW_READY.load(Ordering::SeqCst) {
+            // 半热复用:窗口已存在但前端还没发 preview-ready。
+            // 等 listener 注册完成后再补发文本，避免立即 emit 丢失后只显示空白兜底窗口。
+            let text_for_ready = text.to_string();
+            let window_for_ready = existing.clone();
+            existing.once("preview-ready", move |_| {
+                PREVIEW_READY.store(true, Ordering::SeqCst);
+                let _ = window_for_ready.emit("preview-text", &text_for_ready);
+            });
+        }
+
         existing
     } else {
         // 新建路径:注册一次 preview-ready,等 React mount 后回推 text。
-        // 复用路径不注册——React 已 mount,不会再发 preview-ready,注册了只会累积泄漏。
+        PREVIEW_READY.store(false, Ordering::SeqCst);
         let built = WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
             .title("ByeType Preview")
             .inner_size(width, height)
@@ -72,6 +89,7 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         let text_for_ready = text.to_string();
         let window_for_ready = built.clone();
         built.once("preview-ready", move |_| {
+            PREVIEW_READY.store(true, Ordering::SeqCst);
             let _ = window_for_ready.emit("preview-text", &text_for_ready);
         });
         built
@@ -134,6 +152,8 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
                 tauri::WindowEvent::Destroyed => {
                     // 窗口被销毁后,下次 show 需要重新注册监听器
                     BLUR_HANDLER_REGISTERED.store(false, Ordering::SeqCst);
+                    // 前端随窗口一起销毁,ready 状态失效;下次新建窗口须从 false 重新起算
+                    PREVIEW_READY.store(false, Ordering::SeqCst);
                 }
                 _ => {}
             }
@@ -159,6 +179,8 @@ pub fn prewarm(app: &AppHandle) {
         if app_cloned.get_webview_window("preview").is_some() {
             return;
         }
+        // 预热即开始 React 冷启动，ready 状态从 false 起算。
+        PREVIEW_READY.store(false, Ordering::SeqCst);
         let result = WebviewWindowBuilder::new(
             &app_cloned,
             "preview",
@@ -172,8 +194,19 @@ pub fn prewarm(app: &AppHandle) {
         .center()
         .visible(false)
         .build();
-        if let Err(e) = result {
-            eprintln!("[preview] prewarm failed: {}", e);
+        match result {
+            Ok(window) => {
+                // 关键:预热窗口的 React mount 完成会 emit preview-ready，
+                // 这发生在 show() 之前。必须在此接住并记录，否则该信号无人接收，
+                // show() 时既无法判断前端已 ready，再注册 once 也永不触发
+                // (事件已过去)，最终只剩 200ms 兜底显示空白窗口。
+                window.once("preview-ready", |_| {
+                    PREVIEW_READY.store(true, Ordering::SeqCst);
+                });
+            }
+            Err(e) => {
+                eprintln!("[preview] prewarm failed: {}", e);
+            }
         }
     }) {
         eprintln!("[preview] prewarm dispatch failed: {}", e);
