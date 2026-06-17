@@ -94,6 +94,25 @@ export interface AdvancedConfig {
   proxyUrl: string
 }
 
+export interface S3Config {
+  endpoint: string
+  region: string
+  bucket: string
+  accessKey: string
+  secretKey: string
+  prefix: string
+}
+
+export interface BackupConfig {
+  s3: S3Config
+}
+
+export interface BackupEntry {
+  key: string
+  size: number
+  lastModified: string
+}
+
 export interface AppConfig {
   general: GeneralConfig
   models: ModelsConfig
@@ -101,6 +120,7 @@ export interface AppConfig {
   voiceTemplates: VoiceTemplatesConfig
   extract: ExtractConfig
   advanced: AdvancedConfig
+  backup: BackupConfig
 }
 
 export type TaskStatus = 'recording' | 'transcribing' | 'optimizing' | 'retrying' | 'extracting' | 'completed' | 'failed' | 'cancelled'

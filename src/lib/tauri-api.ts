@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import type { AppConfig, AudioDevice, UpdateInfo } from '../core/types'
+import type { AppConfig, AudioDevice, UpdateInfo, BackupEntry } from '../core/types'
 
 // Config commands
 export async function getConfig(): Promise<AppConfig> {
@@ -110,5 +110,31 @@ export interface ConnectivityResult {
 
 export async function testModelConnectivity(modelId: string): Promise<ConnectivityResult> {
   return invoke<ConnectivityResult>('test_model_connectivity', { modelId })
+}
+
+// ==================== Backup ====================
+
+export async function testS3Connection(): Promise<void> {
+  return invoke<void>('test_s3_connection')
+}
+
+export async function backupToS3(): Promise<string> {
+  return invoke<string>('backup_to_s3')
+}
+
+export async function listS3Backups(): Promise<BackupEntry[]> {
+  return invoke<BackupEntry[]>('list_s3_backups')
+}
+
+export async function restoreFromS3(objectKey: string): Promise<void> {
+  return invoke<void>('restore_from_s3', { objectKey })
+}
+
+export async function backupToLocal(): Promise<string> {
+  return invoke<string>('backup_to_local')
+}
+
+export async function restoreFromLocal(): Promise<void> {
+  return invoke<void>('restore_from_local')
 }
 
