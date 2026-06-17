@@ -283,3 +283,141 @@ pub async fn test_model_connectivity(
     }
 }
 
+// ==================== Backup ====================
+
+use crate::backup::s3 as s3_backup;
+use crate::backup::local as local_backup;
+use crate::backup::archive::create_backup_zip;
+use tauri_plugin_dialog::DialogExt;
+
+#[tauri::command]
+pub async fn test_s3_connection(config_manager: State<'_, ConfigManager>) -> Result<(), String> {
+    let config = config_manager.get();
+    let s3_config = &config.backup.s3;
+    s3_backup::test_connection(s3_config).await
+}
+
+#[tauri::command]
+pub async fn backup_to_s3(
+    app: tauri::AppHandle,
+    config_manager: State<'_, ConfigManager>,
+) -> Result<String, String> {
+    let config = config_manager.get();
+    let s3_config = &config.backup.s3;
+
+    if s3_config.bucket.is_empty() {
+        return Err("请先在设置中配置 S3".to_string());
+    }
+
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+
+    let zip_data = create_backup_zip(&data_dir)?;
+    let key = s3_backup::generate_backup_key(&s3_config.prefix);
+
+    s3_backup::upload(s3_config, zip_data, key).await
+}
+
+#[tauri::command]
+pub async fn list_s3_backups(
+    config_manager: State<'_, ConfigManager>,
+) -> Result<Vec<s3_backup::BackupEntry>, String> {
+    let config = config_manager.get();
+    let s3_config = &config.backup.s3;
+
+    if s3_config.bucket.is_empty() {
+        return Err("请先在设置中配置 S3".to_string());
+    }
+
+    s3_backup::list_backups(s3_config).await
+}
+
+#[tauri::command]
+pub async fn restore_from_s3(
+    app: tauri::AppHandle,
+    config_manager: State<'_, ConfigManager>,
+    object_key: String,
+) -> Result<(), String> {
+    let config = config_manager.get();
+    let s3_config = &config.backup.s3;
+
+    let zip_data = s3_backup::download(s3_config, &object_key).await?;
+
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+
+    // 使用 local_backup 的恢复逻辑（它处理回滚）
+    // 先写入临时文件，再调用 restore_from_local
+    let temp_zip = data_dir.join(".s3_restore_temp.zip");
+    std::fs::write(&temp_zip, &zip_data)
+        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+
+    let result = local_backup::restore_from_local(&temp_zip, &data_dir);
+
+    // 清理临时文件
+    let _ = std::fs::remove_file(&temp_zip);
+
+    result
+}
+
+#[tauri::command]
+pub async fn backup_to_local(
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+
+    let now = chrono::Local::now();
+    let timestamp = now.format("%Y%m%d-%H%M%S").to_string();
+    let default_name = format!("byetype-backup-{}.zip", timestamp);
+
+    // 弹出文件保存对话框
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .add_filter("ZIP 文件", &["zip"])
+        .set_file_name(&default_name)
+        .save_file(move |file_path| {
+            let _ = sender.send(file_path);
+        });
+
+    let file_path = receiver.recv()
+        .map_err(|_| "文件对话框取消或超时".to_string())?;
+
+    let path = match file_path {
+        Some(p) => p,
+        None => return Err("未选择保存位置".to_string()),
+    };
+
+    let save_path = std::path::PathBuf::from(path.to_string());
+    local_backup::backup_to_local(&data_dir, &save_path)
+}
+
+#[tauri::command]
+pub async fn restore_from_local(
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+
+    // 弹出文件选择对话框
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .add_filter("ZIP 文件", &["zip"])
+        .pick_file(move |file_path| {
+            let _ = sender.send(file_path);
+        });
+
+    let file_path = receiver.recv()
+        .map_err(|_| "文件对话框取消或超时".to_string())?;
+
+    let path = match file_path {
+        Some(p) => p,
+        None => return Err("未选择备份文件".to_string()),
+    };
+
+    let zip_path = std::path::PathBuf::from(path.to_string());
+    local_backup::restore_from_local(&zip_path, &data_dir)
+}
+
