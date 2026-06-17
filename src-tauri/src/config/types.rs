@@ -11,6 +11,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub extract: ExtractConfig,
     pub advanced: AdvancedConfig,
+    #[serde(default)]
+    pub backup: BackupConfig,
 }
 
 fn default_true() -> bool {
@@ -217,6 +219,47 @@ pub struct AdvancedConfig {
     pub proxy_url: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S3Config {
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default)]
+    pub region: String,
+    #[serde(default)]
+    pub bucket: String,
+    #[serde(default)]
+    pub access_key: String,
+    #[serde(default)]
+    pub secret_key: String,
+    #[serde(default = "default_s3_prefix")]
+    pub prefix: String,
+}
+
+fn default_s3_prefix() -> String {
+    "byetype/backups".to_string()
+}
+
+impl Default for S3Config {
+    fn default() -> Self {
+        Self {
+            endpoint: String::new(),
+            region: String::new(),
+            bucket: String::new(),
+            access_key: String::new(),
+            secret_key: String::new(),
+            prefix: default_s3_prefix(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupConfig {
+    #[serde(default)]
+    pub s3: S3Config,
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -283,6 +326,7 @@ impl Default for AppConfig {
                 proxy_enabled: true,
                 proxy_url: String::new(),
             },
+            backup: BackupConfig::default(),
         }
     }
 }
