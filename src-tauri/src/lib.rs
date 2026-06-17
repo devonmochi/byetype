@@ -9,6 +9,7 @@ mod preview;
 mod shortcut;
 mod tray;
 mod updater;
+mod backup;
 #[cfg(target_os = "windows")]
 mod screenshot_win32;
 
