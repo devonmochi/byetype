@@ -56,6 +56,12 @@ pub fn run() {
             task::submit_screenshot_crop,
             preview::set_preview_pinned,
             preview::close_preview_window,
+            commands::test_s3_connection,
+            commands::backup_to_s3,
+            commands::list_s3_backups,
+            commands::restore_from_s3,
+            commands::backup_to_local,
+            commands::restore_from_local,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
