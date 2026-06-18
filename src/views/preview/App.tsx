@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { invoke } from '@tauri-apps/api/core'
-import { emit, listen } from '@tauri-apps/api/event'
+import { emit } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -98,15 +98,18 @@ export default function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
+    const win = getCurrentWindow()
+    const label = win.label
     let unlisten: (() => void) | null = null
-    listen<string>('preview-text', (event) => {
+    // 只监听定向到本窗的 preview-text;回执带 label 后缀,避免多窗广播串台。
+    win.listen<string>('preview-text', (event) => {
       // flushSync 强制 React 在本行返回前把 DOM commit 完成,
       // 保证后端收到 applied 回执 → window.show() 时,屏幕已是新文本而非旧 state。
       flushSync(() => setText(event.payload))
-      emit('preview-text-applied', {})
+      emit(`preview-text-applied-${label}`, {})
     }).then((fn) => {
       unlisten = fn
-      emit('preview-ready', {})
+      emit(`preview-ready-${label}`, {})
     })
     return () => { unlisten?.() }
   }, [])
@@ -130,11 +133,11 @@ export default function App() {
   const handlePin = async () => {
     const next = !pinned
     setPinned(next)
-    await invoke('set_preview_pinned', { pinned: next })
+    await invoke('set_preview_pinned', { label: getCurrentWindow().label, pinned: next })
   }
 
   const handleClose = () => {
-    invoke('close_preview_window')
+    invoke('close_preview_window', { label: getCurrentWindow().label })
   }
 
   return (
