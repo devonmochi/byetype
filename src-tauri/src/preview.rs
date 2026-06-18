@@ -1,18 +1,36 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{LazyLock, Mutex};
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// 光标与预览窗口之间的边距(逻辑像素/物理像素,取决于平台 set_position 分支)。
 const CURSOR_OFFSET: f64 = 12.0;
-
-static PINNED: AtomicBool = AtomicBool::new(false);
-/// Epoch millis when the preview window was created — ignore blur within grace period
-static CREATED_AT: AtomicU64 = AtomicU64::new(0);
 const BLUR_GRACE_MS: u128 = 800;
-/// blur 监听器是否已注册(整个进程生命周期内只注册一次,避免复用窗口时叠加)
-static BLUR_HANDLER_REGISTERED: AtomicBool = AtomicBool::new(false);
-/// 前端 React 是否已完成 mount 并注册 preview-text listener。
-/// prewarm 可能只创建了 WebviewWindow，但 listener 还没 ready；此时不能按热复用处理。
-static PREVIEW_READY: AtomicBool = AtomicBool::new(false);
+
+/// 自增窗口序号,生成永不复用的标签 preview-{N}。
+static WINDOW_SEQ: AtomicU64 = AtomicU64::new(0);
+/// 当前「活动槽」窗口标签:没钉住的临时窗,可被复用替换内容。None 表示槽空。
+static ACTIVE_LABEL: Mutex<Option<String>> = Mutex::new(None);
+/// 已钉住的窗口标签集合:这些窗失焦不自动关闭。
+static PINNED_LABELS: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+/// 各窗前端 React 是否已 mount 并注册 listener,按标签存。
+static READY_LABELS: LazyLock<Mutex<HashMap<String, bool>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+/// 各窗创建时间(epoch millis),按标签存,用于 blur 宽限期判断。
+static CREATED_AT: LazyLock<Mutex<HashMap<String, u64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// 生成下一个永不复用的窗口标签。
+fn next_label() -> String {
+    let n = WINDOW_SEQ.fetch_add(1, Ordering::Relaxed);
+    format!("preview-{}", n)
+}
+
+/// 标签对应窗是否已钉住。
+fn is_pinned(label: &str) -> bool {
+    PINNED_LABELS.lock().unwrap().contains(label)
+}
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -22,62 +40,79 @@ fn now_ms() -> u64 {
 }
 
 #[tauri::command]
-pub fn set_preview_pinned(pinned: bool) {
-    PINNED.store(pinned, Ordering::Relaxed);
+pub fn set_preview_pinned(label: String, pinned: bool) {
+    if pinned {
+        PINNED_LABELS.lock().unwrap().insert(label.clone());
+        // 钉住即「毕业」:若它正是活动槽,腾空活动槽,下次识别新建活动窗。
+        let mut active = ACTIVE_LABEL.lock().unwrap();
+        if active.as_deref() == Some(label.as_str()) {
+            *active = None;
+        }
+    } else {
+        PINNED_LABELS.lock().unwrap().remove(&label);
+    }
 }
 
 #[tauri::command]
-pub fn close_preview_window(app: AppHandle) {
-    if let Some(window) = app.get_webview_window("preview") {
+pub fn close_preview_window(app: AppHandle, label: String) {
+    if let Some(window) = app.get_webview_window(&label) {
         let _ = window.close();
     }
 }
 
 pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
-    // 每次新预览重置 pinned 状态
-    PINNED.store(false, Ordering::Relaxed);
-
     // 按文本计算尺寸
     let line_count = text.lines().count().max(3).min(20);
     let max_line_len = text.lines().map(|l| l.len()).max().unwrap_or(40);
     let width = (max_line_len as f64 * 8.0 + 80.0).clamp(320.0, 600.0);
     let height = (line_count as f64 * 22.0 + 140.0).clamp(180.0, 460.0);
 
-    // 显示策略:为避免「窗口先弹出再被新文本覆盖」造成首次内容闪错,
-    // 必须等前端 setText 完成后再 window.show()。前端用 flushSync 保证
-    // setText commit 完成后才发 `preview-text-applied` 回执。
-    //
-    // 两条触发路径:
-    //   A. 冷启动(新建窗口):前端 mount 后 emit `preview-ready`,后端再 emit text。
-    //      preview-ready once handler 只在新建分支注册,避免热复用时累积。
-    //   B. 热复用:前端 listener 已注册,后端立即 emit text 即可被收到。
-    //
-    // 兜底:若 200ms 内未收到回执(前端崩溃/异常),强制 show,避免窗口永远不可见。
     let shown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    // 优先复用已预热的窗口;否则新建。
-    // 注意:prewarm 可能只完成了 WebviewWindow 创建，React 还没 mount 完成。
-    // 因此「窗口存在」不等于「前端 listener 已 ready」。
-    let window = if let Some(existing) = app.get_webview_window("preview") {
-        // 复用:按文本调整尺寸
-        let _ = existing.set_size(tauri::LogicalSize::new(width, height));
+    // 决定目标窗口:活动槽有窗则复用,否则新建并写入活动槽。
+    let active_label = ACTIVE_LABEL.lock().unwrap().clone();
+    let (label, window) = match active_label.and_then(|l| {
+        app.get_webview_window(&l).map(|w| (l, w))
+    }) {
+        Some((label, existing)) => {
+            // 复用活动窗:按文本调整尺寸
+            let _ = existing.set_size(tauri::LogicalSize::new(width, height));
 
-        if !PREVIEW_READY.load(Ordering::SeqCst) {
-            // 半热复用:窗口已存在但前端还没发 preview-ready。
-            // 等 listener 注册完成后再补发文本，避免立即 emit 丢失后只显示空白兜底窗口。
-            let text_for_ready = text.to_string();
-            let window_for_ready = existing.clone();
-            existing.once("preview-ready", move |_| {
-                PREVIEW_READY.store(true, Ordering::SeqCst);
-                let _ = window_for_ready.emit("preview-text", &text_for_ready);
-            });
+            let ready = READY_LABELS
+                .lock()
+                .unwrap()
+                .get(&label)
+                .copied()
+                .unwrap_or(false);
+            if !ready {
+                // 半热复用:窗口已存在但前端还没发 ready,等 ready 后补发文本。
+                let text_for_ready = text.to_string();
+                let window_for_ready = existing.clone();
+                let label_for_ready = label.clone();
+                let ready_event = format!("preview-ready-{}", label);
+                existing.once(ready_event, move |_| {
+                    READY_LABELS
+                        .lock()
+                        .unwrap()
+                        .insert(label_for_ready.clone(), true);
+                    let _ = window_for_ready.emit_to(
+                        &label_for_ready,
+                        "preview-text",
+                        &text_for_ready,
+                    );
+                });
+            }
+            (label, existing)
         }
-
-        existing
-    } else {
-        // 新建路径:注册一次 preview-ready,等 React mount 后回推 text。
-        PREVIEW_READY.store(false, Ordering::SeqCst);
-        let built = WebviewWindowBuilder::new(app, "preview", WebviewUrl::App("preview.html".into()))
+        None => {
+            // 新建活动窗
+            let label = next_label();
+            READY_LABELS.lock().unwrap().insert(label.clone(), false);
+            let built = WebviewWindowBuilder::new(
+                app,
+                &label,
+                WebviewUrl::App("preview.html".into()),
+            )
             .title("ByeType Preview")
             .inner_size(width, height)
             .resizable(true)
@@ -86,32 +121,53 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
             .visible(false)
             .build()
             .map_err(|e| format!("Create preview window failed: {}", e))?;
-        let text_for_ready = text.to_string();
-        let window_for_ready = built.clone();
-        built.once("preview-ready", move |_| {
-            PREVIEW_READY.store(true, Ordering::SeqCst);
-            let _ = window_for_ready.emit("preview-text", &text_for_ready);
-        });
-        built
+            *ACTIVE_LABEL.lock().unwrap() = Some(label.clone());
+
+            let text_for_ready = text.to_string();
+            let window_for_ready = built.clone();
+            let label_for_ready = label.clone();
+            let ready_event = format!("preview-ready-{}", label);
+            built.once(ready_event, move |_| {
+                READY_LABELS
+                    .lock()
+                    .unwrap()
+                    .insert(label_for_ready.clone(), true);
+                let _ = window_for_ready.emit_to(
+                    &label_for_ready,
+                    "preview-text",
+                    &text_for_ready,
+                );
+            });
+            (label, built)
+        }
     };
 
-    // 定位到光标右下,超出屏幕则反向贴边——必须在 show() 之前完成
+    // 定位到光标右下——必须在 show() 之前完成
     position_near_cursor(&window, width, height);
 
     let window_for_applied = window.clone();
+    let label_for_applied = label.clone();
     let shown_for_applied = shown.clone();
-    window.once("preview-text-applied", move |_| {
+    let applied_event = format!("preview-text-applied-{}", label);
+    window.once(applied_event, move |_| {
         if shown_for_applied
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
         {
-            let _ = window_for_applied.show();
+            if let Some(w) = window_for_applied.get_webview_window(&label_for_applied) {
+                let _ = w.show();
+            }
         }
     });
 
-    // 立即 emit 一次:若窗口是预热的且 React 已 mount,此次 emit 会被前端立刻接收。
-    // 冷启动场景前端 listener 还没注册,这次 emit 会丢失——由 preview-ready 路径兜底。
-    let _ = window.emit("preview-text", text);
+    // 立即定向 emit 一次:预热且前端已 mount 时会被立刻接收;冷启动时丢失,由 ready 路径兜底。
+    let _ = window.emit_to(&label, "preview-text", text);
+
+    // 记录创建时间用于 blur 宽限期
+    CREATED_AT
+        .lock()
+        .unwrap()
+        .insert(label.clone(), now_ms());
 
     // 兜底超时:防止前端无回执时窗口永远不可见
     let window_for_fallback = window.clone();
@@ -126,41 +182,46 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
         }
     });
 
-    // 记录创建时间用于 blur 宽限期
-    CREATED_AT.store(now_ms(), Ordering::Relaxed);
-
-    // blur 关闭事件:首次 show 注册一次,后续复用窗口跳过(避免监听器叠加)
-    if BLUR_HANDLER_REGISTERED
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_ok()
-    {
-        let app_handle = app.clone();
-        window.on_window_event(move |event| {
-            match event {
-                tauri::WindowEvent::Focused(false) => {
-                    if PINNED.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let age = now_ms().saturating_sub(CREATED_AT.load(Ordering::Relaxed));
-                    if (age as u128) < BLUR_GRACE_MS {
-                        return;
-                    }
-                    if let Some(w) = app_handle.get_webview_window("preview") {
-                        let _ = w.close();
-                    }
-                }
-                tauri::WindowEvent::Destroyed => {
-                    // 窗口被销毁后,下次 show 需要重新注册监听器
-                    BLUR_HANDLER_REGISTERED.store(false, Ordering::SeqCst);
-                    // 前端随窗口一起销毁,ready 状态失效;下次新建窗口须从 false 重新起算
-                    PREVIEW_READY.store(false, Ordering::SeqCst);
-                }
-                _ => {}
-            }
-        });
-    }
+    // 每个窗口注册自己的 blur/destroy 处理(按标签判断,互不影响)
+    register_window_events(app, &window, label.clone());
 
     Ok(())
+}
+
+/// 为单个预览窗注册 blur(失焦关闭)与 destroy(状态清理)处理。
+/// 每个窗口各自注册一次,按自己的标签判断,互不干扰。
+fn register_window_events(app: &AppHandle, window: &tauri::WebviewWindow, label: String) {
+    let app_handle = app.clone();
+    window.on_window_event(move |event| match event {
+        tauri::WindowEvent::Focused(false) => {
+            if is_pinned(&label) {
+                return;
+            }
+            let created = CREATED_AT
+                .lock()
+                .unwrap()
+                .get(&label)
+                .copied()
+                .unwrap_or(0);
+            let age = now_ms().saturating_sub(created);
+            if (age as u128) < BLUR_GRACE_MS {
+                return;
+            }
+            if let Some(w) = app_handle.get_webview_window(&label) {
+                let _ = w.close();
+            }
+        }
+        tauri::WindowEvent::Destroyed => {
+            READY_LABELS.lock().unwrap().remove(&label);
+            CREATED_AT.lock().unwrap().remove(&label);
+            PINNED_LABELS.lock().unwrap().remove(&label);
+            let mut active = ACTIVE_LABEL.lock().unwrap();
+            if active.as_deref() == Some(label.as_str()) {
+                *active = None;
+            }
+        }
+        _ => {}
+    });
 }
 
 /// 预热:提前创建一个隐藏的预览窗口,让 React bundle 后台加载。
@@ -169,21 +230,21 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
 /// 利用 AI 等待时间掩盖 webview 冷启动开销。失败只打 log,不中断主流程
 /// (后续 show() 会走创建分支,退化到旧行为)。
 pub fn prewarm(app: &AppHandle) {
-    // 幂等检查必须在主线程调度前做,避免重复分派
-    if app.get_webview_window("preview").is_some() {
+    // 活动槽已有窗则跳过(幂等)
+    if ACTIVE_LABEL.lock().unwrap().is_some() {
         return;
     }
     let app_cloned = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
         // 主线程上再次检查,防止调度延迟期间被重复派发
-        if app_cloned.get_webview_window("preview").is_some() {
+        if ACTIVE_LABEL.lock().unwrap().is_some() {
             return;
         }
-        // 预热即开始 React 冷启动，ready 状态从 false 起算。
-        PREVIEW_READY.store(false, Ordering::SeqCst);
+        let label = next_label();
+        READY_LABELS.lock().unwrap().insert(label.clone(), false);
         let result = WebviewWindowBuilder::new(
             &app_cloned,
-            "preview",
+            &label,
             WebviewUrl::App("preview.html".into()),
         )
         .title("ByeType Preview")
@@ -196,12 +257,16 @@ pub fn prewarm(app: &AppHandle) {
         .build();
         match result {
             Ok(window) => {
-                // 关键:预热窗口的 React mount 完成会 emit preview-ready，
-                // 这发生在 show() 之前。必须在此接住并记录，否则该信号无人接收，
-                // show() 时既无法判断前端已 ready，再注册 once 也永不触发
-                // (事件已过去)，最终只剩 200ms 兜底显示空白窗口。
-                window.once("preview-ready", |_| {
-                    PREVIEW_READY.store(true, Ordering::SeqCst);
+                *ACTIVE_LABEL.lock().unwrap() = Some(label.clone());
+                // 预热窗的 React mount 完成会 emit preview-ready-{label},在此接住记录,
+                // 否则 show() 时该信号无人接收,只能靠 200ms 兜底显示空白窗。
+                let label_for_ready = label.clone();
+                let ready_event = format!("preview-ready-{}", label);
+                window.once(ready_event, move |_| {
+                    READY_LABELS
+                        .lock()
+                        .unwrap()
+                        .insert(label_for_ready.clone(), true);
                 });
             }
             Err(e) => {
@@ -213,10 +278,13 @@ pub fn prewarm(app: &AppHandle) {
     }
 }
 
-/// 供失败路径调用:若存在 preview 窗口(可能是预热残留)则关闭。
+/// 供失败路径调用:关闭当前活动槽里的窗(可能是预热残留)。不影响已钉住窗。
 pub fn close_if_exists(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("preview") {
-        let _ = window.close();
+    let label = ACTIVE_LABEL.lock().unwrap().clone();
+    if let Some(label) = label {
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.close();
+        }
     }
 }
 
