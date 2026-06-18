@@ -74,8 +74,8 @@ const dark = {
 
 const PinIcon = ({ pinned, stroke }: { pinned: boolean; stroke: string }) => (
   <svg
-    width="12"
-    height="12"
+    width="16"
+    height="16"
     viewBox="0 0 24 24"
     fill="none"
     stroke={stroke}
@@ -96,22 +96,27 @@ export default function App() {
   const [copied, setCopied] = useState(false)
   const [pinned, setPinned] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const didInit = useRef(false)
 
   useEffect(() => {
+    // StrictMode 会让本 effect 跑两次(挂载→清理→再挂载),而后端对 preview-ready-{label}
+    // 用的是 once 处理器,双重 emit 会触发「handler called more than once」panic。
+    // 用 ref 守卫只初始化一次;且不在 cleanup 里 unlisten——listener 随 webview 销毁自然回收,
+    // 若清理会导致 StrictMode 第二次挂载被守卫拦下后一个 listener 都不剩。
+    if (didInit.current) return
+    didInit.current = true
+
     const win = getCurrentWindow()
     const label = win.label
-    let unlisten: (() => void) | null = null
     // 只监听定向到本窗的 preview-text;回执带 label 后缀,避免多窗广播串台。
     win.listen<string>('preview-text', (event) => {
       // flushSync 强制 React 在本行返回前把 DOM commit 完成,
       // 保证后端收到 applied 回执 → window.show() 时,屏幕已是新文本而非旧 state。
       flushSync(() => setText(event.payload))
       emit(`preview-text-applied-${label}`, {})
-    }).then((fn) => {
-      unlisten = fn
+    }).then(() => {
       emit(`preview-ready-${label}`, {})
     })
-    return () => { unlisten?.() }
   }, [])
 
   useEffect(() => {
@@ -158,11 +163,12 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={handlePin}
+            onMouseDown={(e) => e.stopPropagation()}
             title={pinned ? '取消固定' : '固定窗口'}
             style={{
-              width: '22px',
-              height: '22px',
-              borderRadius: '4px',
+              width: '30px',
+              height: '30px',
+              borderRadius: '6px',
               background: pinned ? t.pinBg : t.btnBg,
               display: 'flex',
               alignItems: 'center',
@@ -179,6 +185,7 @@ export default function App() {
         </div>
         <button
           onClick={handleClose}
+          onMouseDown={(e) => e.stopPropagation()}
           title="关闭"
           style={{
             padding: '3px 8px',
