@@ -51,19 +51,30 @@ export function BackupTab({ config, onSave }: Props) {
     }
   }, [])
 
+  const refreshBackups = useCallback(async () => {
+    setLoadingBackups(true)
+    try {
+      const list = await listS3Backups()
+      setBackups(list)
+    } catch (e: any) {
+      setBackups([])
+    } finally {
+      setLoadingBackups(false)
+    }
+  }, [])
+
   const handleBackupToS3 = useCallback(async () => {
     setS3Backing(true)
     try {
       const key = await backupToS3()
       showMessage('success', `备份成功：${key}`)
-      // 刷新列表
       await refreshBackups()
     } catch (e: any) {
       showMessage('error', `备份失败：${e}`)
     } finally {
       setS3Backing(false)
     }
-  }, [])
+  }, [refreshBackups])
 
   const handleRestoreFromS3 = useCallback(async (key: string) => {
     if (!confirm(`确认从 ${key} 恢复？当前配置将被覆盖，恢复后需要重启应用。`)) return
@@ -105,18 +116,6 @@ export function BackupTab({ config, onSave }: Props) {
     }
   }, [])
 
-  const refreshBackups = useCallback(async () => {
-    setLoadingBackups(true)
-    try {
-      const list = await listS3Backups()
-      setBackups(list)
-    } catch (e: any) {
-      setBackups([])
-    } finally {
-      setLoadingBackups(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (s3.bucket) {
       refreshBackups()
@@ -139,18 +138,18 @@ export function BackupTab({ config, onSave }: Props) {
 
   return (
     <div>
-      <h2>备份与恢复</h2>
+      <h2 className="content-title">备份与恢复</h2>
 
       {message && (
-        <div style={{
-          padding: '8px 12px',
-          marginBottom: 12,
-          borderRadius: 6,
-          background: message.type === 'success' ? '#d4edda' : '#f8d7da',
-          color: message.type === 'success' ? '#155724' : '#721c24',
-          fontSize: 13,
+        <div className="update-collapsed" style={{
+          background: message.type === 'success' ? 'rgba(48, 209, 88, 0.1)' : 'rgba(255, 69, 58, 0.1)',
+          marginBottom: 20,
         }}>
-          {message.text}
+          <span className="update-collapsed-text" style={{
+            color: message.type === 'success' ? 'var(--success-color)' : '#ff453a',
+          }}>
+            {message.text}
+          </span>
         </div>
       )}
 
@@ -158,6 +157,7 @@ export function BackupTab({ config, onSave }: Props) {
         <SettingRow label="Endpoint" description="留空则使用 AWS S3 标准地址">
           <input
             type="text"
+            className="input"
             value={s3.endpoint}
             onChange={e => updateS3({ endpoint: e.target.value })}
             placeholder="https://s3.amazonaws.com"
@@ -167,6 +167,7 @@ export function BackupTab({ config, onSave }: Props) {
         <SettingRow label="Region">
           <input
             type="text"
+            className="input"
             value={s3.region}
             onChange={e => updateS3({ region: e.target.value })}
             placeholder="us-east-1"
@@ -176,6 +177,7 @@ export function BackupTab({ config, onSave }: Props) {
         <SettingRow label="Bucket">
           <input
             type="text"
+            className="input"
             value={s3.bucket}
             onChange={e => updateS3({ bucket: e.target.value })}
             placeholder="my-backup-bucket"
@@ -185,6 +187,7 @@ export function BackupTab({ config, onSave }: Props) {
         <SettingRow label="Access Key">
           <input
             type="text"
+            className="input"
             value={s3.accessKey}
             onChange={e => updateS3({ accessKey: e.target.value })}
             placeholder="AKIAXXXXX"
@@ -194,6 +197,7 @@ export function BackupTab({ config, onSave }: Props) {
         <SettingRow label="Secret Key">
           <input
             type="password"
+            className="input"
             value={s3.secretKey}
             onChange={e => updateS3({ secretKey: e.target.value })}
             placeholder="******"
@@ -203,6 +207,7 @@ export function BackupTab({ config, onSave }: Props) {
         <SettingRow label="路径前缀" description="S3 对象 key 的前缀">
           <input
             type="text"
+            className="input"
             value={s3.prefix}
             onChange={e => updateS3({ prefix: e.target.value })}
             placeholder="byetype/backups"
@@ -211,13 +216,12 @@ export function BackupTab({ config, onSave }: Props) {
         </SettingRow>
         <SettingRow label="连接测试">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleTestConnection} disabled={testing} style={{ padding: '4px 12px' }}>
+            <button className="model-test-btn" onClick={handleTestConnection} disabled={testing}>
               {testing ? '测试中...' : '测试连接'}
             </button>
             {testResult && (
-              <span style={{
-                fontSize: 12,
-                color: testResult.ok ? '#155724' : '#721c24',
+              <span className="model-test-result" style={{
+                color: testResult.ok ? 'var(--success-color)' : '#ff453a',
               }}>
                 {testResult.ok ? '✓' : '✗'} {testResult.msg}
               </span>
@@ -228,37 +232,37 @@ export function BackupTab({ config, onSave }: Props) {
 
       <SettingGroup title="S3 备份">
         <SettingRow label="立即备份到 S3" description="将配置和提示词打包上传到 S3">
-          <button onClick={handleBackupToS3} disabled={s3Backing || !s3.bucket} style={{ padding: '4px 12px' }}>
+          <button className="model-test-btn" onClick={handleBackupToS3} disabled={s3Backing || !s3.bucket}>
             {s3Backing ? '备份中...' : '备份到 S3'}
           </button>
         </SettingRow>
         <SettingRow label="从 S3 恢复" description="选择一个备份恢复">
-          <button onClick={refreshBackups} disabled={loadingBackups || !s3.bucket} style={{ padding: '4px 12px' }}>
+          <button className="model-test-btn" onClick={refreshBackups} disabled={loadingBackups || !s3.bucket}>
             {loadingBackups ? '加载中...' : '刷新列表'}
           </button>
         </SettingRow>
         {backups.length > 0 && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ margin: '8px 16px' }}>
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                  <th style={{ textAlign: 'left', padding: '4px 8px' }}>备份文件</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px' }}>大小</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px' }}>时间</th>
-                  <th style={{ padding: '4px 8px' }}>操作</th>
+                <tr style={{ borderBottom: '1px solid var(--border-color-light)' }}>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>备份文件</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>大小</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>时间</th>
+                  <th style={{ padding: '4px 8px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {backups.map(b => (
-                  <tr key={b.key} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '4px 8px' }}>{b.key.split('/').pop()}</td>
-                    <td style={{ padding: '4px 8px' }}>{formatSize(b.size)}</td>
-                    <td style={{ padding: '4px 8px' }}>{formatDate(b.lastModified)}</td>
+                  <tr key={b.key} style={{ borderBottom: '1px solid var(--border-color-light)' }}>
+                    <td style={{ padding: '4px 8px', color: 'var(--text-primary)' }}>{b.key.split('/').pop()}</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--text-secondary)' }}>{formatSize(b.size)}</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--text-secondary)' }}>{formatDate(b.lastModified)}</td>
                     <td style={{ padding: '4px 8px' }}>
                       <button
+                        className="model-test-btn"
                         onClick={() => handleRestoreFromS3(b.key)}
                         disabled={s3Restoring}
-                        style={{ padding: '2px 8px', fontSize: 12 }}
                       >
                         恢复
                       </button>
@@ -273,12 +277,12 @@ export function BackupTab({ config, onSave }: Props) {
 
       <SettingGroup title="本地备份">
         <SettingRow label="备份到本地" description="选择保存位置，导出 zip 备份文件">
-          <button onClick={handleBackupToLocal} disabled={localBacking} style={{ padding: '4px 12px' }}>
+          <button className="model-test-btn" onClick={handleBackupToLocal} disabled={localBacking}>
             {localBacking ? '备份中...' : '备份到本地'}
           </button>
         </SettingRow>
         <SettingRow label="从本地恢复" description="选择 zip 备份文件恢复配置">
-          <button onClick={handleRestoreFromLocal} disabled={localRestoring} style={{ padding: '4px 12px' }}>
+          <button className="model-test-btn" onClick={handleRestoreFromLocal} disabled={localRestoring}>
             {localRestoring ? '恢复中...' : '从本地恢复'}
           </button>
         </SettingRow>
