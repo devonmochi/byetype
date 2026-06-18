@@ -27,9 +27,9 @@ const TABS: TabItem[] = [
   { type: 'group', label: '图像识别' },
   { type: 'tab', id: 'extract', label: '图像识别设置' },
   { type: 'tab', id: 'extract-prompts', label: '图像识别提示词' },
-  { type: 'tab', id: 'backup', label: '备份与恢复' },
   { type: 'divider' },
   { type: 'tab', id: 'history', label: '历史记录' },
+  { type: 'tab', id: 'backup', label: '备份与恢复' },
   { type: 'tab', id: 'about', label: '关于' },
 ]
 
