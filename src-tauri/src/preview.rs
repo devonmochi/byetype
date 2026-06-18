@@ -20,6 +20,10 @@ static READY_LABELS: LazyLock<Mutex<HashMap<String, bool>>> =
 /// 各窗创建时间(epoch millis),按标签存,用于 blur 宽限期判断。
 static CREATED_AT: LazyLock<Mutex<HashMap<String, u64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+/// 已注册过 blur/destroy 监听的窗口标签集合,保证每个窗口只注册一次
+/// (复用活动窗时 show 会重复调用,必须靠此守卫避免监听器叠加)。
+static REGISTERED_LABELS: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// 生成下一个永不复用的窗口标签。
 fn next_label() -> String {
@@ -189,8 +193,13 @@ pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
 }
 
 /// 为单个预览窗注册 blur(失焦关闭)与 destroy(状态清理)处理。
-/// 每个窗口各自注册一次,按自己的标签判断,互不干扰。
+/// 每个窗口只注册一次:复用活动窗时 show 会重复调用,靠 REGISTERED_LABELS 守卫拦截,
+/// 避免监听器叠加导致同一 blur 被多次处理、窗口被提前关闭或状态错乱。
 fn register_window_events(app: &AppHandle, window: &tauri::WebviewWindow, label: String) {
+    // 已注册过则跳过(复用路径)
+    if !REGISTERED_LABELS.lock().unwrap().insert(label.clone()) {
+        return;
+    }
     let app_handle = app.clone();
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(false) => {
@@ -215,6 +224,7 @@ fn register_window_events(app: &AppHandle, window: &tauri::WebviewWindow, label:
             READY_LABELS.lock().unwrap().remove(&label);
             CREATED_AT.lock().unwrap().remove(&label);
             PINNED_LABELS.lock().unwrap().remove(&label);
+            REGISTERED_LABELS.lock().unwrap().remove(&label);
             let mut active = ACTIVE_LABEL.lock().unwrap();
             if active.as_deref() == Some(label.as_str()) {
                 *active = None;
