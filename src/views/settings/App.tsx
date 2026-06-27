@@ -93,8 +93,10 @@ export function App() {
             checkUpdate().then(result => {
               if (result) {
                 setUpdateState(p => ({ ...p, phase: 'available', info: result, dismissed: false, checkedOnce: true }))
+              } else {
+                setUpdateState(p => ({ ...p, phase: 'idle', info: null, checkedOnce: true }))
               }
-            }).catch(() => {})
+            }).catch(() => setUpdateState(p => ({ ...p, phase: 'idle', info: null, checkedOnce: true })))
             return { ...prev, phase: 'checking' }
           }
           return prev

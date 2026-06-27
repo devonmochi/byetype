@@ -787,14 +787,33 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     };
 
     // 3. Crop the full image
+    // Clamp crop coords to image bounds to avoid panic on out-of-bounds selection
+    // (multi-monitor / DPI scaling / drag-past-edge can make crop exceed image dims).
+    let img_w = full_image.width();
+    let img_h = full_image.height();
+    let cx = crop.x.min(img_w);
+    let cy = crop.y.min(img_h);
+    let cw = crop.w.min(img_w.saturating_sub(cx));
+    let ch = crop.h.min(img_h.saturating_sub(cy));
+    if cw == 0 || ch == 0 {
+        eprintln!(
+            "[TaskManager] Screenshot crop region out of bounds: crop=({},{},{},{}) image={}x{}",
+            crop.x, crop.y, crop.w, crop.h, img_w, img_h
+        );
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        return None;
+    }
     let cropped = image::DynamicImage::ImageRgba8(full_image)
-        .crop_imm(crop.x, crop.y, crop.w, crop.h);
+        .crop_imm(cx, cy, cw, ch);
 
     // 8. Encode cropped image to PNG base64
     let mut png_buf: Vec<u8> = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut png_buf);
     if let Err(e) = cropped.write_to(&mut cursor, image::ImageFormat::Png) {
-        eprintln!("[TaskManager] Failed to encode cropped screenshot ({}x{}): {}", crop.w, crop.h, e);
+        eprintln!("[TaskManager] Failed to encode cropped screenshot ({}x{}): {}", cw, ch, e);
         let state = app.state::<SharedTaskManager>();
         let mut mgr = state.lock().unwrap();
         mgr.cancel_tokens.remove(&task_id);

@@ -15,7 +15,10 @@ static SHOW_GEN: [AtomicU32; 3] = [
 ];
 
 fn gen_index(task_id: u32) -> usize {
-    (task_id as usize).saturating_sub(1).min(2)
+    // 钳制到预创建池大小,避免 max_parallel 配置超过 MAX_BUBBLES 时
+    // label 与索引错位导致 bubble 静默失败 / SHOW_GEN 代次互相干扰。
+    let slot = task_id.min(MAX_BUBBLES);
+    (slot as usize).saturating_sub(1)
 }
 
 fn cursor_position() -> (f64, f64) {
@@ -45,7 +48,10 @@ fn cursor_position() -> (f64, f64) {
 }
 
 fn label_for(task_id: u32) -> String {
-    format!("bubble-{}", task_id)
+    // 钳制到预创建池大小,与 gen_index 保持一致,
+    // 避免 max_parallel 超过 MAX_BUBBLES 时 get_webview_window 返回 None。
+    let slot = task_id.min(MAX_BUBBLES);
+    format!("bubble-{}", slot)
 }
 
 /// Pre-create a pool of hidden bubble windows at startup.
@@ -103,8 +109,16 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWNOACTIVATE};
-            let hwnd = win.hwnd().unwrap().0 as *mut std::ffi::c_void;
-            unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE); }
+            match win.hwnd() {
+                Ok(h) => {
+                    let hwnd = h.0 as *mut std::ffi::c_void;
+                    unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE); }
+                }
+                Err(e) => {
+                    eprintln!("[Bubble] hwnd failed for {}: {}", label, e);
+                    let _ = win.show();
+                }
+            }
         }
         #[cfg(not(target_os = "windows"))]
         {

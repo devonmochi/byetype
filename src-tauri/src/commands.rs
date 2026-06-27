@@ -268,7 +268,10 @@ pub async fn test_model_connectivity(
         });
     }
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
     let start = std::time::Instant::now();
 
     if ai::is_deepseek(&resolved) {

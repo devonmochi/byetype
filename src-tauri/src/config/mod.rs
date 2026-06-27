@@ -44,7 +44,11 @@ impl ConfigManager {
                             if migration::migrate_if_needed(&mut json_value) {
                                 // Migration occurred, save the migrated config back to disk
                                 if let Ok(migrated_json) = serde_json::to_string_pretty(&json_value) {
-                                    fs::write(path, &migrated_json).ok();
+                                    // 原子写入：先写临时文件再 rename，避免写盘中途损坏 config.json
+                                    let tmp = path.with_extension("json.tmp");
+                                    if fs::write(&tmp, &migrated_json).is_ok() {
+                                        fs::rename(&tmp, path).ok();
+                                    }
                                 }
                             }
                             // Deserialize from the (possibly migrated) Value
@@ -79,7 +83,10 @@ impl ConfigManager {
     pub fn update(&self, new_config: AppConfig) -> Result<(), String> {
         // 先序列化并落盘，成功后再更新内存，避免写盘失败时内存与磁盘状态不一致
         let json = serde_json::to_string_pretty(&new_config).map_err(|e| e.to_string())?;
-        fs::write(&self.config_path, json).map_err(|e| e.to_string())?;
+        // 原子写入：先写临时文件再 rename，避免写盘中途崩溃导致 config.json 被截断损坏
+        let tmp = self.config_path.with_extension("json.tmp");
+        fs::write(&tmp, &json).map_err(|e| e.to_string())?;
+        fs::rename(&tmp, &self.config_path).map_err(|e| e.to_string())?;
         let mut config = self.config.lock().unwrap_or_else(|e| e.into_inner());
         *config = new_config;
         Ok(())
