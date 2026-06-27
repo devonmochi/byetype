@@ -131,7 +131,8 @@ pub async fn list_backups(config: &S3Config) -> Result<Vec<BackupEntry>, String>
 /// 生成带时间戳的 S3 对象 key
 pub fn generate_backup_key(prefix: &str) -> String {
     let now = chrono::Local::now();
-    let timestamp = now.format("%Y%m%d-%H%M%S").to_string();
+    // 时间戳精度到毫秒，避免同一秒内连续触发的备份生成相同 key 而被静默覆盖
+    let timestamp = now.format("%Y%m%d-%H%M%S%.3f").to_string();
     let prefix = if prefix.is_empty() { "byetype/backups" } else { prefix };
     format!("{}/byetype-backup-{}.zip", prefix, timestamp)
 }

@@ -57,6 +57,10 @@ where
                 }
                 eprintln!("[AI] Attempt {} failed: {}, retrying...", attempt + 1, e);
                 on_retry(attempt + 1);
+                // 指数退避：避免对 429 限流与 5xx/网络抖动立即重试，
+                // 防止白白耗尽重试次数并放大服务端压力。
+                let backoff = Duration::from_millis(500u64.saturating_mul(1u64 << attempt.min(63)));
+                tokio::time::sleep(backoff).await;
             }
             Err(_) => {
                 if attempt >= max_retries {
@@ -64,6 +68,9 @@ where
                 }
                 eprintln!("[AI] Attempt {} timed out, retrying...", attempt + 1);
                 on_retry(attempt + 1);
+                // 超时分支同样应用指数退避。
+                let backoff = Duration::from_millis(500u64.saturating_mul(1u64 << attempt.min(63)));
+                tokio::time::sleep(backoff).await;
             }
         }
     }

@@ -103,6 +103,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   resolvedPathRef.current = resolvedPath
 
   const activePrompt = promptFiles.find(f => f.key === activeFile) ?? promptFiles[0]
+  const activePromptKey = activePrompt?.key ?? ''
 
   useEffect(() => {
     if (!promptFiles.some(f => f.key === activeFile) && promptFiles.length > 0) {
@@ -242,9 +243,11 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [])
 
   useEffect(() => {
-    if (!activePrompt) return
-    flushSave().then(() => loadFile(activePrompt))
-  }, [activeFile, activePrompt])
+    const prompt = promptFiles.find(f => f.key === activePromptKey) ?? promptFiles[0]
+    if (!prompt) return
+    flushSave().then(() => loadFile(prompt))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePromptKey])
 
   useEffect(() => {
     return () => { flushSave() }
