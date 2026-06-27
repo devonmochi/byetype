@@ -218,11 +218,24 @@ fn start_voice_recording(
     // Press) and its CAS succeeds with the wrong version, dropping the recording.
     let gen = recording_gen.fetch_add(1, Ordering::SeqCst) + 1;
     let mic = app_handle.state::<ConfigManager>().get().general.microphone.clone();
+    // Allocate the task_id and publish it BEFORE starting the recorder, so that
+    // any Release event (or auto-stop timer) arriving between recorder.start()
+    // returning Ok and the task_id being stored will still find a task_id in
+    // place — preventing the race where stop succeeds but process_recording is
+    // skipped because task_id was still None, silently dropping the recording.
+    let tid = match crate::task::start_recording(app_handle) {
+        Some(tid) => tid,
+        None => {
+            // Max parallel reached — roll back the generation we allocated above
+            // so a racing Release's CAS fails cleanly instead of consuming it.
+            recording_gen.fetch_add(1, Ordering::SeqCst);
+            return;
+        }
+    };
+    *current_task_id.lock().unwrap() = Some(tid);
     match recorder.start(&mic) {
         Ok(()) => {
             update_tray_icon(app_handle, true);
-            let tid = crate::task::start_recording(app_handle);
-            *current_task_id.lock().unwrap() = tid;
 
             let max_secs = app_handle.state::<ConfigManager>().get().general.max_recording_seconds;
             if max_secs > 0 {
@@ -262,6 +275,11 @@ fn start_voice_recording(
             // any in-flight Release racing with this failed Press will then
             // see a fresh value and its CAS will fail cleanly.
             recording_gen.fetch_add(1, Ordering::SeqCst);
+            // Clean up the task_id we pre-allocated: clear it from
+            // current_task_id so no later path mistakes it for a live
+            // recording, and cancel the task to release its slot/bubble.
+            *current_task_id.lock().unwrap() = None;
+            crate::task::cancel_recording(app_handle, tid);
             eprintln!("Start recording error: {}", e);
             let _ = app_handle.emit("recording-error", serde_json::json!({
                 "message": e

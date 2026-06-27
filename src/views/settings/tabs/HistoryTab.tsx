@@ -293,7 +293,14 @@ export function HistoryTab() {
         next.set(recordId, 'transcribing')
         return next
       })
-    } catch { /* ignore */ }
+    } catch (e) {
+      setRetryStatus(prev => {
+        const next = new Map(prev)
+        next.delete(recordId)
+        return next
+      })
+      console.error('retry failed:', e)
+    }
   }, [])
 
   return (

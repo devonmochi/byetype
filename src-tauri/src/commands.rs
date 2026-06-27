@@ -72,7 +72,13 @@ pub fn save_config(
         || config.general.extract_shortcut_template != old_extract_shortcut_template
         || config.general.extract_shortcut2_template != old_extract_shortcut2_template;
     if shortcuts_changed {
-        crate::shortcut::register(&app, (*recorder).clone())?;
+        if let Err(e) = crate::shortcut::register(&app, (*recorder).clone()) {
+            // 注册失败：旧快捷键已被 unregister_all 清空，且新配置（含可能非法/冲突的快捷键）已写盘。
+            // 回滚配置到 old_config 并重新注册旧快捷键，避免用户丢失全部全局快捷键且无法恢复。
+            config_manager.update(old_config.clone()).ok();
+            let _ = crate::shortcut::register(&app, (*recorder).clone());
+            return Err(e);
+        }
     }
 
     Ok(true)

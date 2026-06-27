@@ -10,7 +10,14 @@ let dragging = false
 let armed = false
 
 async function init() {
-  const base64: string | null = await invoke('get_screenshot_image')
+  let base64: string | null
+  try {
+    base64 = await invoke('get_screenshot_image')
+  } catch (err) {
+    console.error('get_screenshot_image failed:', err)
+    await invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+    return
+  }
   if (!base64) {
     await invoke('submit_screenshot_crop', { crop: null })
     return
@@ -93,4 +100,7 @@ document.addEventListener('keydown', async (e: KeyboardEvent) => {
   }
 })
 
-init()
+init().catch((err) => {
+  console.error('screenshot init failed:', err)
+  invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+})

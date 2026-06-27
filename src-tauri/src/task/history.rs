@@ -252,9 +252,10 @@ fn now_iso() -> String {
     let mins = (time_secs % 3600) / 60;
     let s = time_secs % 60;
     let (y, m, d) = days_to_ymd(days as i64);
+    let millis = dur.subsec_millis();
     format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z",
-        y, m, d, hours, mins, s
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        y, m, d, hours, mins, s, millis
     )
 }
 
