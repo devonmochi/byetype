@@ -130,9 +130,13 @@ export default function App() {
   }, [text, pinned])
 
   const handleCopy = async () => {
-    await invoke('update_clipboard_text', { text })
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await invoke('update_clipboard_text', { text })
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error('update_clipboard_text failed:', err)
+    }
   }
 
   const handlePin = async () => {

@@ -140,7 +140,7 @@ export interface HistoryRecord {
 
 export interface RetryStatusUpdate {
   recordId: number
-  status: 'transcribing' | 'optimizing' | 'retrying' | 'cancelled'
+  status: 'transcribing' | 'optimizing' | 'retrying' | 'cancelled' | 'completed' | 'failed'
 }
 
 export interface UpdateInfo {

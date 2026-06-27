@@ -275,6 +275,12 @@ export function HistoryTab() {
 
     onEvent<RetryStatusUpdate>('retry-status', (update) => {
       setRetryStatus(prev => {
+        if (update.status === 'completed' || update.status === 'failed' || update.status === 'cancelled') {
+          if (!prev.has(update.recordId)) return prev
+          const next = new Map(prev)
+          next.delete(update.recordId)
+          return next
+        }
         const next = new Map(prev)
         next.set(update.recordId, update.status)
         return next
