@@ -123,7 +123,7 @@ export default function App() {
     const handleBlur = () => {
       // 锁定时用户要在窗口内手动选中复制,失焦自动覆盖整段文本会冲掉刚复制的选区,跳过
       if (pinned) return
-      invoke('update_clipboard_text', { text })
+      invoke('update_clipboard_text', { text }).catch(() => {})
     }
     window.addEventListener('blur', handleBlur)
     return () => window.removeEventListener('blur', handleBlur)

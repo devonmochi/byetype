@@ -97,12 +97,13 @@ export function App() {
         setUpdateState(prev => {
           if (prev.phase === 'idle') {
             checkUpdate().then(result => {
+              if (cancelled) return
               if (result) {
                 setUpdateState(p => ({ ...p, phase: 'available', info: result, dismissed: false, checkedOnce: true }))
               } else {
                 setUpdateState(p => ({ ...p, phase: 'idle', info: null, checkedOnce: true }))
               }
-            }).catch(() => setUpdateState(p => ({ ...p, phase: 'idle', info: null, checkedOnce: true })))
+            }).catch(() => { if (cancelled) return; setUpdateState(p => ({ ...p, phase: 'idle', info: null, checkedOnce: true })) })
             return { ...prev, phase: 'checking' }
           }
           return prev
@@ -117,6 +118,12 @@ export function App() {
       unsubComplete?.()
       unsubError?.()
       unsubNavigate?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [])
 

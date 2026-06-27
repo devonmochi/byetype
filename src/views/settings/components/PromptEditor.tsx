@@ -96,6 +96,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   const contentRef = useRef(content)
   const resolvedPathRef = useRef(resolvedPath)
   const isLoadingRef = useRef(false)
+  const configRef = useRef(config)
+  configRef.current = config
 
   contentRef.current = content
   resolvedPathRef.current = resolvedPath
@@ -136,7 +138,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [])
 
   const resolvePath = useCallback(async (prompt: PromptFileEntry) => {
-    const customPath = getConfigValue(config, prompt.configPath)
+    const currentConfig = configRef.current
+    const customPath = getConfigValue(currentConfig, prompt.configPath)
     if (customPath) {
       const builtin = await isBuiltinPromptPath(customPath)
       if (!builtin) {
@@ -146,10 +149,10 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
     }
     const destPath = await copyBuiltinPrompt(prompt.builtinFilename)
     setResolvedPath(destPath)
-    const newConfig = setConfigValue(config, prompt.configPath, destPath)
+    const newConfig = setConfigValue(currentConfig, prompt.configPath, destPath)
     onSave(newConfig)
     return destPath
-  }, [config, onSave])
+  }, [onSave])
 
   const loadFile = useCallback(async (prompt: PromptFileEntry) => {
     setLoading(true)
@@ -241,7 +244,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   useEffect(() => {
     if (!activePrompt) return
     flushSave().then(() => loadFile(activePrompt))
-  }, [activeFile, config, activePrompt])
+  }, [activeFile, activePrompt])
 
   useEffect(() => {
     return () => { flushSave() }

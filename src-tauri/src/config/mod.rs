@@ -129,7 +129,13 @@ impl ConfigManager {
                 .open(&tmp)
                 .map_err(|e| e.to_string())?;
             use std::io::Write;
-            file.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
+            if let Err(e) = file.write_all(json.as_bytes()) {
+                drop(file);
+                // write_all 失败时清理已创建的临时文件，避免含敏感凭证的残留
+                let _ = fs::remove_file(&tmp);
+                return Err(e.to_string());
+            }
+            drop(file);
         }
         #[cfg(not(unix))]
         {

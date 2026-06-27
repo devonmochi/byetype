@@ -140,14 +140,28 @@ mod windows {
 
         enigo.key(Key::Control, Direction::Press)
             .map_err(|e| format!("Failed to press Ctrl: {}", e))?;
-        enigo.key(Key::Unicode('v'), Direction::Press)
-            .map_err(|e| format!("Failed to press V: {}", e))?;
-        enigo.key(Key::Unicode('v'), Direction::Release)
-            .map_err(|e| format!("Failed to release V: {}", e))?;
-        enigo.key(Key::Control, Direction::Release)
-            .map_err(|e| format!("Failed to release Ctrl: {}", e))?;
 
-        Ok(())
+        // V 的 Press/Release 单独收集结果，任何失败都不立即 return，
+        // 确保下方 Ctrl 的 Release 始终被执行，避免修饰键卡死。
+        let v_result = (|| {
+            enigo.key(Key::Unicode('v'), Direction::Press)
+                .map_err(|e| format!("Failed to press V: {}", e))?;
+            enigo.key(Key::Unicode('v'), Direction::Release)
+                .map_err(|e| format!("Failed to release V: {}", e))?;
+            Ok(())
+        })();
+
+        // 无论 V 操作成功与否，都必须释放 Ctrl，防止系统级按键卡死。
+        if let Err(e) = enigo.key(Key::Control, Direction::Release) {
+            // Ctrl 释放失败属于更严重的问题，优先返回该错误；
+            // 若 V 也有错误，则一并打印以便排查。
+            if let Err(v_err) = &v_result {
+                eprintln!("[clipboard] simulate_paste: Ctrl release failed ({e}); V error: {v_err}");
+            }
+            return Err(format!("Failed to release Ctrl: {}", e));
+        }
+
+        v_result
     }
 }
 

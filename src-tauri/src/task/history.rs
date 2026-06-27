@@ -54,7 +54,20 @@ impl HistoryManager {
             .map_err(|e| format!("Failed to create history dir: {}", e))?;
         if self.json_path.exists() {
             let content = std::fs::read_to_string(&self.json_path).unwrap_or_default();
-            self.records = serde_json::from_str(&content).unwrap_or_default();
+            match serde_json::from_str::<Vec<HistoryRecord>>(&content) {
+                Ok(v) => {
+                    self.records = v;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[History] history.json 解析失败，保留空记录但不删除原文件: {}",
+                        e
+                    );
+                    let corrupt_path = format!("{}.corrupt", self.json_path.display());
+                    let _ = std::fs::rename(&self.json_path, &corrupt_path);
+                    self.records = Vec::new();
+                }
+            }
         }
         // Validate audio and screenshot paths
         for record in &mut self.records {
@@ -236,8 +249,10 @@ impl HistoryManager {
     fn persist(&self) -> Result<(), String> {
         let data = serde_json::to_string_pretty(&self.records)
             .map_err(|e| format!("Failed to serialize history: {}", e))?;
-        std::fs::write(&self.json_path, data)
-            .map_err(|e| format!("Failed to write history: {}", e))
+        let tmp = self.json_path.with_extension("json.tmp");
+        std::fs::write(&tmp, &data).map_err(|e| format!("Failed to write history: {}", e))?;
+        std::fs::rename(&tmp, &self.json_path)
+            .map_err(|e| format!("Failed to rename history: {}", e))
     }
 }
 

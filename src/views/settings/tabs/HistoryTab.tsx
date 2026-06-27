@@ -276,7 +276,7 @@ export function HistoryTab() {
     onEvent<RetryStatusUpdate>('retry-status', (update) => {
       setRetryStatus(prev => {
         const next = new Map(prev)
-        next.set(update.recordId, update.stage)
+        next.set(update.recordId, update.status)
         return next
       })
     }).then(fn => { if (cancelled) fn(); else unlistenRetry = fn })
