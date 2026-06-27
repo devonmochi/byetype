@@ -84,13 +84,35 @@ pub fn get_prompts_dir(app: tauri::AppHandle) -> Result<String, String> {
     Ok(prompts_dir.to_string_lossy().to_string())
 }
 
+/// 校验内置提示词文件名，防止路径穿越（".."、路径分隔符、绝对路径）。
+/// 返回校验通过后的文件名（去除首尾空白）。
+fn sanitize_prompt_filename(filename: &str) -> Result<String, String> {
+    let trimmed = filename.trim();
+    if trimmed.is_empty() {
+        return Err("文件名不能为空".to_string());
+    }
+    if trimmed.contains('/') || trimmed.contains('\\') {
+        return Err("文件名不能包含路径分隔符".to_string());
+    }
+    if trimmed == ".." || trimmed == "." || trimmed.starts_with("..") {
+        return Err("非法文件名".to_string());
+    }
+    // 绝对路径（Windows 盘符或 UNC）同样拒绝
+    let first = trimmed.chars().next().unwrap();
+    if first == '/' || first == '\\' || (trimmed.len() >= 2 && trimmed.as_bytes()[1] == b':') {
+        return Err("文件名不能为绝对路径".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
 #[tauri::command]
 pub fn get_builtin_prompt_path(
     app: tauri::AppHandle,
     filename: String,
 ) -> Result<String, String> {
     let prompts_dir = resolve_prompts_dir(&app)?;
-    let path = prompts_dir.join(filename);
+    let safe_name = sanitize_prompt_filename(&filename)?;
+    let path = prompts_dir.join(&safe_name);
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -101,13 +123,14 @@ pub fn copy_builtin_prompt(
     force: bool,
 ) -> Result<String, String> {
     let prompts_dir = resolve_prompts_dir(&app)?;
-    let src_path = prompts_dir.join(&filename);
+    let safe_name = sanitize_prompt_filename(&filename)?;
+    let src_path = prompts_dir.join(&safe_name);
 
     let data_dir = app.path().app_data_dir()
         .map_err(|e| e.to_string())?;
     let dest_dir = data_dir.join("prompts");
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
-    let dest_path = dest_dir.join(&filename);
+    let dest_path = dest_dir.join(&safe_name);
 
     if !force && dest_path.exists() {
         return Ok(dest_path.to_string_lossy().to_string());

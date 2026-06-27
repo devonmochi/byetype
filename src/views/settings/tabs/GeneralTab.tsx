@@ -347,7 +347,7 @@ export function GeneralTab({ config, onSave }: Props) {
             step={10}
             onChange={e => {
               const v = parseInt(e.target.value, 10)
-              if (!isNaN(v) && v >= 10) update({ maxRecordingSeconds: v })
+              if (!isNaN(v) && v >= 10 && v <= 600) update({ maxRecordingSeconds: v })
             }}
             style={{ width: 80, textAlign: 'center' }}
           />

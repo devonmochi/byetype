@@ -83,7 +83,7 @@ interface Props {
 }
 
 export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: Props) {
-  const [activeFile, setActiveFile] = useState(promptFiles[0].key)
+  const [activeFile, setActiveFile] = useState(promptFiles[0]?.key ?? '')
   const [content, setContent] = useState('')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
   const [loading, setLoading] = useState(true)
@@ -261,6 +261,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
     const newConfig = setConfigValue(config, activePrompt.configPath, builtinPath)
     onSave(newConfig)
   }
+
+  if (promptFiles.length === 0) return null
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>

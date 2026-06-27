@@ -254,6 +254,7 @@ export function HistoryTab() {
 
     let unlistenHistory: (() => void) | null = null
     let unlistenRetry: (() => void) | null = null
+    let cancelled = false
 
     onEvent<HistoryRecord[]>('history-updated', (newRecords) => {
       setRecords(newRecords)
@@ -267,7 +268,7 @@ export function HistoryTab() {
         }
         return next.size !== prev.size ? next : prev
       })
-    }).then(fn => { unlistenHistory = fn })
+    }).then(fn => { if (cancelled) fn(); else unlistenHistory = fn })
 
     onEvent<RetryStatusUpdate>('retry-status', (update) => {
       setRetryStatus(prev => {
@@ -275,9 +276,10 @@ export function HistoryTab() {
         next.set(update.recordId, update.stage)
         return next
       })
-    }).then(fn => { unlistenRetry = fn })
+    }).then(fn => { if (cancelled) fn(); else unlistenRetry = fn })
 
     return () => {
+      cancelled = true
       unlistenHistory?.()
       unlistenRetry?.()
     }

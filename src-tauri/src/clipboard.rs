@@ -164,27 +164,34 @@ pub fn paste_text(text: &str, overwrite_clipboard: bool) -> Result<(), String> {
     clipboard.set_text(text)
         .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
 
-    #[cfg(target_os = "macos")]
-    {
-        if !macos::ensure_accessibility() {
-            return Err("Accessibility permission not granted, please allow in System Settings".to_string());
+    // 先执行模拟粘贴，收集结果；任何失败都不再提前 return，
+    // 以确保下方还原逻辑（保留原剪贴板模式）始终被执行。
+    let paste_result: Result<(), String> = (|| {
+        #[cfg(target_os = "macos")]
+        {
+            if !macos::ensure_accessibility() {
+                return Err("Accessibility permission not granted, please allow in System Settings".to_string());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            macos::simulate_paste()?;
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        macos::simulate_paste()?;
-    }
 
-    #[cfg(target_os = "windows")]
-    {
-        windows::simulate_paste()?;
-    }
+        #[cfg(target_os = "windows")]
+        {
+            windows::simulate_paste()?;
+        }
+
+        Ok(())
+    })();
 
     // 仅当备份非 None 时才执行还原；让目标应用先读完粘贴内容。
+    // 无论模拟粘贴成功或失败都执行还原，避免原剪贴板内容丢失。
     if !matches!(backup, ClipboardSnapshot::None) {
         std::thread::sleep(std::time::Duration::from_millis(150));
         restore_clipboard(backup);
     }
 
-    Ok(())
+    paste_result
 }
 
 #[cfg(test)]

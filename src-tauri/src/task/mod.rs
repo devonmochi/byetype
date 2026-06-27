@@ -755,6 +755,10 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         }
         Err(e) => {
             eprintln!("[TaskManager] spawn_blocking panicked: {}", e);
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
             return None;
         }
     };
