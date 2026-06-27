@@ -73,6 +73,12 @@ pub fn extract_backup_zip(zip_data: &[u8], dest_dir: &Path) -> Result<(), String
     let mut archive = zip::ZipArchive::new(reader)
         .map_err(|e| format!("打开 zip 失败: {}", e))?;
 
+    // 防止 Zip Bomb：限制条目数量
+    const MAX_ENTRIES: usize = 10000;
+    if archive.len() > MAX_ENTRIES {
+        return Err(format!("备份文件无效：条目数量超过上限 {}", MAX_ENTRIES));
+    }
+
     // 校验：zip 中必须包含 config.json
     let has_config = (0..archive.len()).any(|i| {
         archive.by_index(i)
@@ -83,9 +89,18 @@ pub fn extract_backup_zip(zip_data: &[u8], dest_dir: &Path) -> Result<(), String
         return Err("备份文件无效：缺少 config.json".to_string());
     }
 
+    // 防止 Zip Bomb：限制单个文件未压缩大小
+    const MAX_FILE_SIZE: u64 = 256 * 1024 * 1024;
+
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)
+        let file = archive.by_index(i)
             .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
+
+        // 校验未压缩大小，避免解压时无限膨胀内存或磁盘
+        let file_name = file.name().to_string();
+        if file.size() > MAX_FILE_SIZE {
+            return Err(format!("文件过大: {}", file_name));
+        }
 
         let path = match file.enclosed_name() {
             Some(p) => dest_dir.join(p),
@@ -102,9 +117,14 @@ pub fn extract_backup_zip(zip_data: &[u8], dest_dir: &Path) -> Result<(), String
             }
             let mut out = fs::File::create(&path)
                 .map_err(|e| format!("创建文件失败: {}", e))?;
+            // 限制读取大小，防止实际解压数据超出声明大小
             let mut buf = Vec::new();
-            file.read_to_end(&mut buf)
+            file.take(MAX_FILE_SIZE + 1)
+                .read_to_end(&mut buf)
                 .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
+            if buf.len() as u64 > MAX_FILE_SIZE {
+                return Err(format!("文件过大: {}", file_name));
+            }
             out.write_all(&buf)
                 .map_err(|e| format!("写入文件失败: {}", e))?;
         }

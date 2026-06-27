@@ -173,7 +173,7 @@ pub fn cancel_task(app: &AppHandle, task_id: u32) {
 }
 
 /// Retry a previously failed record.
-pub fn retry_record(app: &AppHandle, record_id: u64) {
+pub fn retry_record(app: &AppHandle, record_id: u64) -> Result<(), String> {
     let config = app.state::<ConfigManager>().get();
     let template_id = config.general.shortcut_template.clone();
 
@@ -185,13 +185,22 @@ pub fn retry_record(app: &AppHandle, record_id: u64) {
             Some(a) => a,
             None => {
                 eprintln!("[TaskManager] No audio found for record {}", record_id);
-                return;
+                return Err("未找到录音".to_string());
             }
         };
 
+        // Reentrancy guard: prevent concurrent retries of the same record
+        // (e.g. UI double-click). Two retries of one record would each insert
+        // a distinct (token, Some(record_id)) entry, double-count active_count,
+        // run two pipelines on the same audio, and race on history.update_record.
+        if mgr.cancel_tokens.values().any(|(_, rid)| *rid == Some(record_id)) {
+            eprintln!("[TaskManager] record {} already retrying", record_id);
+            return Err("该录音正在重试中，请稍候".to_string());
+        }
+
         if mgr.active_count >= config.advanced.max_parallel {
             eprintln!("[TaskManager] Max parallel tasks reached, cannot retry");
-            return;
+            return Err("已达最大并行任务数，请稍后重试".to_string());
         }
         if mgr.active_count == 0 {
             mgr.task_counter = 0;
@@ -212,6 +221,7 @@ pub fn retry_record(app: &AppHandle, record_id: u64) {
     tauri::async_runtime::spawn(async move {
         run_pipeline(&app_handle, task_id, audio_base64, Some(record_id), token, template_id).await;
     });
+    Ok(())
 }
 
 fn build_client(proxy_enabled: bool, proxy_url: &str) -> Result<reqwest::Client, String> {
@@ -755,6 +765,10 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
         }
         Err(e) => {
             eprintln!("[TaskManager] spawn_blocking panicked: {}", e);
+            let state = app.state::<SharedTaskManager>();
+            let mut mgr = state.lock().unwrap();
+            mgr.cancel_tokens.remove(&task_id);
+            mgr.active_count = mgr.active_count.saturating_sub(1);
             return None;
         }
     };
@@ -783,14 +797,33 @@ async fn capture_screenshot_windows(app: &AppHandle, task_id: u32) -> Option<Str
     };
 
     // 3. Crop the full image
+    // Clamp crop coords to image bounds to avoid panic on out-of-bounds selection
+    // (multi-monitor / DPI scaling / drag-past-edge can make crop exceed image dims).
+    let img_w = full_image.width();
+    let img_h = full_image.height();
+    let cx = crop.x.min(img_w);
+    let cy = crop.y.min(img_h);
+    let cw = crop.w.min(img_w.saturating_sub(cx));
+    let ch = crop.h.min(img_h.saturating_sub(cy));
+    if cw == 0 || ch == 0 {
+        eprintln!(
+            "[TaskManager] Screenshot crop region out of bounds: crop=({},{},{},{}) image={}x{}",
+            crop.x, crop.y, crop.w, crop.h, img_w, img_h
+        );
+        let state = app.state::<SharedTaskManager>();
+        let mut mgr = state.lock().unwrap();
+        mgr.cancel_tokens.remove(&task_id);
+        mgr.active_count = mgr.active_count.saturating_sub(1);
+        return None;
+    }
     let cropped = image::DynamicImage::ImageRgba8(full_image)
-        .crop_imm(crop.x, crop.y, crop.w, crop.h);
+        .crop_imm(cx, cy, cw, ch);
 
     // 8. Encode cropped image to PNG base64
     let mut png_buf: Vec<u8> = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut png_buf);
     if let Err(e) = cropped.write_to(&mut cursor, image::ImageFormat::Png) {
-        eprintln!("[TaskManager] Failed to encode cropped screenshot ({}x{}): {}", crop.w, crop.h, e);
+        eprintln!("[TaskManager] Failed to encode cropped screenshot ({}x{}): {}", cw, ch, e);
         let state = app.state::<SharedTaskManager>();
         let mut mgr = state.lock().unwrap();
         mgr.cancel_tokens.remove(&task_id);

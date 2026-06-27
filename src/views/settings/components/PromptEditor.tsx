@@ -83,7 +83,7 @@ interface Props {
 }
 
 export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: Props) {
-  const [activeFile, setActiveFile] = useState(promptFiles[0].key)
+  const [activeFile, setActiveFile] = useState(promptFiles[0]?.key ?? '')
   const [content, setContent] = useState('')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
   const [loading, setLoading] = useState(true)
@@ -96,11 +96,20 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   const contentRef = useRef(content)
   const resolvedPathRef = useRef(resolvedPath)
   const isLoadingRef = useRef(false)
+  const configRef = useRef(config)
+  configRef.current = config
 
   contentRef.current = content
   resolvedPathRef.current = resolvedPath
 
-  const activePrompt = promptFiles.find(f => f.key === activeFile)!
+  const activePrompt = promptFiles.find(f => f.key === activeFile) ?? promptFiles[0]
+  const activePromptKey = activePrompt?.key ?? ''
+
+  useEffect(() => {
+    if (!promptFiles.some(f => f.key === activeFile) && promptFiles.length > 0) {
+      setActiveFile(promptFiles[0].key)
+    }
+  }, [promptFiles, activeFile])
 
   const flushSave = useCallback(async () => {
     if (debounceRef.current) {
@@ -130,7 +139,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [])
 
   const resolvePath = useCallback(async (prompt: PromptFileEntry) => {
-    const customPath = getConfigValue(config, prompt.configPath)
+    const currentConfig = configRef.current
+    const customPath = getConfigValue(currentConfig, prompt.configPath)
     if (customPath) {
       const builtin = await isBuiltinPromptPath(customPath)
       if (!builtin) {
@@ -140,10 +150,10 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
     }
     const destPath = await copyBuiltinPrompt(prompt.builtinFilename)
     setResolvedPath(destPath)
-    const newConfig = setConfigValue(config, prompt.configPath, destPath)
+    const newConfig = setConfigValue(currentConfig, prompt.configPath, destPath)
     onSave(newConfig)
     return destPath
-  }, [config, onSave])
+  }, [onSave])
 
   const loadFile = useCallback(async (prompt: PromptFileEntry) => {
     setLoading(true)
@@ -233,8 +243,11 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [])
 
   useEffect(() => {
-    flushSave().then(() => loadFile(activePrompt))
-  }, [activeFile, config])
+    const prompt = promptFiles.find(f => f.key === activePromptKey) ?? promptFiles[0]
+    if (!prompt) return
+    flushSave().then(() => loadFile(prompt))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePromptKey])
 
   useEffect(() => {
     return () => { flushSave() }
@@ -246,21 +259,28 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }
 
   const handleBrowse = async () => {
+    if (!activePrompt) return
     const filePath = await selectFile()
     if (filePath) {
-      const newConfig = setConfigValue(config, activePrompt.configPath, filePath)
+      await flushSave()
+      const newConfig = setConfigValue(configRef.current, activePrompt.configPath, filePath)
       onSave(newConfig)
+      await loadFile(activePrompt)
     }
   }
 
   const handleResetToBuiltin = async () => {
+    if (!activePrompt) return
     const yes = await ask('确定要重置为内置提示词吗？当前的修改将被覆盖。', { title: 'ByeType', kind: 'warning' })
     if (!yes) return
     await flushSave()
     const builtinPath = await copyBuiltinPrompt(activePrompt.builtinFilename, true)
-    const newConfig = setConfigValue(config, activePrompt.configPath, builtinPath)
+    const newConfig = setConfigValue(configRef.current, activePrompt.configPath, builtinPath)
     onSave(newConfig)
+    await loadFile(activePrompt)
   }
+
+  if (promptFiles.length === 0) return null
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>

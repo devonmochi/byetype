@@ -106,7 +106,7 @@ pub async fn download_update(app: AppHandle) -> Result<(), String> {
     let app_clone = app.clone();
     let mut downloaded: f64 = 0.0;
 
-    let bytes = update
+    let bytes = match update
         .download(
             move |chunk_length, content_length| {
                 downloaded += chunk_length as f64;
@@ -119,11 +119,18 @@ pub async fn download_update(app: AppHandle) -> Result<(), String> {
             || {},
         )
         .await
-        .map_err(|e| {
+    {
+        Ok(b) => b,
+        Err(e) => {
             let msg = format!("下载失败：{}", e);
+            // 下载失败时把 Update 放回 state，使 download_update 可被直接重试，
+            // 而不必重新调用 check_update。
+            let state = app.state::<UpdateState>();
+            *state.lock().unwrap() = Some((update, None));
             let _ = app.emit("update-error", ErrorPayload { message: msg.clone() });
-            msg
-        })?;
+            return Err(msg);
+        }
+    };
 
     let state = app.state::<UpdateState>();
     *state.lock().unwrap() = Some((update, Some(bytes)));
@@ -143,6 +150,14 @@ pub async fn install_and_restart(app: AppHandle) -> Result<(), String> {
 
     let bytes = bytes.ok_or_else(|| "更新尚未下载完成".to_string())?;
 
-    update.install(bytes).map_err(|e| format!("安装失败：{}", e))?;
+    if let Err(e) = update.install(bytes.clone()) {
+        // 安装失败时把 (Update, Some(bytes)) 放回 state，使 install_and_restart 可被直接重试，
+        // 而不必重新调用 check_update 与 download_update。
+        let state = app.state::<UpdateState>();
+        *state.lock().unwrap() = Some((update, Some(bytes)));
+        let msg = format!("安装失败：{}", e);
+        let _ = app.emit("update-error", ErrorPayload { message: msg.clone() });
+        return Err(msg);
+    }
     app.restart();
 }

@@ -10,7 +10,14 @@ let dragging = false
 let armed = false
 
 async function init() {
-  const base64: string | null = await invoke('get_screenshot_image')
+  let base64: string | null
+  try {
+    base64 = await invoke('get_screenshot_image')
+  } catch (err) {
+    console.error('get_screenshot_image failed:', err)
+    await invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+    return
+  }
   if (!base64) {
     await invoke('submit_screenshot_crop', { crop: null })
     return
@@ -23,7 +30,7 @@ async function init() {
     }, 300)
   }
   bg.onerror = () => {
-    invoke('submit_screenshot_crop', { crop: null })
+    invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
   }
 }
 
@@ -72,7 +79,9 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
   const h = Math.abs(e.clientY - startY)
 
   if (w < 5 || h < 5) {
-    await invoke('submit_screenshot_crop', { crop: null })
+    await invoke('submit_screenshot_crop', { crop: null }).catch(() =>
+      invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+    )
     return
   }
 
@@ -83,14 +92,24 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
     w: Math.round(w * dpr),
     h: Math.round(h * dpr),
   }
-  await invoke('submit_screenshot_crop', { crop })
+  await invoke('submit_screenshot_crop', { crop }).catch(() =>
+    invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+  )
 })
 
 // Also handle lostpointercapture as a safety net
 document.addEventListener('keydown', async (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    await invoke('submit_screenshot_crop', { crop: null })
+    dragging = false
+    armed = false
+    selection.style.display = 'none'
+    sizeLabel.style.display = 'none'
+    overlay.style.display = 'none'
+    await invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
   }
 })
 
-init()
+init().catch((err) => {
+  console.error('screenshot init failed:', err)
+  invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+})

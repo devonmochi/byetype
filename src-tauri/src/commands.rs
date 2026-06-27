@@ -72,7 +72,13 @@ pub fn save_config(
         || config.general.extract_shortcut_template != old_extract_shortcut_template
         || config.general.extract_shortcut2_template != old_extract_shortcut2_template;
     if shortcuts_changed {
-        crate::shortcut::register(&app, (*recorder).clone())?;
+        if let Err(e) = crate::shortcut::register(&app, (*recorder).clone()) {
+            // 注册失败：旧快捷键已被 unregister_all 清空，且新配置（含可能非法/冲突的快捷键）已写盘。
+            // 回滚配置到 old_config 并重新注册旧快捷键，避免用户丢失全部全局快捷键且无法恢复。
+            config_manager.update(old_config.clone()).ok();
+            let _ = crate::shortcut::register(&app, (*recorder).clone());
+            return Err(e);
+        }
     }
 
     Ok(true)
@@ -84,13 +90,35 @@ pub fn get_prompts_dir(app: tauri::AppHandle) -> Result<String, String> {
     Ok(prompts_dir.to_string_lossy().to_string())
 }
 
+/// 校验内置提示词文件名，防止路径穿越（".."、路径分隔符、绝对路径）。
+/// 返回校验通过后的文件名（去除首尾空白）。
+fn sanitize_prompt_filename(filename: &str) -> Result<String, String> {
+    let trimmed = filename.trim();
+    if trimmed.is_empty() {
+        return Err("文件名不能为空".to_string());
+    }
+    if trimmed.contains('/') || trimmed.contains('\\') {
+        return Err("文件名不能包含路径分隔符".to_string());
+    }
+    if trimmed == ".." || trimmed == "." || trimmed.starts_with("..") {
+        return Err("非法文件名".to_string());
+    }
+    // 绝对路径（Windows 盘符或 UNC）同样拒绝
+    let first = trimmed.chars().next().unwrap();
+    if first == '/' || first == '\\' || (trimmed.len() >= 2 && trimmed.as_bytes()[1] == b':') {
+        return Err("文件名不能为绝对路径".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
 #[tauri::command]
 pub fn get_builtin_prompt_path(
     app: tauri::AppHandle,
     filename: String,
 ) -> Result<String, String> {
     let prompts_dir = resolve_prompts_dir(&app)?;
-    let path = prompts_dir.join(filename);
+    let safe_name = sanitize_prompt_filename(&filename)?;
+    let path = prompts_dir.join(&safe_name);
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -101,13 +129,14 @@ pub fn copy_builtin_prompt(
     force: bool,
 ) -> Result<String, String> {
     let prompts_dir = resolve_prompts_dir(&app)?;
-    let src_path = prompts_dir.join(&filename);
+    let safe_name = sanitize_prompt_filename(&filename)?;
+    let src_path = prompts_dir.join(&safe_name);
 
     let data_dir = app.path().app_data_dir()
         .map_err(|e| e.to_string())?;
     let dest_dir = data_dir.join("prompts");
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
-    let dest_path = dest_dir.join(&filename);
+    let dest_path = dest_dir.join(&safe_name);
 
     if !force && dest_path.exists() {
         return Ok(dest_path.to_string_lossy().to_string());
@@ -123,7 +152,13 @@ pub fn is_builtin_prompt_path(
     path: String,
 ) -> Result<bool, String> {
     let prompts_dir = resolve_prompts_dir(&app)?;
-    Ok(path.starts_with(&prompts_dir.to_string_lossy().as_ref()))
+    // 使用基于路径组件的包含判断（Path::starts_with），避免字符串前缀混淆
+    // （如 /app/promptsEVIL 被误判为内置路径），并对双方 canonicalize 以解析
+    // 符号链接与 ".." 等相对段。
+    let prompts_canon = std::fs::canonicalize(&prompts_dir).unwrap_or(prompts_dir);
+    let target = std::path::Path::new(&path);
+    let target_canon = std::fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf());
+    Ok(target_canon == prompts_canon || target_canon.starts_with(&prompts_canon))
 }
 
 #[tauri::command]
@@ -168,8 +203,7 @@ pub fn retry_record(
     app: tauri::AppHandle,
     record_id: u64,
 ) -> Result<(), String> {
-    crate::task::retry_record(&app, record_id);
-    Ok(())
+    crate::task::retry_record(&app, record_id)
 }
 
 #[tauri::command]
@@ -190,7 +224,7 @@ pub fn list_input_devices() -> Result<Vec<AudioDevice>, String> {
 
     let mut devices = vec![AudioDevice {
         name: "system-default".to_string(),
-        is_default: false,
+        is_default: true,
     }];
 
     if let Ok(input_devices) = host.input_devices() {
@@ -239,7 +273,10 @@ pub async fn test_model_connectivity(
         });
     }
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
     let start = std::time::Instant::now();
 
     if ai::is_deepseek(&resolved) {
@@ -381,7 +418,10 @@ pub async fn backup_to_local(
             let _ = sender.send(file_path);
         });
 
-    let file_path = receiver.recv()
+    // receiver.recv() 是同步阻塞调用，放入 spawn_blocking 以免占用 tokio 异步工作线程
+    let file_path = tokio::task::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|_| "对话框等待失败".to_string())?
         .map_err(|_| "文件对话框取消或超时".to_string())?;
 
     let path = match file_path {
@@ -409,7 +449,10 @@ pub async fn restore_from_local(
             let _ = sender.send(file_path);
         });
 
-    let file_path = receiver.recv()
+    // receiver.recv() 是同步阻塞调用，放入 spawn_blocking 以免占用 tokio 异步工作线程
+    let file_path = tokio::task::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|_| "对话框等待失败".to_string())?
         .map_err(|_| "文件对话框取消或超时".to_string())?;
 
     let path = match file_path {

@@ -104,21 +104,43 @@ pub fn restore_from_local(zip_path: &Path, data_dir: &Path) -> Result<(), String
         }
         Err(e) => {
             // 失败：回滚 config.json
+            let mut config_rollback_err: Option<String> = None;
             if has_existing_config && backup_config_path.exists() {
-                let _ = fs::copy(&backup_config_path, &config_path);
-                let _ = fs::remove_file(&backup_config_path);
+                if let Err(rc) = fs::copy(&backup_config_path, &config_path) {
+                    config_rollback_err = Some(format!(
+                        "config.json 回滚失败: {}（可手动从 {} 恢复）",
+                        rc,
+                        backup_config_path.display()
+                    ));
+                } else {
+                    let _ = fs::remove_file(&backup_config_path);
+                }
             }
             // 失败：回滚 prompts 目录
+            let mut prompts_rollback_err: Option<String> = None;
             if has_existing_prompts && backup_prompts_path.exists() {
                 if prompts_path.exists() {
                     let _ = fs::remove_dir_all(&prompts_path);
                 }
-                let _ = fs::rename(&backup_prompts_path, &prompts_path);
+                if let Err(rp) = fs::rename(&backup_prompts_path, &prompts_path) {
+                    prompts_rollback_err = Some(format!(
+                        "prompts 回滚失败: {}（可手动从 {} 恢复）",
+                        rp,
+                        backup_prompts_path.display()
+                    ));
+                }
             } else if !has_existing_prompts && prompts_path.exists() {
                 // 原本没有 prompts，恢复过程中创建了部分内容，清理掉
                 let _ = fs::remove_dir_all(&prompts_path);
             }
-            Err(format!("恢复失败（已回滚）: {}", e))
+
+            let rollback_status = match (config_rollback_err.as_ref(), prompts_rollback_err.as_ref()) {
+                (None, None) => "已回滚".to_string(),
+                (Some(c), Some(p)) => format!("回滚不完整（{}；{}）", c, p),
+                (Some(c), None) => format!("回滚不完整（{}）", c),
+                (None, Some(p)) => format!("回滚不完整（{}）", p),
+            };
+            Err(format!("恢复失败（{}）: {}", rollback_status, e))
         }
     }
 }

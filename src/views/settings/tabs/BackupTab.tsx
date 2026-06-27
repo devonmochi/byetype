@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import type { AppConfig, BackupEntry } from '../../../core/types'
@@ -116,12 +116,6 @@ export function BackupTab({ config, onSave }: Props) {
     }
   }, [])
 
-  useEffect(() => {
-    if (s3.bucket) {
-      refreshBackups()
-    }
-  }, [s3.bucket])
-
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -129,11 +123,9 @@ export function BackupTab({ config, onSave }: Props) {
   }
 
   const formatDate = (s: string) => {
-    try {
-      return new Date(s).toLocaleString('zh-CN')
-    } catch {
-      return s
-    }
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return s
+    return d.toLocaleString('zh-CN')
   }
 
   return (

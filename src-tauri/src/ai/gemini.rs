@@ -10,10 +10,18 @@ pub fn build_thinking_config(
     if !thinking.enabled {
         return None;
     }
+    // Gemini 的 thinkingLevel 只接受小写值 (minimal/low/medium/high)。
+    // ThinkingConfig.level 在前端以大写存储,需要转小写,与 openai_compat.rs 保持一致。
+    let level = thinking.level.trim().to_lowercase();
+    let thinking_level = if level.is_empty() {
+        "medium".to_string()
+    } else {
+        level
+    };
     Some(GeminiGenerationConfig {
         thinking_config: Some(GeminiThinkingConfig {
             include_thoughts: false,
-            thinking_level: thinking.level.clone(),
+            thinking_level,
         }),
     })
 }

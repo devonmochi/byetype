@@ -176,7 +176,7 @@ impl AudioRecorder {
 fn mix_to_mono(samples: &[f32], channels: u16) -> Vec<f32> {
     let ch = channels as usize;
     samples.chunks(ch)
-        .map(|frame| frame.iter().sum::<f32>() / ch as f32)
+        .map(|frame| frame.iter().sum::<f32>() / frame.len() as f32)
         .collect()
 }
 

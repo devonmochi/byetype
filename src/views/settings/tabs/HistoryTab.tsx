@@ -101,9 +101,12 @@ function CopyButton({ text }: { text: string }) {
 
   const handleCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {
+      console.error('复制失败')
+    })
   }, [text])
 
   return (
@@ -123,7 +126,14 @@ interface RecordRowProps {
   onRetry: (id: number) => void
 }
 
-function getExtractStageInfo(record: HistoryRecord): { screenshot: StageStatus; extract: { status: StageStatus; text: string } } {
+function getExtractStageInfo(record: HistoryRecord, retryStage?: string): { screenshot: StageStatus; extract: { status: StageStatus; text: string } } {
+  if (retryStage && (retryStage === 'retrying' || retryStage === 'extracting' || retryStage === 'transcribing')) {
+    return {
+      screenshot: 'success',
+      extract: { status: 'processing', text: '识别中...' }
+    }
+  }
+
   const screenshot: StageStatus = record.screenshotPath ? 'success' : (record.status === 'failed' ? 'error' : 'success')
 
   let extract: { status: StageStatus; text: string }
@@ -145,7 +155,7 @@ function RecordRow({ record, retryStage, onRetry }: RecordRowProps) {
   const isRetrying = !!retryStage
 
   if (isExtract) {
-    const info = getExtractStageInfo(record)
+    const info = getExtractStageInfo(record, retryStage)
     const screenshotMissing = !record.screenshotPath
     return (
       <div className="history-row">
@@ -254,6 +264,7 @@ export function HistoryTab() {
 
     let unlistenHistory: (() => void) | null = null
     let unlistenRetry: (() => void) | null = null
+    let cancelled = false
 
     onEvent<HistoryRecord[]>('history-updated', (newRecords) => {
       setRecords(newRecords)
@@ -267,17 +278,24 @@ export function HistoryTab() {
         }
         return next.size !== prev.size ? next : prev
       })
-    }).then(fn => { unlistenHistory = fn })
+    }).then(fn => { if (cancelled) fn(); else unlistenHistory = fn })
 
     onEvent<RetryStatusUpdate>('retry-status', (update) => {
       setRetryStatus(prev => {
+        if (update.status === 'completed' || update.status === 'failed' || update.status === 'cancelled') {
+          if (!prev.has(update.recordId)) return prev
+          const next = new Map(prev)
+          next.delete(update.recordId)
+          return next
+        }
         const next = new Map(prev)
-        next.set(update.recordId, update.stage)
+        next.set(update.recordId, update.status)
         return next
       })
-    }).then(fn => { unlistenRetry = fn })
+    }).then(fn => { if (cancelled) fn(); else unlistenRetry = fn })
 
     return () => {
+      cancelled = true
       unlistenHistory?.()
       unlistenRetry?.()
     }
@@ -291,7 +309,14 @@ export function HistoryTab() {
         next.set(recordId, 'transcribing')
         return next
       })
-    } catch { /* ignore */ }
+    } catch (e) {
+      setRetryStatus(prev => {
+        const next = new Map(prev)
+        next.delete(recordId)
+        return next
+      })
+      console.error('retry failed:', e)
+    }
   }, [])
 
   return (

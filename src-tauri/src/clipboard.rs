@@ -140,14 +140,28 @@ mod windows {
 
         enigo.key(Key::Control, Direction::Press)
             .map_err(|e| format!("Failed to press Ctrl: {}", e))?;
-        enigo.key(Key::Unicode('v'), Direction::Press)
-            .map_err(|e| format!("Failed to press V: {}", e))?;
-        enigo.key(Key::Unicode('v'), Direction::Release)
-            .map_err(|e| format!("Failed to release V: {}", e))?;
-        enigo.key(Key::Control, Direction::Release)
-            .map_err(|e| format!("Failed to release Ctrl: {}", e))?;
 
-        Ok(())
+        // V 的 Press/Release 单独收集结果，任何失败都不立即 return，
+        // 确保下方 Ctrl 的 Release 始终被执行，避免修饰键卡死。
+        let v_result = (|| {
+            enigo.key(Key::Unicode('v'), Direction::Press)
+                .map_err(|e| format!("Failed to press V: {}", e))?;
+            enigo.key(Key::Unicode('v'), Direction::Release)
+                .map_err(|e| format!("Failed to release V: {}", e))?;
+            Ok(())
+        })();
+
+        // 无论 V 操作成功与否，都必须释放 Ctrl，防止系统级按键卡死。
+        if let Err(e) = enigo.key(Key::Control, Direction::Release) {
+            // Ctrl 释放失败属于更严重的问题，优先返回该错误；
+            // 若 V 也有错误，则一并打印以便排查。
+            if let Err(v_err) = &v_result {
+                eprintln!("[clipboard] simulate_paste: Ctrl release failed ({e}); V error: {v_err}");
+            }
+            return Err(format!("Failed to release Ctrl: {}", e));
+        }
+
+        v_result
     }
 }
 
@@ -164,27 +178,34 @@ pub fn paste_text(text: &str, overwrite_clipboard: bool) -> Result<(), String> {
     clipboard.set_text(text)
         .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
 
-    #[cfg(target_os = "macos")]
-    {
-        if !macos::ensure_accessibility() {
-            return Err("Accessibility permission not granted, please allow in System Settings".to_string());
+    // 先执行模拟粘贴，收集结果；任何失败都不再提前 return，
+    // 以确保下方还原逻辑（保留原剪贴板模式）始终被执行。
+    let paste_result: Result<(), String> = (|| {
+        #[cfg(target_os = "macos")]
+        {
+            if !macos::ensure_accessibility() {
+                return Err("Accessibility permission not granted, please allow in System Settings".to_string());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            macos::simulate_paste()?;
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        macos::simulate_paste()?;
-    }
 
-    #[cfg(target_os = "windows")]
-    {
-        windows::simulate_paste()?;
-    }
+        #[cfg(target_os = "windows")]
+        {
+            windows::simulate_paste()?;
+        }
+
+        Ok(())
+    })();
 
     // 仅当备份非 None 时才执行还原；让目标应用先读完粘贴内容。
+    // 无论模拟粘贴成功或失败都执行还原，避免原剪贴板内容丢失。
     if !matches!(backup, ClipboardSnapshot::None) {
         std::thread::sleep(std::time::Duration::from_millis(150));
         restore_clipboard(backup);
     }
 
-    Ok(())
+    paste_result
 }
 
 #[cfg(test)]
