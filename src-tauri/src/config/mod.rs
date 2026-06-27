@@ -47,7 +47,21 @@ impl ConfigManager {
                                     // 原子写入：先写临时文件再 rename，避免写盘中途损坏 config.json
                                     let tmp = path.with_extension("json.tmp");
                                     if fs::write(&tmp, &migrated_json).is_ok() {
-                                        fs::rename(&tmp, path).ok();
+                                        if fs::rename(&tmp, path).is_err() {
+                                            // rename 失败时清理残留临时文件，避免敏感信息残留
+                                            let _ = fs::remove_file(&tmp);
+                                        } else {
+                                            // 收紧文件权限为仅属主可读写，防止敏感凭证泄露
+                                            #[cfg(unix)]
+                                            {
+                                                use std::os::unix::fs::PermissionsExt;
+                                                if let Ok(meta) = fs::metadata(path) {
+                                                    let mut perm = meta.permissions();
+                                                    perm.set_mode(0o600);
+                                                    let _ = fs::set_permissions(path, perm);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -86,7 +100,21 @@ impl ConfigManager {
         // 原子写入：先写临时文件再 rename，避免写盘中途崩溃导致 config.json 被截断损坏
         let tmp = self.config_path.with_extension("json.tmp");
         fs::write(&tmp, &json).map_err(|e| e.to_string())?;
-        fs::rename(&tmp, &self.config_path).map_err(|e| e.to_string())?;
+        if let Err(e) = fs::rename(&tmp, &self.config_path) {
+            // rename 失败时清理残留临时文件，避免敏感信息残留
+            let _ = fs::remove_file(&tmp);
+            return Err(e.to_string());
+        }
+        // 收紧文件权限为仅属主可读写，防止同机其他本地用户读取 API Key 等敏感凭证
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = fs::metadata(&self.config_path) {
+                let mut perm = meta.permissions();
+                perm.set_mode(0o600);
+                let _ = fs::set_permissions(&self.config_path, perm);
+            }
+        }
         let mut config = self.config.lock().unwrap_or_else(|e| e.into_inner());
         *config = new_config;
         Ok(())

@@ -401,7 +401,11 @@ export function GeneralTab({ config, onSave }: Props) {
             className="input"
             type="number"
             value={config.advanced.transcribeTimeout}
-            onChange={e => updateAdvanced({ transcribeTimeout: Number(e.target.value) })}
+            onChange={e => {
+              const v = Number(e.target.value)
+              if (e.target.value === '' || !Number.isFinite(v) || v < 1) return
+              updateAdvanced({ transcribeTimeout: v })
+            }}
             min={1}
             style={{ width: 100 }}
           />
@@ -411,7 +415,11 @@ export function GeneralTab({ config, onSave }: Props) {
             className="input"
             type="number"
             value={config.advanced.optimizeTimeout}
-            onChange={e => updateAdvanced({ optimizeTimeout: Number(e.target.value) })}
+            onChange={e => {
+              const v = Number(e.target.value)
+              if (e.target.value === '' || !Number.isFinite(v) || v < 1) return
+              updateAdvanced({ optimizeTimeout: v })
+            }}
             min={1}
             style={{ width: 100 }}
           />
@@ -421,7 +429,11 @@ export function GeneralTab({ config, onSave }: Props) {
             className="input"
             type="number"
             value={config.advanced.maxRetries}
-            onChange={e => updateAdvanced({ maxRetries: Number(e.target.value) })}
+            onChange={e => {
+              const v = Number(e.target.value)
+              if (e.target.value === '' || !Number.isFinite(v) || v < 0) return
+              updateAdvanced({ maxRetries: v })
+            }}
             min={0}
             style={{ width: 100 }}
           />
@@ -431,7 +443,11 @@ export function GeneralTab({ config, onSave }: Props) {
             className="input"
             type="number"
             value={config.advanced.maxParallel}
-            onChange={e => updateAdvanced({ maxParallel: Number(e.target.value) })}
+            onChange={e => {
+              const v = Number(e.target.value)
+              if (e.target.value === '' || !Number.isFinite(v) || v < 1) return
+              updateAdvanced({ maxParallel: v })
+            }}
             min={1}
             style={{ width: 100 }}
           />

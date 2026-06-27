@@ -56,36 +56,42 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    getConfig().then((c) => setConfig(c))
-    getVersion().then((v) => setAppVersion(v))
+    let cancelled = false
+    getConfig().then((c) => { if (!cancelled) setConfig(c) })
+    getVersion().then((v) => { if (!cancelled) setAppVersion(v) })
 
     let unsubUpdateAvailable: (() => void) | null = null
     onEvent<UpdateInfo>('update-available', (payload) => {
+      if (cancelled) return
       setUpdateState(prev => ({
         ...prev,
         phase: 'available',
         info: payload,
         dismissed: false,
       }))
-    }).then(unsub => { unsubUpdateAvailable = unsub })
+    }).then(unsub => { if (cancelled) unsub(); else unsubUpdateAvailable = unsub })
 
     let unsubProgress: (() => void) | null = null
     onEvent<{ percent: number }>('update-progress', (payload) => {
+      if (cancelled) return
       setUpdateState(prev => ({ ...prev, progress: payload.percent }))
-    }).then(unsub => { unsubProgress = unsub })
+    }).then(unsub => { if (cancelled) unsub(); else unsubProgress = unsub })
 
     let unsubComplete: (() => void) | null = null
     onEvent<Record<string, never>>('update-complete', () => {
+      if (cancelled) return
       setUpdateState(prev => ({ ...prev, phase: 'downloaded' }))
-    }).then(unsub => { unsubComplete = unsub })
+    }).then(unsub => { if (cancelled) unsub(); else unsubComplete = unsub })
 
     let unsubError: (() => void) | null = null
     onEvent<{ message: string }>('update-error', (payload) => {
+      if (cancelled) return
       setUpdateState(prev => ({ ...prev, phase: 'error', error: payload.message }))
-    }).then(unsub => { unsubError = unsub })
+    }).then(unsub => { if (cancelled) unsub(); else unsubError = unsub })
 
     let unsubNavigate: (() => void) | null = null
     onEvent<{ tab: string }>('navigate-to-tab', (payload) => {
+      if (cancelled) return
       setActiveTab(payload.tab)
       if (payload.tab === 'about') {
         setUpdateState(prev => {
@@ -102,9 +108,10 @@ export function App() {
           return prev
         })
       }
-    }).then(unsub => { unsubNavigate = unsub })
+    }).then(unsub => { if (cancelled) unsub(); else unsubNavigate = unsub })
 
     return () => {
+      cancelled = true
       unsubUpdateAvailable?.()
       unsubProgress?.()
       unsubComplete?.()

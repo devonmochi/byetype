@@ -152,7 +152,13 @@ pub fn is_builtin_prompt_path(
     path: String,
 ) -> Result<bool, String> {
     let prompts_dir = resolve_prompts_dir(&app)?;
-    Ok(path.starts_with(&prompts_dir.to_string_lossy().as_ref()))
+    // 使用基于路径组件的包含判断（Path::starts_with），避免字符串前缀混淆
+    // （如 /app/promptsEVIL 被误判为内置路径），并对双方 canonicalize 以解析
+    // 符号链接与 ".." 等相对段。
+    let prompts_canon = std::fs::canonicalize(&prompts_dir).unwrap_or(prompts_dir);
+    let target = std::path::Path::new(&path);
+    let target_canon = std::fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf());
+    Ok(target_canon == prompts_canon || target_canon.starts_with(&prompts_canon))
 }
 
 #[tauri::command]

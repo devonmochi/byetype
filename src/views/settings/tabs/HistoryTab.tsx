@@ -101,9 +101,12 @@ function CopyButton({ text }: { text: string }) {
 
   const handleCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {
+      console.error('复制失败')
+    })
   }, [text])
 
   return (

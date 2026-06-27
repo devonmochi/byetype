@@ -30,7 +30,7 @@ async function init() {
     }, 300)
   }
   bg.onerror = () => {
-    invoke('submit_screenshot_crop', { crop: null })
+    invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
   }
 }
 

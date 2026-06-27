@@ -196,18 +196,20 @@ impl HistoryManager {
         status: &str,
         error_message: Option<String>,
     ) -> Result<(), String> {
-        if let Some(record) = self.records.iter_mut().find(|r| r.id == id) {
-            if let Some(t) = transcribe_text {
-                record.transcribe_text = Some(t);
-            }
-            if let Some(o) = optimize_text {
-                record.optimize_text = Some(o);
-            }
-            record.status = status.to_string();
-            record.error_message = error_message;
-            self.persist()?;
+        let record = self
+            .records
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or_else(|| format!("record {} not found", id))?;
+        if let Some(t) = transcribe_text {
+            record.transcribe_text = Some(t);
         }
-        Ok(())
+        if let Some(o) = optimize_text {
+            record.optimize_text = Some(o);
+        }
+        record.status = status.to_string();
+        record.error_message = error_message;
+        self.persist()
     }
 
     pub fn get_records(&self) -> &[HistoryRecord] {
