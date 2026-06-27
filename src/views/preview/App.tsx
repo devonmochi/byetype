@@ -146,7 +146,9 @@ export default function App() {
   }
 
   const handleClose = () => {
-    invoke('close_preview_window', { label: getCurrentWindow().label })
+    invoke('close_preview_window', { label: getCurrentWindow().label }).catch((err) =>
+      console.error('close_preview_window failed:', err)
+    )
   }
 
   return (

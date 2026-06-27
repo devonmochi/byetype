@@ -126,7 +126,14 @@ interface RecordRowProps {
   onRetry: (id: number) => void
 }
 
-function getExtractStageInfo(record: HistoryRecord): { screenshot: StageStatus; extract: { status: StageStatus; text: string } } {
+function getExtractStageInfo(record: HistoryRecord, retryStage?: string): { screenshot: StageStatus; extract: { status: StageStatus; text: string } } {
+  if (retryStage && (retryStage === 'retrying' || retryStage === 'extracting' || retryStage === 'transcribing')) {
+    return {
+      screenshot: 'success',
+      extract: { status: 'processing', text: '识别中...' }
+    }
+  }
+
   const screenshot: StageStatus = record.screenshotPath ? 'success' : (record.status === 'failed' ? 'error' : 'success')
 
   let extract: { status: StageStatus; text: string }
@@ -148,7 +155,7 @@ function RecordRow({ record, retryStage, onRetry }: RecordRowProps) {
   const isRetrying = !!retryStage
 
   if (isExtract) {
-    const info = getExtractStageInfo(record)
+    const info = getExtractStageInfo(record, retryStage)
     const screenshotMissing = !record.screenshotPath
     return (
       <div className="history-row">

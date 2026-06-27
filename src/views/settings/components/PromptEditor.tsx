@@ -259,8 +259,10 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
     if (!activePrompt) return
     const filePath = await selectFile()
     if (filePath) {
-      const newConfig = setConfigValue(config, activePrompt.configPath, filePath)
+      await flushSave()
+      const newConfig = setConfigValue(configRef.current, activePrompt.configPath, filePath)
       onSave(newConfig)
+      await loadFile(activePrompt)
     }
   }
 
@@ -270,8 +272,9 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
     if (!yes) return
     await flushSave()
     const builtinPath = await copyBuiltinPrompt(activePrompt.builtinFilename, true)
-    const newConfig = setConfigValue(config, activePrompt.configPath, builtinPath)
+    const newConfig = setConfigValue(configRef.current, activePrompt.configPath, builtinPath)
     onSave(newConfig)
+    await loadFile(activePrompt)
   }
 
   if (promptFiles.length === 0) return null
