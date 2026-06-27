@@ -225,7 +225,7 @@ pub fn list_input_devices() -> Result<Vec<AudioDevice>, String> {
 
     let mut devices = vec![AudioDevice {
         name: "system-default".to_string(),
-        is_default: false,
+        is_default: true,
     }];
 
     if let Ok(input_devices) = host.input_devices() {
@@ -419,7 +419,10 @@ pub async fn backup_to_local(
             let _ = sender.send(file_path);
         });
 
-    let file_path = receiver.recv()
+    // receiver.recv() 是同步阻塞调用，放入 spawn_blocking 以免占用 tokio 异步工作线程
+    let file_path = tokio::task::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|_| "对话框等待失败".to_string())?
         .map_err(|_| "文件对话框取消或超时".to_string())?;
 
     let path = match file_path {
@@ -447,7 +450,10 @@ pub async fn restore_from_local(
             let _ = sender.send(file_path);
         });
 
-    let file_path = receiver.recv()
+    // receiver.recv() 是同步阻塞调用，放入 spawn_blocking 以免占用 tokio 异步工作线程
+    let file_path = tokio::task::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|_| "对话框等待失败".to_string())?
         .map_err(|_| "文件对话框取消或超时".to_string())?;
 
     let path = match file_path {

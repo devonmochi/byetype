@@ -96,7 +96,12 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
 // Also handle lostpointercapture as a safety net
 document.addEventListener('keydown', async (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    await invoke('submit_screenshot_crop', { crop: null })
+    dragging = false
+    armed = false
+    selection.style.display = 'none'
+    sizeLabel.style.display = 'none'
+    overlay.style.display = 'none'
+    await invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
   }
 })
 
