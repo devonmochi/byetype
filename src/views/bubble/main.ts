@@ -31,7 +31,7 @@ function render(status: string) {
         e.preventDefault()
         e.stopPropagation()
         if (currentTaskId > 0) {
-          invoke('cancel_task', { taskId: currentTaskId })
+          invoke('cancel_task', { taskId: currentTaskId }).catch((err) => console.error('cancel_task failed:', err))
         }
       })
     }

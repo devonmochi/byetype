@@ -46,7 +46,23 @@ impl ConfigManager {
                                 if let Ok(migrated_json) = serde_json::to_string_pretty(&json_value) {
                                     // 原子写入：先写临时文件再 rename，避免写盘中途损坏 config.json
                                     let tmp = path.with_extension("json.tmp");
-                                    if fs::write(&tmp, &migrated_json).is_ok() {
+                                    // 以 0o600 权限直接创建临时文件，避免在权限收紧前的时间窗口内泄露敏感凭证
+                                    #[cfg(unix)]
+                                    let write_ok = {
+                                        use std::os::unix::fs::OpenOptionsExt;
+                                        use std::io::Write;
+                                        std::fs::OpenOptions::new()
+                                            .write(true)
+                                            .create(true)
+                                            .truncate(true)
+                                            .mode(0o600)
+                                            .open(&tmp)
+                                            .and_then(|mut f| f.write_all(migrated_json.as_bytes()))
+                                            .is_ok()
+                                    };
+                                    #[cfg(not(unix))]
+                                    let write_ok = fs::write(&tmp, &migrated_json).is_ok();
+                                    if write_ok {
                                         if fs::rename(&tmp, path).is_err() {
                                             // rename 失败时清理残留临时文件，避免敏感信息残留
                                             let _ = fs::remove_file(&tmp);
@@ -95,11 +111,30 @@ impl ConfigManager {
     }
 
     pub fn update(&self, new_config: AppConfig) -> Result<(), String> {
-        // 先序列化并落盘，成功后再更新内存，避免写盘失败时内存与磁盘状态不一致
+        // 先序列化，落盘与内存更新都在同一锁临界区内完成：
+        // 既避免写盘失败时内存与磁盘状态不一致，也防止并发 update() 争用同一临时文件导致 config.json 损坏
         let json = serde_json::to_string_pretty(&new_config).map_err(|e| e.to_string())?;
+        let mut config = self.config.lock().unwrap_or_else(|e| e.into_inner());
         // 原子写入：先写临时文件再 rename，避免写盘中途崩溃导致 config.json 被截断损坏
         let tmp = self.config_path.with_extension("json.tmp");
-        fs::write(&tmp, &json).map_err(|e| e.to_string())?;
+        // 以 0o600 权限直接创建临时文件，从源头避免在权限收紧前的时间窗口内泄露 API Key 等敏感凭证
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&tmp)
+                .map_err(|e| e.to_string())?;
+            use std::io::Write;
+            file.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&tmp, &json).map_err(|e| e.to_string())?;
+        }
         if let Err(e) = fs::rename(&tmp, &self.config_path) {
             // rename 失败时清理残留临时文件，避免敏感信息残留
             let _ = fs::remove_file(&tmp);
@@ -115,7 +150,6 @@ impl ConfigManager {
                 let _ = fs::set_permissions(&self.config_path, perm);
             }
         }
-        let mut config = self.config.lock().unwrap_or_else(|e| e.into_inner());
         *config = new_config;
         Ok(())
     }

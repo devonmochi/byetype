@@ -203,8 +203,7 @@ pub fn retry_record(
     app: tauri::AppHandle,
     record_id: u64,
 ) -> Result<(), String> {
-    crate::task::retry_record(&app, record_id);
-    Ok(())
+    crate::task::retry_record(&app, record_id)
 }
 
 #[tauri::command]

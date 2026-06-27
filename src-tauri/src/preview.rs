@@ -67,8 +67,17 @@ pub fn close_preview_window(app: AppHandle, label: String) {
 pub fn show(app: &AppHandle, text: &str) -> Result<(), String> {
     // 按文本计算尺寸
     let line_count = text.lines().count().max(3).min(20);
-    let max_line_len = text.lines().map(|l| l.len()).max().unwrap_or(40);
-    let width = (max_line_len as f64 * 8.0 + 80.0).clamp(320.0, 600.0);
+    // 按显示宽度估算而非字节长度:str::len() 对中文返回字节数(每字 3 字节),
+    // 会导致纯中文窗口严重偏宽。改用字符加权:CJK 约 16px、ASCII 约 8px。
+    let max_line_width = text
+        .lines()
+        .map(|l| {
+            l.chars()
+                .map(|c| if c.is_ascii() { 8.0 } else { 16.0 })
+                .sum::<f64>()
+        })
+        .fold(0.0f64, f64::max);
+    let width = (max_line_width + 80.0).clamp(320.0, 600.0);
     let height = (line_count as f64 * 22.0 + 140.0).clamp(180.0, 460.0);
 
     let shown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));

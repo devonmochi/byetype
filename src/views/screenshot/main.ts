@@ -79,7 +79,9 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
   const h = Math.abs(e.clientY - startY)
 
   if (w < 5 || h < 5) {
-    await invoke('submit_screenshot_crop', { crop: null })
+    await invoke('submit_screenshot_crop', { crop: null }).catch(() =>
+      invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+    )
     return
   }
 
@@ -90,7 +92,9 @@ document.addEventListener('pointerup', async (e: PointerEvent) => {
     w: Math.round(w * dpr),
     h: Math.round(h * dpr),
   }
-  await invoke('submit_screenshot_crop', { crop })
+  await invoke('submit_screenshot_crop', { crop }).catch(() =>
+    invoke('submit_screenshot_crop', { crop: null }).catch(() => {})
+  )
 })
 
 // Also handle lostpointercapture as a safety net

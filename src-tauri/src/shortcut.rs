@@ -16,10 +16,15 @@ pub fn register(
     recorder: Arc<AudioRecorder>,
 ) -> Result<(), String> {
     let cfg = app.state::<ConfigManager>().get();
+    // Image shortcut 1 falls back to "F6" when empty (see register_image_shortcut
+    // below). Apply the same fallback here so conflict detection sees the actual
+    // key that will be registered — otherwise an empty extract_shortcut would
+    // bypass the uniqueness check and silently collide with another "F6" shortcut.
+    let ek1 = if cfg.general.extract_shortcut.is_empty() { "F6".to_string() } else { cfg.general.extract_shortcut.clone() };
     let keys = [
         cfg.general.shortcut.clone(),
         cfg.general.shortcut2.clone(),
-        cfg.general.extract_shortcut.clone(),
+        ek1.clone(),
         cfg.general.extract_shortcut2.clone(),
     ];
 
@@ -43,8 +48,7 @@ pub fn register(
     if !cfg.general.shortcut2.is_empty() {
         register_voice_shortcut(app, &cfg.general.shortcut2, cfg.general.shortcut2_template.clone(), recorder.clone())?;
     }
-    // Image shortcut 1
-    let ek1 = if cfg.general.extract_shortcut.is_empty() { "F6".to_string() } else { cfg.general.extract_shortcut.clone() };
+    // Image shortcut 1 (ek1 with fallback already computed above for conflict detection)
     register_image_shortcut(app, &ek1, cfg.general.extract_shortcut_template.clone())?;
     // Image shortcut 2
     if !cfg.general.extract_shortcut2.is_empty() {

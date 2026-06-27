@@ -100,7 +100,13 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   contentRef.current = content
   resolvedPathRef.current = resolvedPath
 
-  const activePrompt = promptFiles.find(f => f.key === activeFile)!
+  const activePrompt = promptFiles.find(f => f.key === activeFile) ?? promptFiles[0]
+
+  useEffect(() => {
+    if (!promptFiles.some(f => f.key === activeFile) && promptFiles.length > 0) {
+      setActiveFile(promptFiles[0].key)
+    }
+  }, [promptFiles, activeFile])
 
   const flushSave = useCallback(async () => {
     if (debounceRef.current) {
@@ -233,8 +239,9 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [])
 
   useEffect(() => {
+    if (!activePrompt) return
     flushSave().then(() => loadFile(activePrompt))
-  }, [activeFile, config])
+  }, [activeFile, config, activePrompt])
 
   useEffect(() => {
     return () => { flushSave() }
@@ -246,6 +253,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }
 
   const handleBrowse = async () => {
+    if (!activePrompt) return
     const filePath = await selectFile()
     if (filePath) {
       const newConfig = setConfigValue(config, activePrompt.configPath, filePath)
@@ -254,6 +262,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }
 
   const handleResetToBuiltin = async () => {
+    if (!activePrompt) return
     const yes = await ask('确定要重置为内置提示词吗？当前的修改将被覆盖。', { title: 'ByeType', kind: 'warning' })
     if (!yes) return
     await flushSave()

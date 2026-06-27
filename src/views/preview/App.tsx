@@ -116,7 +116,7 @@ export default function App() {
       emit(`preview-text-applied-${label}`, {})
     }).then(() => {
       emit(`preview-ready-${label}`, {})
-    })
+    }).catch((err) => console.error('preview listen failed:', err))
   }, [])
 
   useEffect(() => {
