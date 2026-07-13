@@ -105,8 +105,6 @@ pub struct BuiltinApiKeys {
     pub openrouter: String,
     #[serde(default)]
     pub mimo: String,
-    #[serde(default)]
-    pub longcat: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -290,7 +288,6 @@ impl Default for AppConfig {
                     dashscope: String::new(),
                     openrouter: String::new(),
                     mimo: String::new(),
-                    longcat: String::new(),
                 },
                 custom: Vec::new(),
             },

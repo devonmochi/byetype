@@ -17,7 +17,6 @@ ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdo
 
 | 快捷指令 | 模型 | 安装 |
 |---------|------|------|
-| ByeType LongCat | LongCat Flash Omni（国内直连） | [添加到快捷指令](https://www.icloud.com/shortcuts/32e44afb36734dedab1ad61d863481e3) |
 | ByeType Gemini | Gemini 3 Flash | [添加到快捷指令](https://www.icloud.com/shortcuts/85403a4e55a0487c985109f944f46ae8) |
 
 > 安装后需要在快捷指令中填写你自己的 API Key和规则词汇等，和桌面版共用同一个 Key。
@@ -142,7 +141,6 @@ fn main() {
 |------|--------|---------|------|
 | Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
 | Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 国内直连，速度更快 |
-| LongCat Flash Omni | `LongCat-Flash-Omni-2603` | [LongCat](https://platform.longcat.chat/) | 国内直连，Qwen 的替代方案 |
 | MiMo v2.5 | `mimo-v2.5` | [小米 MiMo](https://api.xiaomimimo.com/) | 国内直连，Qwen 的替代方案 |
 | Gemini 3.0 Flash | `gemini-3-flash-preview` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理 |
 | Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite-preview` | 同上 | 更快速，适合低延迟场景，需代理 |

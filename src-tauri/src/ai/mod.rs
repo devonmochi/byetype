@@ -3,7 +3,6 @@ pub mod retry;
 pub mod gemini;
 pub mod openai_compat;
 pub mod mimo;
-pub mod longcat;
 pub mod deepseek;
 pub mod prompt;
 pub mod models;
@@ -67,17 +66,6 @@ pub async fn transcribe(
         }
         "mimo" => {
             mimo::transcribe(
-                client,
-                audio_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        "longcat" => {
-            longcat::transcribe(
                 client,
                 audio_base64,
                 &system_prompt,
@@ -164,17 +152,6 @@ pub async fn extract_text(
             )
             .await
         }
-        "longcat" => {
-            longcat::extract_text(
-                client,
-                image_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
         _ => {
             openai_compat::extract_text(
                 client,
@@ -250,17 +227,6 @@ pub async fn optimize(
         }
         "mimo" => {
             mimo::optimize(
-                client,
-                text,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        "longcat" => {
-            longcat::optimize(
                 client,
                 text,
                 &system_prompt,
