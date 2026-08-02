@@ -18,17 +18,16 @@ pub struct NormalizedAudio {
 }
 
 pub fn normalize_audio(
-    bytes: &[u8],
+    bytes: Vec<u8>,
     content_type: &str,
     max_duration_seconds: u32,
 ) -> Result<NormalizedAudio, String> {
-    let extension = extension_for_content_type(content_type)
-        .ok_or_else(|| format!("不支持的音频格式：{}", content_type))?;
+    let extension = validate_content_type(content_type)?;
     if bytes.is_empty() {
         return Err("音频内容为空".to_string());
     }
 
-    let source = MediaSourceStream::new(Box::new(Cursor::new(bytes.to_vec())), Default::default());
+    let source = MediaSourceStream::new(Box::new(Cursor::new(bytes)), Default::default());
     let mut hint = Hint::new();
     hint.with_extension(extension);
     let probed = symphonia::default::get_probe()
@@ -75,11 +74,16 @@ pub fn normalize_audio(
             Err(error) => return Err(format!("解码音频失败：{}", error)),
         };
         let spec = *decoded.spec();
-        sample_rate.get_or_insert(spec.rate);
-        channels.get_or_insert(spec.channels.count() as u16);
+        let current_sample_rate = *sample_rate.get_or_insert(spec.rate);
+        let current_channels = *channels.get_or_insert(spec.channels.count() as u16);
         let mut samples = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
         samples.copy_interleaved_ref(decoded);
         interleaved.extend_from_slice(samples.samples());
+        let max_interleaved_samples =
+            max_duration_seconds as u64 * current_sample_rate as u64 * current_channels as u64;
+        if interleaved.len() as u64 > max_interleaved_samples {
+            return Err(format!("音频时长超过{}秒限制", max_duration_seconds));
+        }
     }
 
     let sample_rate = sample_rate.ok_or_else(|| "音频中没有可解码内容".to_string())?;
@@ -91,7 +95,7 @@ pub fn normalize_audio(
     };
     let duration_seconds = mono.len() as f64 / sample_rate as f64;
     if duration_seconds > max_duration_seconds as f64 {
-        return Err(format!("音频时长超过 {} 秒限制", max_duration_seconds));
+        return Err(format!("音频时长超过{}秒限制", max_duration_seconds));
     }
 
     let resampled = resample(&mono, sample_rate, TARGET_SAMPLE_RATE);
@@ -105,10 +109,11 @@ pub fn normalize_audio(
     })
 }
 
-fn extension_for_content_type(content_type: &str) -> Option<&'static str> {
-    match content_type
+pub(crate) fn validate_content_type(content_type: &str) -> Result<&'static str, String> {
+    let extension = match content_type
         .split(';')
-        .next()?
+        .next()
+        .unwrap_or_default()
         .trim()
         .to_ascii_lowercase()
         .as_str()
@@ -118,7 +123,8 @@ fn extension_for_content_type(content_type: &str) -> Option<&'static str> {
         "audio/mp4" | "audio/m4a" | "audio/x-m4a" => Some("m4a"),
         "audio/wav" | "audio/wave" | "audio/x-wav" => Some("wav"),
         _ => None,
-    }
+    };
+    extension.ok_or_else(|| format!("不支持的音频格式：{}", content_type))
 }
 
 #[cfg(test)]
@@ -158,14 +164,14 @@ mod tests {
     fn wav_input_is_normalized_to_flac() {
         let wav = mono_wav(8_000, &[0, 1_000, -1_000, 0]);
 
-        let normalized = normalize_audio(&wav, "audio/wav", 180).unwrap();
+        let normalized = normalize_audio(wav, "audio/wav", 180).unwrap();
 
         assert_eq!(flac_sample_rate_and_channels(&normalized.flac), (16_000, 1));
     }
 
     #[test]
     fn unsupported_content_type_is_rejected() {
-        let error = normalize_audio(b"not audio", "text/plain", 180).unwrap_err();
+        let error = normalize_audio(b"not audio".to_vec(), "text/plain", 180).unwrap_err();
 
         assert_eq!(error, "不支持的音频格式：text/plain");
     }
@@ -174,8 +180,8 @@ mod tests {
     fn audio_over_the_configured_duration_is_rejected() {
         let wav = mono_wav(8_000, &[0; 8_000]);
 
-        let error = normalize_audio(&wav, "audio/wav", 0).unwrap_err();
+        let error = normalize_audio(wav, "audio/wav", 0).unwrap_err();
 
-        assert_eq!(error, "音频时长超过 0 秒限制");
+        assert_eq!(error, "音频时长超过0秒限制");
     }
 }

@@ -426,14 +426,14 @@ export function GeneralTab({ config, onSave }: Props) {
       <SettingGroup title="网络与性能">
         <SettingRow
           label="本机转写接口"
-          description="允许本机程序通过 HTTP 提交音频，结果以纯文本返回"
+          description="允许本机程序通过HTTP提交音频，结果以纯文本返回"
         >
           <Toggle
             checked={config.localApi.enabled}
             onChange={enabled => onSave({ ...config, localApi: { ...config.localApi, enabled } })}
           />
         </SettingRow>
-        <SettingRow label="本机接口端口" description="仅监听 127.0.0.1，不接受局域网访问">
+        <SettingRow label="本机接口端口" description="仅监听127.0.0.1，不接受局域网访问">
           <input
             className="input"
             type="number"
@@ -468,7 +468,7 @@ export function GeneralTab({ config, onSave }: Props) {
                 : '未开启'}
           </span>
         </SettingRow>
-        <SettingRow label="curl 示例" description="文件名和 Content-Type 按实际音频格式修改">
+        <SettingRow label="curl示例" description="文件名和Content-Type按实际音频格式修改">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 440 }}>
             <code style={{
               fontSize: 11,

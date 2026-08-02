@@ -2,8 +2,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Mutex;
 
 use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::extract::{DefaultBodyLimit, Extension, Query, Request, State};
+use axum::http::{header, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::Router;
@@ -12,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State as TauriState};
 use tokio_util::sync::CancellationToken;
 
-use crate::audio::input::normalize_audio;
+use crate::audio::input::{normalize_audio, validate_content_type};
 use crate::config::types::{AppConfig, LocalApiConfig};
 use crate::config::ConfigManager;
 use crate::task;
@@ -82,7 +83,7 @@ impl LocalApiManager {
         let listener = match tokio::net::TcpListener::bind(address).await {
             Ok(listener) => listener,
             Err(error) => {
-                let message = format!("无法监听 127.0.0.1:{}：{}", config.port, error);
+                let message = format!("无法监听127.0.0.1:{}：{}", config.port, error);
                 let previous_port = running.as_ref().map(|server| server.port);
                 self.set_status(
                     &app,
@@ -98,10 +99,15 @@ impl LocalApiManager {
 
         let shutdown = CancellationToken::new();
         let shutdown_signal = shutdown.clone();
+        let state = ApiState { app: app.clone() };
         let router = Router::new()
             .route("/transcribe", post(transcribe))
+            .route_layer(middleware::from_fn_with_state(
+                state.clone(),
+                reserve_task_slot,
+            ))
             .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
-            .with_state(ApiState { app: app.clone() });
+            .with_state(state);
 
         tauri::async_runtime::spawn(async move {
             let result = axum::serve(listener, router)
@@ -143,6 +149,12 @@ struct ApiState {
     app: AppHandle,
 }
 
+#[derive(Clone)]
+struct RequestTaskToken(CancellationToken);
+
+#[derive(Clone)]
+struct RequestAudioType(String);
+
 #[derive(Deserialize)]
 struct TranscribeQuery {
     template: Option<String>,
@@ -150,36 +162,21 @@ struct TranscribeQuery {
 
 async fn transcribe(
     State(state): State<ApiState>,
+    Extension(RequestTaskToken(token)): Extension<RequestTaskToken>,
+    Extension(RequestAudioType(content_type)): Extension<RequestAudioType>,
     Query(query): Query<TranscribeQuery>,
-    headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let content_type = match headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-    {
-        Some(content_type) => content_type.to_string(),
-        None => {
-            return text_response(
-                StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                "缺少 Content-Type 请求头",
-            )
-        }
-    };
     let config = state.app.state::<ConfigManager>().get();
     let template_id = match resolve_template(&config, query.template.as_deref()) {
         Ok(template_id) => template_id,
         Err(error) => return text_response(StatusCode::BAD_REQUEST, error),
     };
-    let lease = match task::start_external_task(&state.app) {
-        Ok(lease) => lease,
-        Err(error) => return text_response(StatusCode::TOO_MANY_REQUESTS, error),
-    };
-    let token = lease.token();
     let max_duration_seconds = config.general.max_recording_seconds;
     let audio_bytes = body.to_vec();
+    drop(body);
     let normalized = match tokio::task::spawn_blocking(move || {
-        normalize_audio(&audio_bytes, &content_type, max_duration_seconds)
+        normalize_audio(audio_bytes, &content_type, max_duration_seconds)
     })
     .await
     {
@@ -194,7 +191,6 @@ async fn transcribe(
     };
     let audio_base64 = base64::engine::general_purpose::STANDARD.encode(normalized.flac);
     let result = task::run_silent_pipeline(&state.app, audio_base64, token, template_id).await;
-    lease.finish();
 
     match result {
         Ok(text) => text_response(StatusCode::OK, text),
@@ -203,6 +199,37 @@ async fn transcribe(
         }
         Err(error) => text_response(StatusCode::BAD_GATEWAY, error),
     }
+}
+
+async fn reserve_task_slot(
+    State(state): State<ApiState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let content_type = match request
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+    {
+        Some(content_type) => content_type.to_string(),
+        None => return text_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, "缺少Content-Type请求头"),
+    };
+    if let Err(error) = validate_content_type(&content_type) {
+        return text_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, error);
+    }
+    let lease = match task::start_external_task(&state.app) {
+        Ok(lease) => lease,
+        Err(error) => return text_response(StatusCode::TOO_MANY_REQUESTS, error),
+    };
+    request
+        .extensions_mut()
+        .insert(RequestTaskToken(lease.token()));
+    request
+        .extensions_mut()
+        .insert(RequestAudioType(content_type));
+    let response = next.run(request).await;
+    lease.finish();
+    response
 }
 
 fn text_response(status: StatusCode, body: impl Into<String>) -> Response {
@@ -214,9 +241,9 @@ fn text_response(status: StatusCode, body: impl Into<String>) -> Response {
         .into_response()
 }
 
-fn resolve_template(config: &AppConfig, requested: Option<&str>) -> Result<String, String> {
+fn resolve_template(config: &AppConfig, requested: Option<&str>) -> Result<Option<String>, String> {
     match requested {
-        Some("raw") => Ok(String::new()),
+        Some("raw") => Ok(None),
         Some(template_id)
             if config
                 .voice_templates
@@ -224,10 +251,11 @@ fn resolve_template(config: &AppConfig, requested: Option<&str>) -> Result<Strin
                 .iter()
                 .any(|template| template.id == template_id) =>
         {
-            Ok(template_id.to_string())
+            Ok(Some(template_id.to_string()))
         }
         Some(template_id) => Err(format!("未知语音模板：{}", template_id)),
-        None => Ok(config.general.shortcut_template.clone()),
+        None => Ok((!config.general.shortcut_template.is_empty())
+            .then(|| config.general.shortcut_template.clone())),
     }
 }
 
@@ -242,19 +270,24 @@ pub fn get_local_api_status(
 mod tests {
     use super::*;
     use crate::config::types::AppConfig;
+    use std::sync::Arc;
+    use tokio::sync::Notify;
 
     #[test]
     fn missing_template_uses_the_first_shortcut_binding() {
         let config = AppConfig::default();
 
-        assert_eq!(resolve_template(&config, None).unwrap(), "voice-optimize");
+        assert_eq!(
+            resolve_template(&config, None).unwrap(),
+            Some("voice-optimize".to_string())
+        );
     }
 
     #[test]
     fn raw_template_skips_text_optimization() {
         let config = AppConfig::default();
 
-        assert_eq!(resolve_template(&config, Some("raw")), Ok(String::new()));
+        assert_eq!(resolve_template(&config, Some("raw")), Ok(None));
     }
 
     #[test]
@@ -265,5 +298,67 @@ mod tests {
             resolve_template(&config, Some("missing")),
             Err("未知语音模板：missing".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn client_disconnect_drops_the_request_future() {
+        #[derive(Clone)]
+        struct Probe {
+            started: Arc<Notify>,
+            cancelled: Arc<Notify>,
+        }
+
+        struct NotifyOnDrop(Arc<Notify>);
+
+        impl Drop for NotifyOnDrop {
+            fn drop(&mut self) {
+                self.0.notify_one();
+            }
+        }
+
+        async fn pending_request(State(probe): State<Probe>) -> &'static str {
+            let _cancel_on_drop = NotifyOnDrop(probe.cancelled.clone());
+            probe.started.notify_one();
+            std::future::pending::<()>().await;
+            "unreachable"
+        }
+
+        let probe = Probe {
+            started: Arc::new(Notify::new()),
+            cancelled: Arc::new(Notify::new()),
+        };
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_probe = probe.clone();
+        let server = tokio::spawn(async move {
+            axum::serve(
+                listener,
+                Router::new()
+                    .route("/probe", post(pending_request))
+                    .with_state(server_probe),
+            )
+            .await
+            .unwrap();
+        });
+        let client = tokio::net::TcpStream::connect(address).await.unwrap();
+        client.writable().await.unwrap();
+        client
+            .try_write(b"POST /probe HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), probe.started.notified())
+            .await
+            .unwrap();
+
+        drop(client);
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            probe.cancelled.notified(),
+        )
+        .await
+        .unwrap();
+        server.abort();
     }
 }

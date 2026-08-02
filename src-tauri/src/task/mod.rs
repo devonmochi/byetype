@@ -53,6 +53,26 @@ impl TaskManager {
     pub fn clear_history(&mut self) -> Result<(), String> {
         self.history.clear()
     }
+
+    fn reserve_task(
+        &mut self,
+        max_parallel: u32,
+        retry_record_id: Option<u64>,
+    ) -> Option<(u32, CancellationToken)> {
+        if self.active_count >= max_parallel {
+            return None;
+        }
+        if self.active_count == 0 {
+            self.task_counter = 0;
+        }
+        self.task_counter += 1;
+        self.active_count += 1;
+        let task_id = self.task_counter;
+        let token = CancellationToken::new();
+        self.cancel_tokens
+            .insert(task_id, (token.clone(), retry_record_id));
+        Some((task_id, token))
+    }
 }
 
 pub type SharedTaskManager = Arc<Mutex<TaskManager>>;
@@ -78,7 +98,10 @@ impl ExternalTaskLease {
             return;
         }
         self.token.cancel();
-        let mut manager = self.manager.lock().unwrap_or_else(|error| error.into_inner());
+        let mut manager = self
+            .manager
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if manager.cancel_tokens.remove(&self.task_id).is_some() {
             manager.active_count = manager.active_count.saturating_sub(1);
         }
@@ -97,18 +120,9 @@ pub fn start_external_task(app: &AppHandle) -> Result<ExternalTaskLease, String>
     let manager = app.state::<SharedTaskManager>().inner().clone();
     let (task_id, token) = {
         let mut state = manager.lock().unwrap_or_else(|error| error.into_inner());
-        if state.active_count >= max_parallel {
-            return Err("已达最大并行任务数，请稍后重试".to_string());
-        }
-        if state.active_count == 0 {
-            state.task_counter = 0;
-        }
-        state.task_counter += 1;
-        state.active_count += 1;
-        let task_id = state.task_counter;
-        let token = CancellationToken::new();
-        state.cancel_tokens.insert(task_id, (token.clone(), None));
-        (task_id, token)
+        state
+            .reserve_task(max_parallel, None)
+            .ok_or_else(|| "已达最大并行任务数，请稍后重试".to_string())?
     };
 
     Ok(ExternalTaskLease {
@@ -141,17 +155,11 @@ pub async fn run_silent_pipeline(
     app: &AppHandle,
     audio_base64: String,
     token: CancellationToken,
-    template_id: String,
+    template_id: Option<String>,
 ) -> Result<String, String> {
-    let output = execute_pipeline(
-        app,
-        audio_base64,
-        token,
-        template_id,
-        Arc::new(|_| {}),
-    )
-    .await
-    .map_err(|failure| failure.message)?;
+    let output = execute_pipeline(app, audio_base64, token, template_id, Arc::new(|_| {}))
+        .await
+        .map_err(|failure| failure.message)?;
     Ok(output.final_text)
 }
 
@@ -162,22 +170,14 @@ pub fn start_recording(app: &AppHandle) -> Option<u32> {
     let task_id = {
         let state = app.state::<SharedTaskManager>();
         let mut mgr = state.lock().unwrap();
-        if mgr.active_count >= config.advanced.max_parallel {
+        let Some((task_id, _token)) = mgr.reserve_task(config.advanced.max_parallel, None) else {
             eprintln!(
                 "[TaskManager] Max parallel tasks reached ({}), cannot start",
                 config.advanced.max_parallel
             );
             return None;
-        }
-        if mgr.active_count == 0 {
-            mgr.task_counter = 0;
-        }
-        mgr.task_counter += 1;
-        mgr.active_count += 1;
-        let token = CancellationToken::new();
-        let id = mgr.task_counter;
-        mgr.cancel_tokens.insert(id, (token, None));
-        id
+        };
+        task_id
     };
 
     if let Err(e) = crate::bubble::show(app, task_id) {
@@ -296,19 +296,13 @@ pub fn retry_record(app: &AppHandle, record_id: u64) -> Result<(), String> {
             return Err("该录音正在重试中，请稍候".to_string());
         }
 
-        if mgr.active_count >= config.advanced.max_parallel {
+        let Some((task_id, token)) =
+            mgr.reserve_task(config.advanced.max_parallel, Some(record_id))
+        else {
             eprintln!("[TaskManager] Max parallel tasks reached, cannot retry");
             return Err("已达最大并行任务数，请稍后重试".to_string());
-        }
-        if mgr.active_count == 0 {
-            mgr.task_counter = 0;
-        }
-        mgr.task_counter += 1;
-        mgr.active_count += 1;
-        let token = CancellationToken::new();
-        let id = mgr.task_counter;
-        mgr.cancel_tokens.insert(id, (token.clone(), Some(record_id)));
-        (id, audio, token)
+        };
+        (task_id, audio, token)
     };
 
     if let Err(e) = crate::bubble::show(app, task_id) {
@@ -346,33 +340,21 @@ async fn run_pipeline(
     template_id: String,
 ) {
     let observer_app = app.clone();
-    let observer = Arc::new(move |event| match event {
-        PipelineEvent::Transcribing => {
-            let _ = crate::bubble::update(&observer_app, task_id, "transcribing");
-            if let Some(record_id) = retry_record_id {
-                let _ = observer_app.emit("retry-status", serde_json::json!({
+    let observer = Arc::new(move |event| {
+        let status = match event {
+            PipelineEvent::Transcribing => "transcribing",
+            PipelineEvent::Optimizing => "optimizing",
+            PipelineEvent::Retrying => "retrying",
+        };
+        let _ = crate::bubble::update(&observer_app, task_id, status);
+        if let Some(record_id) = retry_record_id {
+            let _ = observer_app.emit(
+                "retry-status",
+                serde_json::json!({
                     "recordId": record_id,
-                    "status": "transcribing"
-                }));
-            }
-        }
-        PipelineEvent::Optimizing => {
-            let _ = crate::bubble::update(&observer_app, task_id, "optimizing");
-            if let Some(record_id) = retry_record_id {
-                let _ = observer_app.emit("retry-status", serde_json::json!({
-                    "recordId": record_id,
-                    "status": "optimizing"
-                }));
-            }
-        }
-        PipelineEvent::Retrying => {
-            let _ = crate::bubble::update(&observer_app, task_id, "retrying");
-            if let Some(record_id) = retry_record_id {
-                let _ = observer_app.emit("retry-status", serde_json::json!({
-                    "recordId": record_id,
-                    "status": "retrying"
-                }));
-            }
+                    "status": status
+                }),
+            );
         }
     });
 
@@ -380,7 +362,7 @@ async fn run_pipeline(
         app,
         audio_base64.clone(),
         token.clone(),
-        template_id,
+        (!template_id.is_empty()).then_some(template_id),
         observer,
     )
     .await
@@ -409,14 +391,22 @@ async fn run_pipeline(
     let config = app.state::<ConfigManager>().get();
 
     // Phase 3: Paste result
-    if let Err(e) = crate::clipboard::paste_text(&output.final_text, config.general.overwrite_clipboard) {
+    if let Err(e) =
+        crate::clipboard::paste_text(&output.final_text, config.general.overwrite_clipboard)
+    {
         eprintln!("[TaskManager] Paste failed: {}", e);
     }
 
     // Success
     finish_pipeline(
-        app, task_id, retry_record_id, &audio_base64,
-        Some(output.transcribe_text), output.optimize_text, "completed", None,
+        app,
+        task_id,
+        retry_record_id,
+        &audio_base64,
+        Some(output.transcribe_text),
+        output.optimize_text,
+        "completed",
+        None,
     );
 }
 
@@ -424,19 +414,23 @@ async fn execute_pipeline(
     app: &AppHandle,
     audio_base64: String,
     token: CancellationToken,
-    template_id: String,
+    template_id: Option<String>,
     observer: Arc<dyn Fn(PipelineEvent) + Send + Sync>,
 ) -> Result<PipelineOutput, PipelineFailure> {
     let (config, prompts_dir) = {
         let state = app.state::<SharedTaskManager>();
         let manager = state.lock().unwrap_or_else(|error| error.into_inner());
-        (app.state::<ConfigManager>().get(), manager.prompts_dir.clone())
+        (
+            app.state::<ConfigManager>().get(),
+            manager.prompts_dir.clone(),
+        )
     };
-    let client = build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url)
-        .map_err(|message| PipelineFailure {
+    let client = build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url).map_err(
+        |message| PipelineFailure {
             message,
             transcribe_text: None,
-        })?;
+        },
+    )?;
 
     observer(PipelineEvent::Transcribing);
     let retry_observer = observer.clone();
@@ -469,13 +463,13 @@ async fn execute_pipeline(
         transcribe_text: None,
     })?;
 
-    if template_id.is_empty() {
+    let Some(template_id) = template_id else {
         return Ok(PipelineOutput {
             final_text: transcribe.clone(),
             transcribe_text: transcribe,
             optimize_text: None,
         });
-    }
+    };
 
     observer(PipelineEvent::Optimizing);
     let retry_observer = observer.clone();
@@ -587,22 +581,14 @@ pub fn start_extraction(app: &AppHandle, template_id: String) -> Option<u32> {
     let task_id = {
         let state = app.state::<SharedTaskManager>();
         let mut mgr = state.lock().unwrap();
-        if mgr.active_count >= config.advanced.max_parallel {
+        let Some((task_id, _token)) = mgr.reserve_task(config.advanced.max_parallel, None) else {
             eprintln!(
                 "[TaskManager] Max parallel tasks reached ({}), cannot start extraction",
                 config.advanced.max_parallel
             );
             return None;
-        }
-        if mgr.active_count == 0 {
-            mgr.task_counter = 0;
-        }
-        mgr.task_counter += 1;
-        mgr.active_count += 1;
-        let token = CancellationToken::new();
-        let id = mgr.task_counter;
-        mgr.cancel_tokens.insert(id, (token, None));
-        id
+        };
+        task_id
     };
 
     let app_handle = app.clone();
