@@ -135,13 +135,13 @@ impl AudioRecorder {
 
         // Mix to mono if multi-channel
         let mono = if channels > 1 {
-            mix_to_mono(&samples_data, channels)
+            super::mix_to_mono(&samples_data, channels)
         } else {
             samples_data
         };
 
         // Resample to 16kHz
-        let resampled = resample(&mono, sample_rate, 16_000);
+        let resampled = super::resample(&mono, sample_rate, 16_000);
 
         // Convert f32 [-1.0, 1.0] to i16
         let pcm: Vec<i16> = resampled.iter().map(|&s| {
@@ -172,31 +172,6 @@ impl AudioRecorder {
     }
 }
 
-/// Mix interleaved multi-channel samples to mono by averaging.
-fn mix_to_mono(samples: &[f32], channels: u16) -> Vec<f32> {
-    let ch = channels as usize;
-    samples.chunks(ch)
-        .map(|frame| frame.iter().sum::<f32>() / frame.len() as f32)
-        .collect()
-}
-
-/// Resample using linear interpolation.
-fn resample(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
-    if from_rate == to_rate || input.is_empty() {
-        return input.to_vec();
-    }
-    let ratio = from_rate as f64 / to_rate as f64;
-    let output_len = (input.len() as f64 / ratio) as usize;
-    (0..output_len).map(|i| {
-        let src_pos = i as f64 * ratio;
-        let idx = src_pos as usize;
-        let frac = (src_pos - idx as f64) as f32;
-        let a = input[idx];
-        let b = if idx + 1 < input.len() { input[idx + 1] } else { a };
-        a + (b - a) * frac
-    }).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,7 +191,7 @@ mod tests {
     #[test]
     fn test_mix_to_mono_stereo() {
         let stereo = vec![0.5, -0.5, 1.0, 0.0];
-        let mono = mix_to_mono(&stereo, 2);
+        let mono = crate::audio::mix_to_mono(&stereo, 2);
         assert_eq!(mono.len(), 2);
         assert!((mono[0] - 0.0).abs() < 1e-6);
         assert!((mono[1] - 0.5).abs() < 1e-6);
@@ -225,7 +200,7 @@ mod tests {
     #[test]
     fn test_resample_downsample() {
         let input = vec![0.0, 0.5, 1.0, 0.5];
-        let output = resample(&input, 48_000, 16_000);
+        let output = crate::audio::resample(&input, 48_000, 16_000);
         assert!(!output.is_empty());
         assert!(output.len() < input.len());
     }
@@ -233,7 +208,7 @@ mod tests {
     #[test]
     fn test_resample_same_rate() {
         let input = vec![0.1, 0.2, 0.3];
-        let output = resample(&input, 16_000, 16_000);
+        let output = crate::audio::resample(&input, 16_000, 16_000);
         assert_eq!(output, input);
     }
 

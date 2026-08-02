@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub general: GeneralConfig,
+    #[serde(default)]
+    pub local_api: LocalApiConfig,
     pub models: ModelsConfig,
     pub transcribe: TranscribeConfig,
     #[serde(alias = "optimize")]
@@ -13,6 +15,31 @@ pub struct AppConfig {
     pub advanced: AdvancedConfig,
     #[serde(default)]
     pub backup: BackupConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalApiConfig {
+    pub enabled: bool,
+    pub port: u16,
+}
+
+impl Default for LocalApiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: 8765,
+        }
+    }
+}
+
+impl AppConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.local_api.port < 1024 {
+            return Err("本机接口端口必须在 1024 到 65535 之间".to_string());
+        }
+        Ok(())
+    }
 }
 
 fn default_true() -> bool {
@@ -281,6 +308,7 @@ impl Default for AppConfig {
                 ptt_mode: false,
                 overwrite_clipboard: true,
             },
+            local_api: LocalApiConfig::default(),
             models: ModelsConfig {
                 builtin_api_keys: BuiltinApiKeys {
                     gemini: String::new(),
@@ -325,5 +353,41 @@ impl Default for AppConfig {
             },
             backup: BackupConfig::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod local_api_tests {
+    use super::*;
+
+    #[test]
+    fn local_api_is_opt_in_on_the_stable_default_port() {
+        let config = AppConfig::default();
+
+        assert!(!config.local_api.enabled);
+        assert_eq!(config.local_api.port, 8765);
+    }
+
+    #[test]
+    fn local_api_rejects_privileged_ports() {
+        let mut config = AppConfig::default();
+        config.local_api.enabled = true;
+        config.local_api.port = 80;
+
+        assert_eq!(
+            config.validate(),
+            Err("本机接口端口必须在 1024 到 65535 之间".to_string())
+        );
+    }
+
+    #[test]
+    fn existing_config_without_local_api_uses_safe_defaults() {
+        let mut value = serde_json::to_value(AppConfig::default()).unwrap();
+        value.as_object_mut().unwrap().remove("localApi");
+
+        let config: AppConfig = serde_json::from_value(value).unwrap();
+
+        assert!(!config.local_api.enabled);
+        assert_eq!(config.local_api.port, 8765);
     }
 }

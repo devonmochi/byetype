@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import type { AppConfig, AudioDevice, UpdateInfo, BackupEntry } from '../core/types'
+import type { AppConfig, AudioDevice, UpdateInfo, BackupEntry, LocalApiStatus } from '../core/types'
 
 // Config commands
 export async function getConfig(): Promise<AppConfig> {
@@ -11,6 +11,10 @@ export async function getConfig(): Promise<AppConfig> {
 
 export async function saveConfig(config: AppConfig): Promise<boolean> {
   return invoke<boolean>('save_config', { config })
+}
+
+export async function getLocalApiStatus(): Promise<LocalApiStatus> {
+  return invoke<LocalApiStatus>('get_local_api_status')
 }
 
 // Prompt commands
@@ -137,4 +141,3 @@ export async function backupToLocal(): Promise<string> {
 export async function restoreFromLocal(): Promise<void> {
   return invoke<void>('restore_from_local')
 }
-

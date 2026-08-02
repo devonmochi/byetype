@@ -57,6 +57,104 @@ impl TaskManager {
 
 pub type SharedTaskManager = Arc<Mutex<TaskManager>>;
 
+pub struct ExternalTaskLease {
+    manager: SharedTaskManager,
+    task_id: u32,
+    token: CancellationToken,
+    released: bool,
+}
+
+impl ExternalTaskLease {
+    pub fn token(&self) -> CancellationToken {
+        self.token.clone()
+    }
+
+    pub fn finish(mut self) {
+        self.release();
+    }
+
+    fn release(&mut self) {
+        if self.released {
+            return;
+        }
+        self.token.cancel();
+        let mut manager = self.manager.lock().unwrap_or_else(|error| error.into_inner());
+        if manager.cancel_tokens.remove(&self.task_id).is_some() {
+            manager.active_count = manager.active_count.saturating_sub(1);
+        }
+        self.released = true;
+    }
+}
+
+impl Drop for ExternalTaskLease {
+    fn drop(&mut self) {
+        self.release();
+    }
+}
+
+pub fn start_external_task(app: &AppHandle) -> Result<ExternalTaskLease, String> {
+    let max_parallel = app.state::<ConfigManager>().get().advanced.max_parallel;
+    let manager = app.state::<SharedTaskManager>().inner().clone();
+    let (task_id, token) = {
+        let mut state = manager.lock().unwrap_or_else(|error| error.into_inner());
+        if state.active_count >= max_parallel {
+            return Err("已达最大并行任务数，请稍后重试".to_string());
+        }
+        if state.active_count == 0 {
+            state.task_counter = 0;
+        }
+        state.task_counter += 1;
+        state.active_count += 1;
+        let task_id = state.task_counter;
+        let token = CancellationToken::new();
+        state.cancel_tokens.insert(task_id, (token.clone(), None));
+        (task_id, token)
+    };
+
+    Ok(ExternalTaskLease {
+        manager,
+        task_id,
+        token,
+        released: false,
+    })
+}
+
+#[derive(Clone, Copy)]
+enum PipelineEvent {
+    Transcribing,
+    Optimizing,
+    Retrying,
+}
+
+struct PipelineOutput {
+    transcribe_text: String,
+    optimize_text: Option<String>,
+    final_text: String,
+}
+
+struct PipelineFailure {
+    message: String,
+    transcribe_text: Option<String>,
+}
+
+pub async fn run_silent_pipeline(
+    app: &AppHandle,
+    audio_base64: String,
+    token: CancellationToken,
+    template_id: String,
+) -> Result<String, String> {
+    let output = execute_pipeline(
+        app,
+        audio_base64,
+        token,
+        template_id,
+        Arc::new(|_| {}),
+    )
+    .await
+    .map_err(|failure| failure.message)?;
+    Ok(output.final_text)
+}
+
 /// Called from shortcut.rs when recording STARTS.
 /// Allocates a task_id, shows bubble with "recording" status, returns the task_id.
 pub fn start_recording(app: &AppHandle) -> Option<u32> {
@@ -247,157 +345,175 @@ async fn run_pipeline(
     token: CancellationToken,
     template_id: String,
 ) {
-    // Get config snapshot and prompts_dir - release lock before any .await
-    let (config, prompts_dir) = {
-        let state = app.state::<SharedTaskManager>();
-        let mgr = state.lock().unwrap();
-        (app.state::<ConfigManager>().get(), mgr.prompts_dir.clone())
-    };
+    let observer_app = app.clone();
+    let observer = Arc::new(move |event| match event {
+        PipelineEvent::Transcribing => {
+            let _ = crate::bubble::update(&observer_app, task_id, "transcribing");
+            if let Some(record_id) = retry_record_id {
+                let _ = observer_app.emit("retry-status", serde_json::json!({
+                    "recordId": record_id,
+                    "status": "transcribing"
+                }));
+            }
+        }
+        PipelineEvent::Optimizing => {
+            let _ = crate::bubble::update(&observer_app, task_id, "optimizing");
+            if let Some(record_id) = retry_record_id {
+                let _ = observer_app.emit("retry-status", serde_json::json!({
+                    "recordId": record_id,
+                    "status": "optimizing"
+                }));
+            }
+        }
+        PipelineEvent::Retrying => {
+            let _ = crate::bubble::update(&observer_app, task_id, "retrying");
+            if let Some(record_id) = retry_record_id {
+                let _ = observer_app.emit("retry-status", serde_json::json!({
+                    "recordId": record_id,
+                    "status": "retrying"
+                }));
+            }
+        }
+    });
 
-    let max_retries = config.advanced.max_retries;
-    let transcribe_timeout = config.advanced.transcribe_timeout;
-    let optimize_timeout = config.advanced.optimize_timeout;
-
-    // Build HTTP client (once per pipeline run)
-    let client = match build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("[TaskManager] Failed to build client: {}", e);
+    let output = match execute_pipeline(
+        app,
+        audio_base64.clone(),
+        token.clone(),
+        template_id,
+        observer,
+    )
+    .await
+    {
+        Ok(output) => output,
+        Err(_) if token.is_cancelled() => {
+            eprintln!("[TaskManager] Task {} cancelled", task_id);
+            return;
+        }
+        Err(failure) => {
+            eprintln!("[TaskManager] Pipeline failed: {}", failure.message);
             finish_pipeline(
-                app, task_id, retry_record_id, &audio_base64,
-                None, None, "failed", Some(e),
+                app,
+                task_id,
+                retry_record_id,
+                &audio_base64,
+                failure.transcribe_text,
+                None,
+                "failed",
+                Some(failure.message),
             );
             return;
         }
     };
 
-    // Phase 1: Transcribe
-    let _ = crate::bubble::update(app, task_id, "transcribing");
-    if let Some(rid) = retry_record_id {
-        let _ = app.emit("retry-status", serde_json::json!({ "recordId": rid, "status": "transcribing" }));
-    }
-
-    let transcribe_result = {
-        let client = client.clone();
-        let audio = audio_base64.clone();
-        let cfg = config.clone();
-        let pd = prompts_dir.clone();
-        tokio::select! {
-            result = ai::retry::with_retry(
-                || {
-                    let client = client.clone();
-                    let audio = audio.clone();
-                    let cfg = cfg.clone();
-                    let pd = pd.clone();
-                    async move {
-                        ai::transcribe(&client, &audio, &cfg, &pd).await
-                    }
-                },
-                max_retries,
-                transcribe_timeout,
-                |_attempt| {
-                    let _ = crate::bubble::update(app, task_id, "retrying");
-                    if let Some(rid) = retry_record_id {
-                        let _ = app.emit("retry-status", serde_json::json!({
-                            "recordId": rid, "status": "retrying"
-                        }));
-                    }
-                },
-            ) => result,
-            _ = token.cancelled() => {
-                eprintln!("[TaskManager] Task {} cancelled during transcription", task_id);
-                return;
-            }
-        }
-    };
-
-    let transcribe_text: String = match transcribe_result {
-        Ok(text) => text,
-        Err(e) => {
-            eprintln!("[TaskManager] Transcription failed: {}", e);
-            finish_pipeline(
-                app, task_id, retry_record_id, &audio_base64,
-                None, None, "failed", Some(e),
-            );
-            return;
-        }
-    };
-
-    // Phase 2: Optimize (if enabled)
-    let final_text: String;
-    let optimize_text: Option<String>;
-
-    if !template_id.is_empty() {
-        let _ = crate::bubble::update(app, task_id, "optimizing");
-        if let Some(rid) = retry_record_id {
-            let _ = app.emit("retry-status", serde_json::json!({ "recordId": rid, "status": "optimizing" }));
-        }
-
-        let optimize_result = {
-            let client = client.clone();
-            let txt = transcribe_text.clone();
-            let cfg = config.clone();
-            let pd = prompts_dir.clone();
-            let tid = template_id.clone();
-            tokio::select! {
-                result = ai::retry::with_retry(
-                    || {
-                        let client = client.clone();
-                        let txt = txt.clone();
-                        let cfg = cfg.clone();
-                        let pd = pd.clone();
-                        let tid = tid.clone();
-                        async move {
-                            ai::optimize(&client, &txt, &cfg, &pd, &tid).await
-                        }
-                    },
-                    max_retries,
-                    optimize_timeout,
-                    |_attempt| {
-                        let _ = crate::bubble::update(app, task_id, "retrying");
-                        if let Some(rid) = retry_record_id {
-                            let _ = app.emit("retry-status", serde_json::json!({
-                                "recordId": rid, "status": "retrying"
-                            }));
-                        }
-                    },
-                ) => result,
-                _ = token.cancelled() => {
-                    eprintln!("[TaskManager] Task {} cancelled during optimization", task_id);
-                    return;
-                }
-            }
-        };
-
-        match optimize_result {
-            Ok(text) => {
-                optimize_text = Some(text.clone());
-                final_text = text;
-            }
-            Err(e) => {
-                eprintln!("[TaskManager] Optimization failed: {}", e);
-                finish_pipeline(
-                    app, task_id, retry_record_id, &audio_base64,
-                    Some(transcribe_text), None, "failed", Some(e),
-                );
-                return;
-            }
-        }
-    } else {
-        optimize_text = None;
-        final_text = transcribe_text.clone();
-    }
+    let config = app.state::<ConfigManager>().get();
 
     // Phase 3: Paste result
-    if let Err(e) = crate::clipboard::paste_text(&final_text, config.general.overwrite_clipboard) {
+    if let Err(e) = crate::clipboard::paste_text(&output.final_text, config.general.overwrite_clipboard) {
         eprintln!("[TaskManager] Paste failed: {}", e);
     }
 
     // Success
     finish_pipeline(
         app, task_id, retry_record_id, &audio_base64,
-        Some(transcribe_text), optimize_text, "completed", None,
+        Some(output.transcribe_text), output.optimize_text, "completed", None,
     );
+}
+
+async fn execute_pipeline(
+    app: &AppHandle,
+    audio_base64: String,
+    token: CancellationToken,
+    template_id: String,
+    observer: Arc<dyn Fn(PipelineEvent) + Send + Sync>,
+) -> Result<PipelineOutput, PipelineFailure> {
+    let (config, prompts_dir) = {
+        let state = app.state::<SharedTaskManager>();
+        let manager = state.lock().unwrap_or_else(|error| error.into_inner());
+        (app.state::<ConfigManager>().get(), manager.prompts_dir.clone())
+    };
+    let client = build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url)
+        .map_err(|message| PipelineFailure {
+            message,
+            transcribe_text: None,
+        })?;
+
+    observer(PipelineEvent::Transcribing);
+    let retry_observer = observer.clone();
+    let transcribe = {
+        let client = client.clone();
+        let audio = audio_base64.clone();
+        let config = config.clone();
+        let prompts_dir = prompts_dir.clone();
+        tokio::select! {
+            result = ai::retry::with_retry(
+                || {
+                    let client = client.clone();
+                    let audio = audio.clone();
+                    let config = config.clone();
+                    let prompts_dir = prompts_dir.clone();
+                    async move { ai::transcribe(&client, &audio, &config, &prompts_dir).await }
+                },
+                config.advanced.max_retries,
+                config.advanced.transcribe_timeout,
+                move |_| retry_observer(PipelineEvent::Retrying),
+            ) => result,
+            _ = token.cancelled() => return Err(PipelineFailure {
+                message: "任务已取消".to_string(),
+                transcribe_text: None,
+            }),
+        }
+    }
+    .map_err(|message| PipelineFailure {
+        message,
+        transcribe_text: None,
+    })?;
+
+    if template_id.is_empty() {
+        return Ok(PipelineOutput {
+            final_text: transcribe.clone(),
+            transcribe_text: transcribe,
+            optimize_text: None,
+        });
+    }
+
+    observer(PipelineEvent::Optimizing);
+    let retry_observer = observer.clone();
+    let optimized = {
+        let client = client.clone();
+        let text = transcribe.clone();
+        let config = config.clone();
+        let prompts_dir = prompts_dir.clone();
+        tokio::select! {
+            result = ai::retry::with_retry(
+                || {
+                    let client = client.clone();
+                    let text = text.clone();
+                    let config = config.clone();
+                    let prompts_dir = prompts_dir.clone();
+                    let template_id = template_id.clone();
+                    async move { ai::optimize(&client, &text, &config, &prompts_dir, &template_id).await }
+                },
+                config.advanced.max_retries,
+                config.advanced.optimize_timeout,
+                move |_| retry_observer(PipelineEvent::Retrying),
+            ) => result,
+            _ = token.cancelled() => return Err(PipelineFailure {
+                message: "任务已取消".to_string(),
+                transcribe_text: Some(transcribe.clone()),
+            }),
+        }
+    }
+    .map_err(|message| PipelineFailure {
+        message,
+        transcribe_text: Some(transcribe.clone()),
+    })?;
+
+    Ok(PipelineOutput {
+        transcribe_text: transcribe,
+        optimize_text: Some(optimized.clone()),
+        final_text: optimized,
+    })
 }
 
 fn finish_pipeline(

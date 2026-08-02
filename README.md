@@ -25,6 +25,34 @@ ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdo
 
 ![录音 → 转写 → 优化 → 自动粘贴](docs/images/demo.gif)
 
+## 🔌 本机 HTTP 接口
+
+在「设置 → 通用设置 → 网络与性能」中首次开启本机转写接口后，其他本机程序可以复用ByeType当前的模型、代理、专有词汇、转写规则和语音模板。接口只监听`127.0.0.1`，不会开放给局域网设备。
+
+处理音频文件：
+
+```bash
+curl -fsS -X POST \
+  --data-binary @recording.m4a \
+  -H 'Content-Type: audio/mp4' \
+  'http://127.0.0.1:8765/transcribe'
+```
+
+从标准输入读取音频，并指定已有模板：
+
+```bash
+some-audio-command | curl -fsS -X POST \
+  --data-binary @- \
+  -H 'Content-Type: audio/mpeg' \
+  'http://127.0.0.1:8765/transcribe?template=voice-translate'
+```
+
+- 支持M4A、MP3、WAV和FLAC。
+- 不传`template`时，使用第一语音快捷键绑定的模板。
+- 使用`template=raw`时，只执行转写，不执行第二阶段文本优化。
+- 成功响应只包含最终文本；错误通过HTTP状态码返回。
+- 接口调用不会显示气泡、修改剪贴板、自动粘贴或写入历史记录。
+
 ## 🏆 为什么选择 ByeType
 
 | | ByeType | 传统语音输入 | Whisper/ASR 本地方案 |

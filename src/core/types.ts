@@ -26,6 +26,17 @@ export interface GeneralConfig {
   overwriteClipboard?: boolean
 }
 
+export interface LocalApiConfig {
+  enabled: boolean
+  port: number
+}
+
+export interface LocalApiStatus {
+  running: boolean
+  port: number | null
+  error: string | null
+}
+
 export interface ThinkingConfig {
   enabled: boolean
   budget: number
@@ -114,6 +125,7 @@ export interface BackupEntry {
 
 export interface AppConfig {
   general: GeneralConfig
+  localApi: LocalApiConfig
   models: ModelsConfig
   transcribe: TranscribeConfig
   voiceTemplates: VoiceTemplatesConfig

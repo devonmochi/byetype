@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { AppConfig, AudioDevice, ThemeMode } from '../../../core/types'
+import { AppConfig, AudioDevice, LocalApiStatus, ThemeMode } from '../../../core/types'
 import {
   getLaunchAtLogin,
+  getLocalApiStatus,
+  onEvent,
   setLaunchAtLogin,
   listInputDevices,
 } from '../../../lib/tauri-api'
@@ -39,12 +41,36 @@ export function GeneralTab({ config, onSave }: Props) {
   const [recordingExtract2, setRecordingExtract2] = useState(false)
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [conflictMsg, setConflictMsg] = useState('')
+  const [localApiStatus, setLocalApiStatus] = useState<LocalApiStatus>({
+    running: false,
+    port: null,
+    error: null,
+  })
+  const [curlCopied, setCurlCopied] = useState(false)
 
   // Load device list
   useEffect(() => {
     listInputDevices()
       .then(setDevices)
       .catch(e => console.error('Failed to list input devices:', e))
+  }, [])
+
+  useEffect(() => {
+    let disposed = false
+    let unsubscribe: (() => void) | undefined
+    getLocalApiStatus()
+      .then(status => { if (!disposed) setLocalApiStatus(status) })
+      .catch(error => console.error('Failed to get local API status:', error))
+    onEvent<LocalApiStatus>('local-api-status', status => {
+      if (!disposed) setLocalApiStatus(status)
+    }).then(fn => {
+      if (disposed) fn()
+      else unsubscribe = fn
+    })
+    return () => {
+      disposed = true
+      unsubscribe?.()
+    }
   }, [])
 
   const refreshDevices = async () => {
@@ -76,6 +102,8 @@ export function GeneralTab({ config, onSave }: Props) {
   const updateAdvanced = (changes: Partial<AppConfig['advanced']>) => {
     onSave({ ...config, advanced: { ...config.advanced, ...changes } })
   }
+
+  const curlCommand = `curl -fsS -X POST --data-binary @recording.m4a -H 'Content-Type: audio/mp4' 'http://127.0.0.1:${config.localApi.port}/transcribe'`
 
   const labelOf = {
     shortcut: config.general.shortcutLabel?.trim() || DEFAULT_LABELS.shortcut,
@@ -396,6 +424,72 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="网络与性能">
+        <SettingRow
+          label="本机转写接口"
+          description="允许本机程序通过 HTTP 提交音频，结果以纯文本返回"
+        >
+          <Toggle
+            checked={config.localApi.enabled}
+            onChange={enabled => onSave({ ...config, localApi: { ...config.localApi, enabled } })}
+          />
+        </SettingRow>
+        <SettingRow label="本机接口端口" description="仅监听 127.0.0.1，不接受局域网访问">
+          <input
+            className="input"
+            type="number"
+            value={config.localApi.port}
+            min={1024}
+            max={65535}
+            onChange={event => {
+              const port = Number(event.target.value)
+              if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
+                onSave({ ...config, localApi: { ...config.localApi, port } })
+              }
+            }}
+            style={{ width: 100 }}
+          />
+        </SettingRow>
+        <SettingRow label="接口状态">
+          <span style={{
+            color: localApiStatus.error
+              ? '#ff3b30'
+              : localApiStatus.running
+                ? '#34c759'
+                : 'var(--text-secondary)',
+            fontSize: 12,
+            maxWidth: 360,
+            display: 'inline-block',
+            textAlign: 'right',
+          }}>
+            {localApiStatus.error
+              ? localApiStatus.error
+              : localApiStatus.running
+                ? `运行中：127.0.0.1:${localApiStatus.port}`
+                : '未开启'}
+          </span>
+        </SettingRow>
+        <SettingRow label="curl 示例" description="文件名和 Content-Type 按实际音频格式修改">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 440 }}>
+            <code style={{
+              fontSize: 11,
+              color: 'var(--text-secondary)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: 340,
+            }} title={curlCommand}>{curlCommand}</code>
+            <button
+              className="file-picker-btn"
+              onClick={async () => {
+                await navigator.clipboard.writeText(curlCommand)
+                setCurlCopied(true)
+                setTimeout(() => setCurlCopied(false), 1500)
+              }}
+            >
+              {curlCopied ? '已复制' : '复制'}
+            </button>
+          </div>
+        </SettingRow>
         <SettingRow label="转写超时时间" description="单位：秒">
           <input
             className="input"

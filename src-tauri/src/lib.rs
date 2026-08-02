@@ -10,6 +10,7 @@ mod shortcut;
 mod tray;
 mod updater;
 mod backup;
+mod local_api;
 #[cfg(target_os = "windows")]
 mod screenshot_win32;
 
@@ -32,6 +33,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(recorder.clone())
+        .manage(local_api::LocalApiManager::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
@@ -52,6 +54,7 @@ pub fn run() {
             commands::list_input_devices,
             commands::test_model_connectivity,
             commands::update_clipboard_text,
+            local_api::get_local_api_status,
             task::get_screenshot_image,
             task::submit_screenshot_crop,
             preview::set_preview_pinned,
@@ -88,6 +91,18 @@ pub fn run() {
             app.manage::<ScreenshotSender>(Arc::new(Mutex::new(None)));
             app.manage::<ScreenshotImageState>(Arc::new(Mutex::new(None)));
             app.manage(updater::UpdateState::new(None));
+
+            let local_api_handle = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let config = local_api_handle.state::<ConfigManager>().get();
+                let manager = local_api_handle.state::<local_api::LocalApiManager>();
+                if let Err(error) = manager
+                    .configure(local_api_handle.clone(), &config.local_api)
+                    .await
+                {
+                    eprintln!("[LocalApi] Startup failed: {}", error);
+                }
+            });
 
             bubble::init(&app_handle)
                 .expect("Failed to pre-create bubble window");

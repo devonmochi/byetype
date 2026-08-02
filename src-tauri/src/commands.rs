@@ -46,13 +46,16 @@ pub fn get_config(config_manager: State<'_, ConfigManager>) -> Result<AppConfig,
 }
 
 #[tauri::command]
-pub fn save_config(
+pub async fn save_config(
     app: tauri::AppHandle,
     config_manager: State<'_, ConfigManager>,
     recorder: State<'_, Arc<AudioRecorder>>,
+    local_api_manager: State<'_, crate::local_api::LocalApiManager>,
     config: AppConfig,
 ) -> Result<bool, String> {
+    config.validate()?;
     let old_config = config_manager.get();
+    let recorder = recorder.inner().clone();
     let old_shortcut = old_config.general.shortcut.clone();
     let old_shortcut2 = old_config.general.shortcut2.clone();
     let old_extract_shortcut = old_config.general.extract_shortcut.clone();
@@ -61,7 +64,15 @@ pub fn save_config(
     let old_shortcut2_template = old_config.general.shortcut2_template.clone();
     let old_extract_shortcut_template = old_config.general.extract_shortcut_template.clone();
     let old_extract_shortcut2_template = old_config.general.extract_shortcut2_template.clone();
-    config_manager.update(config.clone())?;
+    local_api_manager
+        .configure(app.clone(), &config.local_api)
+        .await?;
+    if let Err(error) = config_manager.update(config.clone()) {
+        let _ = local_api_manager
+            .configure(app.clone(), &old_config.local_api)
+            .await;
+        return Err(error);
+    }
 
     let shortcuts_changed = config.general.shortcut != old_shortcut
         || config.general.shortcut2 != old_shortcut2
@@ -72,11 +83,14 @@ pub fn save_config(
         || config.general.extract_shortcut_template != old_extract_shortcut_template
         || config.general.extract_shortcut2_template != old_extract_shortcut2_template;
     if shortcuts_changed {
-        if let Err(e) = crate::shortcut::register(&app, (*recorder).clone()) {
+        if let Err(e) = crate::shortcut::register(&app, recorder.clone()) {
             // 注册失败：旧快捷键已被 unregister_all 清空，且新配置（含可能非法/冲突的快捷键）已写盘。
             // 回滚配置到 old_config 并重新注册旧快捷键，避免用户丢失全部全局快捷键且无法恢复。
             config_manager.update(old_config.clone()).ok();
-            let _ = crate::shortcut::register(&app, (*recorder).clone());
+            let _ = local_api_manager
+                .configure(app.clone(), &old_config.local_api)
+                .await;
+            let _ = crate::shortcut::register(&app, recorder.clone());
             return Err(e);
         }
     }
@@ -460,4 +474,3 @@ pub async fn restore_from_local(
     let zip_path = std::path::PathBuf::from(path.to_string());
     local_backup::restore_from_local(&zip_path, &data_dir)
 }
-

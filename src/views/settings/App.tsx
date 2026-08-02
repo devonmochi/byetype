@@ -158,6 +158,7 @@ export function App() {
       } catch (e: any) {
         const msg = typeof e === 'string' ? e : e?.message || '保存失败'
         setErrorMsg(msg)
+        getConfig().then(setConfig).catch(() => {})
         setTimeout(() => setErrorMsg(''), 4000)
       }
     }, 300)
