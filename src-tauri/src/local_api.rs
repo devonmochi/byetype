@@ -176,17 +176,18 @@ async fn transcribe(
     let audio_bytes = body.to_vec();
     drop(body);
     let conversion_token = token.clone();
-    let normalized = match tokio::task::spawn_blocking(move || {
-        normalize_audio(
+    let audio_base64 = match tokio::task::spawn_blocking(move || {
+        let normalized = normalize_audio(
             audio_bytes,
             &content_type,
             max_duration_seconds,
             &conversion_token,
-        )
+        )?;
+        encode_base64_with_cancel(normalized.flac, &conversion_token)
     })
     .await
     {
-        Ok(Ok(audio)) => audio,
+        Ok(Ok(audio_base64)) => audio_base64,
         Ok(Err(error)) => return text_response(StatusCode::BAD_REQUEST, error),
         Err(error) => {
             return text_response(
@@ -195,7 +196,6 @@ async fn transcribe(
             )
         }
     };
-    let audio_base64 = base64::engine::general_purpose::STANDARD.encode(normalized.flac);
     let result = task::run_silent_pipeline(&state.app, audio_base64, token, template_id).await;
 
     match result {
@@ -205,6 +205,22 @@ async fn transcribe(
         }
         Err(error) => text_response(StatusCode::BAD_GATEWAY, error),
     }
+}
+
+fn encode_base64_with_cancel(
+    bytes: Vec<u8>,
+    cancellation: &CancellationToken,
+) -> Result<String, String> {
+    const INPUT_CHUNK_BYTES: usize = 3 * 4096;
+
+    let mut encoded = String::with_capacity(bytes.len().saturating_mul(4) / 3 + 4);
+    for chunk in bytes.chunks(INPUT_CHUNK_BYTES) {
+        if cancellation.is_cancelled() {
+            return Err("请求已取消".to_string());
+        }
+        base64::engine::general_purpose::STANDARD.encode_string(chunk, &mut encoded);
+    }
+    Ok(encoded)
 }
 
 async fn reserve_task_slot(
@@ -304,6 +320,16 @@ mod tests {
             resolve_template(&config, Some("missing")),
             Err("未知语音模板：missing".to_string())
         );
+    }
+
+    #[test]
+    fn cancelled_base64_conversion_stops_before_encoding() {
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let error = encode_base64_with_cancel(b"audio".to_vec(), &cancellation).unwrap_err();
+
+        assert_eq!(error, "请求已取消");
     }
 
     #[tokio::test]
