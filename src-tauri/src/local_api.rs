@@ -175,8 +175,14 @@ async fn transcribe(
     let max_duration_seconds = config.general.max_recording_seconds;
     let audio_bytes = body.to_vec();
     drop(body);
+    let conversion_token = token.clone();
     let normalized = match tokio::task::spawn_blocking(move || {
-        normalize_audio(audio_bytes, &content_type, max_duration_seconds)
+        normalize_audio(
+            audio_bytes,
+            &content_type,
+            max_duration_seconds,
+            &conversion_token,
+        )
     })
     .await
     {
