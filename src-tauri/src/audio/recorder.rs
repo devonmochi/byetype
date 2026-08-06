@@ -1,9 +1,23 @@
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::SampleFormat;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use super::encoder;
+
+/// 判定麦克风「真的在采集」的能量阈值（RMS）。蓝牙耳机在 HFP 握手期间
+/// CoreAudio 会照常回调，但送来的是全零静音，只看回调到达会误判成已就绪。
+/// 真实麦克风即使在安静环境也有本底噪声，不会是精确的 0。
+const READY_RMS_THRESHOLD: f32 = 0.00002;
+
+fn rms(data: &[f32]) -> f32 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    let sum: f32 = data.iter().map(|s| s * s).sum();
+    (sum / data.len() as f32).sqrt()
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RecordingState {
@@ -22,6 +36,9 @@ pub struct AudioRecorder {
     state: Mutex<RecordingState>,
     active: Mutex<Option<ActiveRecording>>,
     start_instant: Mutex<Option<Instant>>,
+    /// 首个音频回调是否已到达。蓝牙耳机要先完成 HFP 握手才会送数据，
+    /// 这段时间 CoreAudio 不回调，用这个标志告诉 UI 何时真正可以开口。
+    audio_started: Arc<AtomicBool>,
 }
 
 // SAFETY: All fields are protected by Mutex. cpal::Stream is !Send/!Sync only
@@ -36,6 +53,7 @@ impl AudioRecorder {
             state: Mutex::new(RecordingState::Idle),
             active: Mutex::new(None),
             start_instant: Mutex::new(None),
+            audio_started: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -45,6 +63,11 @@ impl AudioRecorder {
 
     pub fn elapsed_since_start(&self) -> Option<std::time::Duration> {
         self.start_instant.lock().unwrap().as_ref().map(|t| t.elapsed())
+    }
+
+    /// 本次录音是否已收到首个音频回调（即设备真正开始采集）。
+    pub fn audio_started(&self) -> bool {
+        self.audio_started.load(Ordering::SeqCst)
     }
 
     pub fn start(&self, device_name: &str) -> Result<(), String> {
@@ -65,13 +88,18 @@ impl AudioRecorder {
         let config: cpal::StreamConfig = default_config.into();
 
         let samples: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
+        self.audio_started.store(false, Ordering::SeqCst);
 
         let stream = match sample_format {
             SampleFormat::F32 => {
                 let sc = Arc::clone(&samples);
+                let started = Arc::clone(&self.audio_started);
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                        if !started.load(Ordering::Relaxed) && rms(data) > READY_RMS_THRESHOLD {
+                            started.store(true, Ordering::SeqCst);
+                        }
                         if let Ok(mut buf) = sc.try_lock() {
                             buf.extend_from_slice(data);
                         }
@@ -82,9 +110,22 @@ impl AudioRecorder {
             }
             SampleFormat::I16 => {
                 let sc = Arc::clone(&samples);
+                let started = Arc::clone(&self.audio_started);
                 device.build_input_stream(
                     &config,
                     move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                        if !started.load(Ordering::Relaxed) && !data.is_empty() {
+                            let sum: f32 = data
+                                .iter()
+                                .map(|&s| {
+                                    let f = s as f32 / 32768.0;
+                                    f * f
+                                })
+                                .sum();
+                            if (sum / data.len() as f32).sqrt() > READY_RMS_THRESHOLD {
+                                started.store(true, Ordering::SeqCst);
+                            }
+                        }
                         if let Ok(mut buf) = sc.try_lock() {
                             buf.extend(data.iter().map(|&s| s as f32 / 32768.0));
                         }

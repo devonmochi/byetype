@@ -10,130 +10,101 @@
       display: flex; align-items: center; justify-content: center;
     }
 
-    .check {
-      color: white; font-size: 18px; font-weight: bold;
+    /* === 唯一的气泡元素 ===
+       所有状态复用同一个 .shape，只切换形状类和配色类。首次插入时就带上
+       最终的类，所以初始渲染不会触发过渡（否则宽度会从内容自然宽度收到
+       34px，看起来像弹出时缺了半截）。 */
+    .shape {
+      position: relative;
+      box-sizing: border-box;
+      width: 34px; height: 34px;
+      padding: 0 12px;              /* 圆形和药丸共用，避免过渡 padding 触发额外布局 */
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      white-space: nowrap;
+      color: white; font-size: 13px; font-weight: 600;
       font-family: -apple-system, sans-serif;
-    }
-    .x {
-      color: white; font-size: 16px; font-weight: bold;
-      font-family: -apple-system, sans-serif;
-    }
-
-    /* === 进行中：录音 圆形 === */
-    .s-recording {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: linear-gradient(270deg, #ff4757, #ff6b81, #ff4757, #c44569);
       background-size: 400% 100%;
       animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
                  wave 4s ease infinite 0.6s;
+      transition: width 0.32s cubic-bezier(0.4,0,0.2,1),
+                  border-radius 0.32s cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 0.32s ease;
+    }
+
+    /* 形状：圆形（录音/完成/失败） 与 药丸（各种 Thinking） */
+    .shape.is-round { width: 34px; border-radius: 50%; }
+    .shape.is-pill  { width: 130px; border-radius: 20px; }
+
+    /* 准备中：麦克风还没送出音频（蓝牙握手期）。
+       用一层灰色遮罩淡入淡出，而不是 filter: grayscale ——
+       filter 会让底下持续跑的渐变动画每帧重新做一次全量重绘，明显掉帧；
+       遮罩只改 opacity，交给合成器处理，不产生重绘。 */
+    .shape::before {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: inherit;
+      background: #929b9e;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+    }
+    .shape.is-preparing::before { opacity: 1; }
+    /* 遮罩盖不住 box-shadow，红色投影会在灰点周围透出一圈红晕，
+       所以准备中要单独把投影也换成中性灰。 */
+    .shape.is-preparing { box-shadow: 0 2px 8px rgba(120,130,133,0.35); }
+
+    /* 配色 */
+    .c-recording {
+      background-image: linear-gradient(270deg, #ff4757, #ff6b81, #ff4757, #c44569);
       box-shadow: 0 4px 14px rgba(255,71,87,0.4);
-      display: flex; align-items: center; justify-content: center;
     }
-    .rec-dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: white;
-    }
-
-    /* === 进行中：转录 药丸 === */
-    .s-transcribing {
-      display: inline-flex; align-items: center;
-      padding: 7px 18px; border-radius: 20px;
-      background: linear-gradient(270deg, #5f27cd, #6c63ff, #a29bfe, #5f27cd);
-      background-size: 400% 100%;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
-                 wave 4s ease infinite 0.6s;
+    .c-thinking {
+      background-image: linear-gradient(270deg, #5f27cd, #6c63ff, #a29bfe, #5f27cd);
       box-shadow: 0 4px 14px rgba(108,99,255,0.4);
-      color: white; font-size: 13px; font-weight: 600;
-      font-family: -apple-system, sans-serif;
     }
-
-    /* === 进行中：图像识别 药丸 === */
-    .s-extracting {
-      display: inline-flex; align-items: center;
-      padding: 7px 18px; border-radius: 20px;
-      background: linear-gradient(270deg, #5f27cd, #6c63ff, #a29bfe, #5f27cd);
-      background-size: 400% 100%;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
-                 wave 4s ease infinite 0.6s;
-      box-shadow: 0 4px 14px rgba(108,99,255,0.4);
-      color: white; font-size: 13px; font-weight: 600;
-      font-family: -apple-system, sans-serif;
-    }
-
-    /* === 进行中：优化 药丸 === */
-    .s-optimizing {
-      display: inline-flex; align-items: center;
-      padding: 7px 18px; border-radius: 20px;
-      background: linear-gradient(270deg, #0abde3, #48dbfb, #74b9ff, #0abde3);
-      background-size: 400% 100%;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
-                 wave 4s ease infinite 0.6s;
+    .c-optimizing {
+      background-image: linear-gradient(270deg, #0abde3, #48dbfb, #74b9ff, #0abde3);
       box-shadow: 0 4px 14px rgba(10,189,227,0.4);
-      color: white; font-size: 13px; font-weight: 600;
-      font-family: -apple-system, sans-serif;
     }
-
-    /* === 进行中：重试 药丸 === */
-    .s-retrying {
-      display: inline-flex; align-items: center;
-      padding: 7px 18px; border-radius: 20px;
-      background: linear-gradient(270deg, #ff9f43, #feca57, #f39c12, #ff9f43);
-      background-size: 400% 100%;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
-                 wave 4s ease infinite 0.6s;
+    .c-retrying {
+      background-image: linear-gradient(270deg, #ff9f43, #feca57, #f39c12, #ff9f43);
       box-shadow: 0 4px 14px rgba(255,159,67,0.4);
-      color: white; font-size: 13px; font-weight: 600;
-      font-family: -apple-system, sans-serif;
     }
-
-    /* === 终态：完成 === */
-    .s-completed {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: linear-gradient(270deg, #2ecc71, #55efc4, #00b894, #2ecc71);
-      background-size: 400% 100%;
+    .c-completed {
+      background-image: linear-gradient(270deg, #2ecc71, #55efc4, #00b894, #2ecc71);
       box-shadow: 0 4px 14px rgba(46,204,113,0.4);
-      display: flex; align-items: center; justify-content: center;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
-                 wave 4s ease infinite 0.6s;
     }
-
-    /* === 终态：失败 === */
-    .s-failed {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: linear-gradient(270deg, #95a5a6, #b2bec3, #636e72, #95a5a6);
-      background-size: 400% 100%;
+    .c-failed {
+      background-image: linear-gradient(270deg, #95a5a6, #b2bec3, #636e72, #95a5a6);
       box-shadow: 0 2px 8px rgba(149,165,166,0.4);
-      display: flex; align-items: center; justify-content: center;
-      animation: bounceIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both,
-                 wave 4s ease infinite 0.6s;
     }
 
-    /* === 动画 === */
+    /* 内容元素：压在遮罩之上，按状态显隐 */
+    .dot, .label, .glyph, .cancel-btn { position: relative; z-index: 1; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: white; flex: none; }
+    .glyph { font-size: 18px; font-weight: bold; line-height: 1; }
+    .cancel-btn {
+      margin-left: 8px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px; font-weight: bold;
+      cursor: pointer; padding: 0 2px;
+      transition: color 0.15s;
+    }
+    .cancel-btn:hover { color: rgba(255, 255, 255, 1); }
+
+    /* === 动画 ===
+       bounceIn 峰值从 1.18 降到 1.10：药丸宽 130px，1.18 倍会超出
+       140px 的气泡窗口被系统裁掉，看起来就是弹出时缺了两边。 */
     @keyframes bounceIn {
-      0%   { transform: scale(0); opacity: 0; }
-      50%  { transform: scale(1.18); }
-      70%  { transform: scale(0.92); }
+      0%   { transform: scale(0.4); opacity: 0; }
+      55%  { transform: scale(1.06); opacity: 1; }
       100% { transform: scale(1); opacity: 1; }
     }
     @keyframes wave {
       0%   { background-position: 0% 50%; }
       50%  { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
-    }
-
-    /* === 取消按钮 === */
-    .cancel-btn {
-      margin-left: 8px;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      padding: 0 2px;
-      font-family: -apple-system, sans-serif;
-      transition: color 0.15s;
-    }
-    .cancel-btn:hover {
-      color: rgba(255, 255, 255, 1);
     }
   </style>
 </head>

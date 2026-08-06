@@ -10,6 +10,11 @@ use crate::config::ConfigManager;
 /// PTT 模式下，按住时间小于此阈值视为误触，丢弃录音。
 const PTT_MIN_DURATION_MS: u64 = 300;
 
+/// 等待麦克风送出首帧音频的轮询间隔。
+const READY_POLL_INTERVAL_MS: u64 = 20;
+/// 等待首帧音频的最大轮询次数（20ms × 150 = 3 秒兜底）。
+const READY_POLL_TICKS: u32 = 150;
+
 /// Register all 4 global shortcuts (2 voice + 2 image), each bound to its own template_id.
 pub fn register(
     app: &AppHandle,
@@ -240,6 +245,31 @@ fn start_voice_recording(
     match recorder.start(&mic) {
         Ok(()) => {
             update_tray_icon(app_handle, true);
+
+            // 蓝牙耳机要先完成 HFP 握手才会送出第一帧音频，这段时间麦克风
+            // 其实没在采集。气泡先停在 preparing，收到首个回调后再转 recording，
+            // 用户看到红点再开口，避免开头几秒白说。有线/内置麦克风几乎瞬间
+            // 回调，观感上和以前一样。
+            {
+                let w_recorder = recorder.clone();
+                let w_app = app_handle.clone();
+                let w_gen = recording_gen.clone();
+                std::thread::spawn(move || {
+                    // 兜底 3 秒：设备异常一直不送有效音频时也让气泡转红，不卡在准备中。
+                    for _ in 0..READY_POLL_TICKS {
+                        if w_gen.load(Ordering::SeqCst) != gen {
+                            return; // 录音已结束，不要再改气泡
+                        }
+                        if w_recorder.audio_started() {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(READY_POLL_INTERVAL_MS));
+                    }
+                    if w_gen.load(Ordering::SeqCst) == gen {
+                        let _ = crate::bubble::update(&w_app, tid, "recording");
+                    }
+                });
+            }
 
             let max_secs = app_handle.state::<ConfigManager>().get().general.max_recording_seconds;
             if max_secs > 0 {

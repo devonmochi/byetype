@@ -127,7 +127,9 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
         let _ = app.emit_to(
             &label,
             "show-bubble",
-            serde_json::json!({ "taskNumber": task_id, "status": "recording" }),
+            // 先渲染 preparing（灰点），等麦克风真正送出首帧音频后由
+            // shortcut.rs 的等待线程 update 成 recording（红点）。
+            serde_json::json!({ "taskNumber": task_id, "status": "preparing" }),
         );
     } else {
         eprintln!("[Bubble] Window {} not found in pool", label);
