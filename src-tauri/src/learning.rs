@@ -14,7 +14,7 @@ const LEARNING_SYSTEM_PROMPT: &str = r#"你负责从用户对语音转写结果�
 1. 先判断corrected是否由original修改而来。主题或文本结构明显无关时，related为false，不输出任何规则操作。
 2. 只学习语音识别造成的词语错误。忽略标点、排版、语气、增删内容和改写表达。
 3. 每条规则只保留正确词及周围1至2个能说明语境的词，格式为“正确片段，不是错误片段”。例如：“项目技能，不是项目智能”。
-4. 与existingRules重复时不要添加。新规则与旧规则语义相反或比旧规则更具体时，把冲突的旧规则放进remove，把新规则放进add。remove中的每项必须逐字复制existingRules中的完整字符串。不要删除无关规则。
+4. 与existingRules完全重复时不要添加。学习规则只累加，不删除或替换已有规则，remove始终返回空数组。
 5. 只返回JSON，不要使用Markdown或解释。格式必须是：{"related":true,"remove":[],"add":[]}。"#;
 
 pub struct VoiceLearningManager {
@@ -166,17 +166,13 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
     let mut rules = parse_rules(&existing);
     let original_rules = rules.clone();
 
-    let removals: Vec<String> = analysis
-        .remove
+    let additions: Vec<String> = analysis
+        .add
         .iter()
         .filter_map(|rule| normalize_rule(rule))
         .collect();
-    let before_remove = rules.len();
-    rules.retain(|rule| !removals.contains(rule));
-    let removed = before_remove - rules.len();
-
     let mut added = 0;
-    for rule in analysis.add.iter().filter_map(|rule| normalize_rule(rule)) {
+    for rule in additions {
         if !rules.contains(&rule) {
             rules.push(rule);
             added += 1;
@@ -194,7 +190,7 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
     let document = update_rule_lines(&existing, &original_rules, &rules);
     write_document(path, &document)?;
 
-    Ok(LearningOutcome::Updated { added, removed })
+    Ok(LearningOutcome::Updated { added, removed: 0 })
 }
 
 fn write_document(path: &Path, content: &str) -> Result<(), String> {
@@ -446,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn updates_conflicting_rule_and_deduplicates_additions() {
+    fn appends_new_rule_and_deduplicates_additions() {
         let path = test_file("voice-learning.md");
         fs::create_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be created");
@@ -473,12 +469,12 @@ mod tests {
             outcome,
             LearningOutcome::Updated {
                 added: 1,
-                removed: 1
+                removed: 0
             }
         );
         assert_eq!(
             fs::read_to_string(&path).expect("learning document should exist"),
-            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 保持API大写\n\n- 项目技能，不是项目智能\n"
+            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n\n- 项目技能，不是项目智能\n"
         );
 
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
@@ -551,7 +547,7 @@ mod tests {
             .expect("test directory should be created");
         fs::write(
             &path,
-            "# 我的学习规则\n\n这段说明由用户维护。\n\n- 旧规则\n\n## 备注\n\n保留这里。\n",
+            "# 我的学习规则\n\n这段说明由用户维护。\n\n- 智能，不是技能\n\n## 备注\n\n保留这里。\n",
         )
         .expect("fixture should be written");
 
@@ -559,7 +555,7 @@ mod tests {
             &path,
             LearningAnalysis {
                 related: true,
-                remove: vec!["旧规则".to_string()],
+                remove: vec!["智能，不是技能".to_string()],
                 add: vec!["项目技能，不是项目智能".to_string()],
             },
         )
@@ -569,7 +565,7 @@ mod tests {
         assert!(content.contains("# 我的学习规则"));
         assert!(content.contains("这段说明由用户维护。"));
         assert!(content.contains("## 备注\n\n保留这里。"));
-        assert!(!content.contains("- 旧规则"));
+        assert!(content.contains("- 智能，不是技能"));
         assert!(content.contains("- 项目技能，不是项目智能"));
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be removed");
@@ -587,5 +583,30 @@ mod tests {
         assert!(merged.contains("用户改过的说明。"));
         assert!(!merged.contains("- 原规则"));
         assert!(merged.contains("- AI新增规则"));
+    }
+
+    #[test]
+    fn unrelated_existing_rule_is_not_removed_when_adding_a_new_rule() {
+        let path = test_file("voice-learning.md");
+        fs::create_dir_all(path.parent().expect("test path should have parent"))
+            .expect("test directory should be created");
+        fs::write(&path, format!("{DOCUMENT_HEADER}- 李氏，不是李四\n"))
+            .expect("fixture should be written");
+
+        apply_analysis(
+            &path,
+            LearningAnalysis {
+                related: true,
+                remove: vec!["李氏，不是李四".to_string()],
+                add: vec!["宠物组，不是宠物族".to_string()],
+            },
+        )
+        .expect("analysis should be applied");
+
+        let content = fs::read_to_string(&path).expect("learning document should exist");
+        assert!(content.contains("- 李氏，不是李四"));
+        assert!(content.contains("- 宠物组，不是宠物族"));
+        fs::remove_dir_all(path.parent().expect("test path should have parent"))
+            .expect("test directory should be removed");
     }
 }
