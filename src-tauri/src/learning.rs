@@ -1,9 +1,9 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const DOCUMENT_HEADER: &str = "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n";
 const LEARNING_SYSTEM_PROMPT: &str = r#"你负责从用户对语音转写结果的手动修改中提取简短纠错规则。
@@ -20,6 +20,7 @@ const LEARNING_SYSTEM_PROMPT: &str = r#"你负责从用户对语音转写结果�
 pub struct VoiceLearningManager {
     latest_output: Mutex<Option<String>>,
     rules_path: PathBuf,
+    document_lock: Mutex<()>,
     running: AtomicBool,
 }
 
@@ -32,6 +33,7 @@ impl VoiceLearningManager {
         Self {
             latest_output: Mutex::new(None),
             rules_path,
+            document_lock: Mutex::new(()),
             running: AtomicBool::new(false),
         }
     }
@@ -50,6 +52,53 @@ impl VoiceLearningManager {
         })
     }
 
+    fn ensure_document_unlocked(&self) -> Result<PathBuf, String> {
+        if self.rules_path.exists() {
+            read_document(&self.rules_path)?;
+            return Ok(self.rules_path.clone());
+        }
+
+        let parent = self
+            .rules_path
+            .parent()
+            .ok_or_else(|| "学习文档路径无效".to_string())?;
+        fs::create_dir_all(parent).map_err(|error| format!("创建学习目录失败: {error}"))?;
+        fs::write(&self.rules_path, DOCUMENT_HEADER)
+            .map_err(|error| format!("创建学习文档失败: {error}"))?;
+        Ok(self.rules_path.clone())
+    }
+
+    fn document(&self) -> Result<LearningDocument, String> {
+        let _guard = self
+            .document_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.ensure_document_unlocked()?;
+        Ok(LearningDocument {
+            path: self.rules_path.to_string_lossy().to_string(),
+            content: read_document(&self.rules_path)?,
+        })
+    }
+
+    fn save_document(&self, content: &str, base_content: &str) -> Result<LearningDocument, String> {
+        let _guard = self
+            .document_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.ensure_document_unlocked()?;
+        let current = read_document(&self.rules_path)?;
+        let merged = if current == base_content {
+            content.to_string()
+        } else {
+            merge_user_document(base_content, content, &current)
+        };
+        write_document(&self.rules_path, &merged)?;
+        Ok(LearningDocument {
+            path: self.rules_path.to_string_lossy().to_string(),
+            content: merged,
+        })
+    }
+
     fn latest_output(&self) -> Option<String> {
         self.latest_output
             .lock()
@@ -63,6 +112,13 @@ impl VoiceLearningManager {
             .map_err(|_| "自动学习正在进行，请稍候".to_string())?;
         Ok(LearningRun(&self.running))
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningDocument {
+    path: String,
+    content: String,
 }
 
 struct LearningRun<'a>(&'a AtomicBool);
@@ -135,18 +191,77 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
         .parent()
         .ok_or_else(|| "学习文档路径无效".to_string())?;
     fs::create_dir_all(parent).map_err(|error| format!("创建学习目录失败: {error}"))?;
-    let mut document = DOCUMENT_HEADER.to_string();
-    for rule in rules {
-        document.push_str("- ");
-        document.push_str(&rule);
-        document.push('\n');
-    }
-
-    let temp_path = path.with_extension("md.tmp");
-    fs::write(&temp_path, document).map_err(|error| format!("写入学习文档失败: {error}"))?;
-    replace_document(&temp_path, path)?;
+    let document = update_rule_lines(&existing, &original_rules, &rules);
+    write_document(path, &document)?;
 
     Ok(LearningOutcome::Updated { added, removed })
+}
+
+fn write_document(path: &Path, content: &str) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "学习文档路径无效".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| format!("创建学习目录失败: {error}"))?;
+    let temp_path = path.with_extension("md.tmp");
+    fs::write(&temp_path, content).map_err(|error| format!("写入学习文档失败: {error}"))?;
+    replace_document(&temp_path, path)
+}
+
+fn update_rule_lines(content: &str, old_rules: &[String], new_rules: &[String]) -> String {
+    let removed: Vec<String> = old_rules
+        .iter()
+        .filter(|rule| !new_rules.contains(rule))
+        .cloned()
+        .collect();
+    let mut present = Vec::new();
+    let mut output = String::new();
+
+    for line in content.lines() {
+        let rule = line.trim().strip_prefix("- ").and_then(normalize_rule);
+        if rule.as_ref().is_some_and(|rule| removed.contains(rule)) {
+            continue;
+        }
+        if let Some(rule) = rule {
+            present.push(rule);
+        }
+        output.push_str(line);
+        output.push('\n');
+    }
+
+    let missing: Vec<&String> = new_rules
+        .iter()
+        .filter(|rule| !present.contains(rule))
+        .collect();
+    if output.is_empty() && !missing.is_empty() {
+        output.push_str(DOCUMENT_HEADER);
+    } else if !missing.is_empty() && !output.ends_with("\n\n") {
+        output.push('\n');
+    }
+    for rule in missing {
+        output.push_str("- ");
+        output.push_str(rule);
+        output.push('\n');
+    }
+    output
+}
+
+fn merge_user_document(base: &str, edited: &str, current: &str) -> String {
+    let base_rules = parse_rules(base);
+    let edited_rules = parse_rules(edited);
+    let current_rules = parse_rules(current);
+    let mut merged_rules = current_rules.clone();
+
+    merged_rules.retain(|rule| !base_rules.contains(rule) || edited_rules.contains(rule));
+    for rule in edited_rules
+        .iter()
+        .filter(|rule| !base_rules.contains(rule))
+    {
+        if !merged_rules.contains(rule) {
+            merged_rules.push(rule.clone());
+        }
+    }
+
+    update_rule_lines(edited, &edited_rules, &merged_rules)
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -267,7 +382,33 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
     )
     .await?;
     let analysis = parse_analysis(&response)?;
-    apply_analysis(&manager.rules_path, analysis)
+    let outcome = {
+        let _guard = manager
+            .document_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        apply_analysis(&manager.rules_path, analysis)?
+    };
+    if matches!(outcome, LearningOutcome::Updated { .. }) {
+        let _ = app.emit("voice-learning-updated", ());
+    }
+    Ok(outcome)
+}
+
+#[tauri::command]
+pub fn get_voice_learning_document(
+    manager: State<'_, VoiceLearningManager>,
+) -> Result<LearningDocument, String> {
+    manager.document()
+}
+
+#[tauri::command]
+pub fn save_voice_learning_document(
+    manager: State<'_, VoiceLearningManager>,
+    content: String,
+    base_content: String,
+) -> Result<LearningDocument, String> {
+    manager.save_document(&content, &base_content)
 }
 
 #[cfg(test)]
@@ -337,7 +478,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(&path).expect("learning document should exist"),
-            "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n- 保持API大写\n- 项目技能，不是项目智能\n"
+            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 保持API大写\n\n- 项目技能，不是项目智能\n"
         );
 
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
@@ -381,5 +522,70 @@ mod tests {
         assert!(path.is_dir());
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be removed");
+    }
+
+    #[test]
+    fn creates_editable_learning_document_on_request() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+
+        let document_path = PathBuf::from(
+            manager
+                .document()
+                .expect("learning document should be created")
+                .path,
+        );
+
+        assert_eq!(
+            fs::read_to_string(&document_path).expect("learning document should be readable"),
+            DOCUMENT_HEADER
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn learning_update_preserves_user_markdown() {
+        let path = test_file("voice-learning.md");
+        fs::create_dir_all(path.parent().expect("test path should have parent"))
+            .expect("test directory should be created");
+        fs::write(
+            &path,
+            "# 我的学习规则\n\n这段说明由用户维护。\n\n- 旧规则\n\n## 备注\n\n保留这里。\n",
+        )
+        .expect("fixture should be written");
+
+        apply_analysis(
+            &path,
+            LearningAnalysis {
+                related: true,
+                remove: vec!["旧规则".to_string()],
+                add: vec!["项目技能，不是项目智能".to_string()],
+            },
+        )
+        .expect("analysis should be applied");
+
+        let content = fs::read_to_string(&path).expect("learning document should exist");
+        assert!(content.contains("# 我的学习规则"));
+        assert!(content.contains("这段说明由用户维护。"));
+        assert!(content.contains("## 备注\n\n保留这里。"));
+        assert!(!content.contains("- 旧规则"));
+        assert!(content.contains("- 项目技能，不是项目智能"));
+        fs::remove_dir_all(path.parent().expect("test path should have parent"))
+            .expect("test directory should be removed");
+    }
+
+    #[test]
+    fn concurrent_manual_save_merges_external_rule_update() {
+        let base = "# 语音纠正学习\n\n用户说明。\n\n- 原规则\n";
+        let edited = "# 我的规则\n\n用户改过的说明。\n";
+        let current = "# 语音纠正学习\n\n用户说明。\n\n- 原规则\n- AI新增规则\n";
+
+        let merged = merge_user_document(base, edited, current);
+
+        assert!(merged.contains("# 我的规则"));
+        assert!(merged.contains("用户改过的说明。"));
+        assert!(!merged.contains("- 原规则"));
+        assert!(merged.contains("- AI新增规则"));
     }
 }

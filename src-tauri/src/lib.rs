@@ -55,6 +55,8 @@ pub fn run() {
             commands::list_input_devices,
             commands::test_model_connectivity,
             commands::update_clipboard_text,
+            learning::get_voice_learning_document,
+            learning::save_voice_learning_document,
             local_api::get_local_api_status,
             task::get_screenshot_image,
             task::submit_screenshot_crop,

@@ -34,6 +34,22 @@ export async function isBuiltinPromptPath(path: string): Promise<boolean> {
   return invoke<boolean>('is_builtin_prompt_path', { path })
 }
 
+export interface VoiceLearningDocument {
+  path: string
+  content: string
+}
+
+export async function getVoiceLearningDocument(): Promise<VoiceLearningDocument> {
+  return invoke<VoiceLearningDocument>('get_voice_learning_document')
+}
+
+export async function saveVoiceLearningDocument(
+  content: string,
+  baseContent: string
+): Promise<VoiceLearningDocument> {
+  return invoke<VoiceLearningDocument>('save_voice_learning_document', { content, baseContent })
+}
+
 // File operations
 export async function selectFile(): Promise<string | null> {
   const result = await openDialog({

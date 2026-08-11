@@ -1,11 +1,19 @@
 import { memo, useState } from 'react'
 import { AppConfig } from '../../../core/types'
 import { PromptEditor, PromptFileEntry } from '../components/PromptEditor'
+import { getVoiceLearningDocument, saveVoiceLearningDocument } from '../../../lib/tauri-api'
 
 const TRANSCRIBE_PROMPT_FILES: PromptFileEntry[] = [
   { key: 'agent', label: '角色定义', configPath: 'transcribe.prompts.agent', builtinFilename: 'agent.md' },
   { key: 'rules', label: '转录规则', configPath: 'transcribe.prompts.rules', builtinFilename: 'rules.md' },
   { key: 'vocabulary', label: '专有词汇', configPath: 'transcribe.prompts.vocabulary', builtinFilename: 'vocabulary.md' },
+  {
+    key: 'voice-learning',
+    label: '自动学习',
+    loadContent: getVoiceLearningDocument,
+    saveContent: saveVoiceLearningDocument,
+    refreshEvent: 'voice-learning-updated',
+  },
 ]
 
 const BUILTIN_VOICE_TEMPLATE_IDS = ['voice-optimize', 'voice-translate', 'voice-custom']

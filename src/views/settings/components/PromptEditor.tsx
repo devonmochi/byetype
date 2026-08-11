@@ -11,14 +11,19 @@ import {
   readPromptFile,
   writePromptFile,
   selectFile,
+  onEvent,
 } from '../../../lib/tauri-api'
 import { ask } from '@tauri-apps/plugin-dialog'
 
 export interface PromptFileEntry {
   key: string
   label: string
-  configPath: string
-  builtinFilename: string
+  configPath?: string
+  builtinFilename?: string
+  resolvePath?: () => Promise<string>
+  loadContent?: () => Promise<{ path: string; content: string }>
+  saveContent?: (content: string, baseContent: string) => Promise<{ path: string; content: string }>
+  refreshEvent?: string
 }
 
 function getConfigValue(config: AppConfig, configPath: string): string {
@@ -93,6 +98,10 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   const viewRef = useRef<EditorView | null>(null)
   const themeCompartment = useRef(new Compartment())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPromptRef = useRef<PromptFileEntry | null>(null)
+  const savePromiseRef = useRef<Promise<void> | null>(null)
+  const persistedContentRef = useRef('')
+  const loadRequestRef = useRef(0)
   const contentRef = useRef(content)
   const resolvedPathRef = useRef(resolvedPath)
   const isLoadingRef = useRef(false)
@@ -104,6 +113,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
 
   const activePrompt = promptFiles.find(f => f.key === activeFile) ?? promptFiles[0]
   const activePromptKey = activePrompt?.key ?? ''
+  const activePromptRef = useRef(activePrompt)
+  activePromptRef.current = activePrompt
 
   useEffect(() => {
     if (!promptFiles.some(f => f.key === activeFile) && promptFiles.length > 0) {
@@ -111,34 +122,72 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
     }
   }, [promptFiles, activeFile])
 
+  const saveFile = useCallback(async (prompt: PromptFileEntry, filePath: string, newContent: string) => {
+    const previous = savePromiseRef.current
+    const save = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(async () => {
+      const result = prompt.saveContent
+        ? await prompt.saveContent(newContent, persistedContentRef.current)
+        : (await writePromptFile(filePath, newContent), { path: filePath, content: newContent })
+      persistedContentRef.current = result.content
+      if (contentRef.current === newContent && result.content !== newContent && viewRef.current) {
+        isLoadingRef.current = true
+        const state = viewRef.current.state
+        viewRef.current.dispatch({
+          changes: { from: 0, to: state.doc.length, insert: result.content }
+        })
+        setContent(result.content)
+        contentRef.current = result.content
+        isLoadingRef.current = false
+      }
+    })
+    savePromiseRef.current = save
+    try {
+      await save
+    } finally {
+      if (savePromiseRef.current === save) savePromiseRef.current = null
+    }
+  }, [])
+
   const flushSave = useCallback(async () => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
       debounceRef.current = null
       if (resolvedPathRef.current) {
         try {
-          await writePromptFile(resolvedPathRef.current, contentRef.current)
+          const prompt = pendingPromptRef.current
+          if (prompt) await saveFile(prompt, resolvedPathRef.current, contentRef.current)
         } catch { /* ignore flush errors */ }
       }
     }
-  }, [])
+    if (savePromiseRef.current) await savePromiseRef.current
+  }, [saveFile])
 
-  const scheduleSave = useCallback((newContent: string, filePath: string) => {
+  const scheduleSave = useCallback((prompt: PromptFileEntry, newContent: string, filePath: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    pendingPromptRef.current = prompt
     debounceRef.current = setTimeout(async () => {
       debounceRef.current = null
       setSaveStatus('saving')
       try {
-        await writePromptFile(filePath, newContent)
+        await saveFile(prompt, filePath, newContent)
         setSaveStatus('saved')
         setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500)
       } catch {
         setSaveStatus('error')
       }
     }, 500)
-  }, [])
+  }, [saveFile])
 
   const resolvePath = useCallback(async (prompt: PromptFileEntry) => {
+    if (prompt.resolvePath) {
+      const filePath = await prompt.resolvePath()
+      setResolvedPath(filePath)
+      return filePath
+    }
+
+    if (!prompt.configPath || !prompt.builtinFilename) {
+      throw new Error('提示词文件配置不完整')
+    }
     const currentConfig = configRef.current
     const customPath = getConfigValue(currentConfig, prompt.configPath)
     if (customPath) {
@@ -156,12 +205,19 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [onSave])
 
   const loadFile = useCallback(async (prompt: PromptFileEntry) => {
+    const requestId = ++loadRequestRef.current
     setLoading(true)
     setSaveStatus('idle')
     isLoadingRef.current = true
     try {
-      const filePath = await resolvePath(prompt)
-      const text = await readPromptFile(filePath)
+      const loaded = prompt.loadContent
+        ? await prompt.loadContent()
+        : await resolvePath(prompt).then(async path => ({ path, content: await readPromptFile(path) }))
+      if (requestId !== loadRequestRef.current) return
+      const filePath = loaded.path
+      const text = loaded.content
+      setResolvedPath(filePath)
+      persistedContentRef.current = text
       setContent(text)
       if (viewRef.current) {
         const state = viewRef.current.state
@@ -170,6 +226,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
         })
       }
     } catch (err: unknown) {
+      if (requestId !== loadRequestRef.current) return
       setContent('')
       if (viewRef.current) {
         const state = viewRef.current.state
@@ -184,8 +241,10 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
         setSaveStatus('error')
       }
     }
-    isLoadingRef.current = false
-    setLoading(false)
+    if (requestId === loadRequestRef.current) {
+      isLoadingRef.current = false
+      setLoading(false)
+    }
   }, [resolvePath])
 
   useEffect(() => {
@@ -206,7 +265,8 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
             setContent(newContent)
             contentRef.current = newContent
             if (resolvedPathRef.current) {
-              scheduleSave(newContent, resolvedPathRef.current)
+              const prompt = activePromptRef.current
+              if (prompt) scheduleSave(prompt, newContent, resolvedPathRef.current)
             }
           }
         }),
@@ -223,7 +283,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
       viewRef.current?.destroy()
       viewRef.current = null
     }
-  }, [])
+  }, [scheduleSave])
 
   useEffect(() => {
     const el = document.documentElement
@@ -250,6 +310,27 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }, [activePromptKey])
 
   useEffect(() => {
+    const prompt = promptFiles.find(f => f.key === activePromptKey) ?? promptFiles[0]
+    if (!prompt?.refreshEvent) return
+
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+    onEvent(prompt.refreshEvent, async () => {
+      await flushSave()
+      if (cancelled) return
+      await loadFile(prompt)
+    }).then(fn => {
+      if (cancelled) fn()
+      else unlisten = fn
+    })
+
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [activePromptKey, flushSave, loadFile, promptFiles])
+
+  useEffect(() => {
     return () => { flushSave() }
   }, [flushSave])
 
@@ -259,7 +340,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }
 
   const handleBrowse = async () => {
-    if (!activePrompt) return
+    if (!activePrompt?.configPath) return
     const filePath = await selectFile()
     if (filePath) {
       await flushSave()
@@ -270,7 +351,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
   }
 
   const handleResetToBuiltin = async () => {
-    if (!activePrompt) return
+    if (!activePrompt?.configPath || !activePrompt.builtinFilename) return
     const yes = await ask('确定要重置为内置提示词吗？当前的修改将被覆盖。', { title: 'ByeType', kind: 'warning' })
     if (!yes) return
     await flushSave()
@@ -302,8 +383,12 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
         <span className="path-text">
           {resolvedPath}
         </span>
-        <button className="file-picker-btn" onClick={handleBrowse}>选择文件</button>
-        <button className="file-picker-btn" onClick={handleResetToBuiltin}>重置为内置</button>
+        {!activePrompt?.resolvePath && !activePrompt?.loadContent && (
+          <>
+            <button className="file-picker-btn" onClick={handleBrowse}>选择文件</button>
+            <button className="file-picker-btn" onClick={handleResetToBuiltin}>重置为内置</button>
+          </>
+        )}
       </div>
 
       <div className="prompt-editor-container" ref={editorRef}
