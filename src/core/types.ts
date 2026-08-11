@@ -74,6 +74,12 @@ export interface TranscribeConfig {
   prompts: { agent: string; rules: string; vocabulary: string }
 }
 
+export interface VoiceLearningConfig {
+  modelId: string
+  thinking: ThinkingConfig
+  deepseekReasoningEffort?: 'high' | 'max'
+}
+
 export interface TemplateEntry {
   id: string
   name: string
@@ -128,6 +134,7 @@ export interface AppConfig {
   localApi: LocalApiConfig
   models: ModelsConfig
   transcribe: TranscribeConfig
+  voiceLearning: VoiceLearningConfig
   voiceTemplates: VoiceTemplatesConfig
   extract: ExtractConfig
   advanced: AdvancedConfig

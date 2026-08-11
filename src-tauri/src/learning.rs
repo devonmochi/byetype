@@ -370,7 +370,7 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
     .to_string();
     let learning_prompt = manager.prompt_content()?;
     let config = app.state::<crate::config::ConfigManager>().get();
-    if !crate::ai::models::supports_text(&config, &config.transcribe.model_id)? {
+    if !crate::ai::models::supports_text(&config, &config.voice_learning.model_id)? {
         return Err("当前语音转写模型不支持文本分析，无法执行自动学习".to_string());
     }
     let client =
@@ -382,7 +382,13 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
             let learning_prompt = learning_prompt.clone();
             let config = config.clone();
             async move {
-                crate::ai::analyze_correction(&client, &input, &learning_prompt, &config).await
+                crate::ai::analyze_correction(
+                    &client,
+                    &input,
+                    &learning_prompt,
+                    &config,
+                )
+                .await
             }
         },
         config.advanced.max_retries,

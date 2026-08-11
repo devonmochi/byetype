@@ -74,6 +74,30 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
         migrated = true;
     }
 
+    if raw.get("voiceLearning").is_none() {
+        let model_id = raw
+            .get("voiceTemplates")
+            .and_then(|section| section.get("modelId"))
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.is_empty())
+            .or_else(|| raw.get("transcribe").and_then(|section| section.get("modelId")).and_then(|value| value.as_str()).filter(|value| !value.is_empty()))
+            .unwrap_or("builtin-gemini-3-flash")
+            .to_string();
+        raw["voiceLearning"] = serde_json::json!({
+            "modelId": model_id,
+            "thinking": { "enabled": false, "budget": 1024, "level": "LOW" }
+        });
+        migrated = true;
+    } else if raw
+        .get("voiceLearning")
+        .and_then(|section| section.get("thinking"))
+        .is_none()
+    {
+        raw["voiceLearning"]["thinking"] =
+            serde_json::json!({ "enabled": false, "budget": 1024, "level": "LOW" });
+        migrated = true;
+    }
+
     if migrate_legacy_model_ids(raw) {
         migrated = true;
     }
@@ -155,7 +179,7 @@ fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
         ("builtin-mimo-v2-omni", "builtin-mimo-v2.5"),
     ];
 
-    let targets = ["transcribe", "extract", "voiceTemplates"];
+    let targets = ["transcribe", "extract", "voiceTemplates", "voiceLearning"];
     let mut changed = false;
 
     for section in targets {
@@ -216,5 +240,28 @@ mod tests {
 
         let mut raw2 = json!({});
         assert!(!migrate_legacy_model_ids(&mut raw2));
+    }
+
+    #[test]
+    fn adds_voice_learning_with_existing_text_model() {
+        let mut raw = json!({
+            "transcribe": { "modelId": "builtin-gemini-3-flash" },
+            "voiceTemplates": { "modelId": "builtin-deepseek-v4-flash" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-v4-flash");
+        assert_eq!(raw["voiceLearning"]["thinking"]["enabled"], false);
+    }
+
+    #[test]
+    fn adds_thinking_to_existing_voice_learning() {
+        let mut raw = json!({
+            "voiceLearning": { "modelId": "builtin-deepseek-v4-flash" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-v4-flash");
+        assert_eq!(raw["voiceLearning"]["thinking"]["enabled"], false);
     }
 }

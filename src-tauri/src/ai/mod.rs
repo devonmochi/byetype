@@ -252,14 +252,15 @@ pub async fn optimize(
     }
 }
 
-/// Analyze a user correction using the configured transcription model.
+/// Analyze a user correction using the configured learning model.
 pub async fn analyze_correction(
     client: &reqwest::Client,
     input: &str,
     system_prompt: &str,
     config: &AppConfig,
 ) -> Result<String, String> {
-    let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
+    let resolved = models::resolve_model(config, &config.voice_learning.model_id)?;
+    let thinking = &config.voice_learning.thinking;
 
     if is_deepseek(&resolved) {
         return deepseek::optimize(
@@ -269,8 +270,8 @@ pub async fn analyze_correction(
             &resolved.api_key,
             &resolved.model,
             &resolved.base_url,
-            &config.transcribe.thinking,
-            None,
+            thinking,
+            config.voice_learning.deepseek_reasoning_effort.as_deref(),
         )
         .await;
     }
@@ -284,7 +285,7 @@ pub async fn analyze_correction(
                 &resolved.api_key,
                 &resolved.model,
                 &resolved.base_url,
-                &config.transcribe.thinking,
+                thinking,
             )
             .await
         }
@@ -318,7 +319,7 @@ pub async fn analyze_correction(
                 &resolved.api_key,
                 &resolved.model,
                 &resolved.base_url,
-                Some(&config.transcribe.thinking),
+                Some(thinking),
             )
             .await
         }

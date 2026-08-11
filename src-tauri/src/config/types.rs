@@ -8,6 +8,8 @@ pub struct AppConfig {
     pub local_api: LocalApiConfig,
     pub models: ModelsConfig,
     pub transcribe: TranscribeConfig,
+    #[serde(default)]
+    pub voice_learning: VoiceLearningConfig,
     #[serde(alias = "optimize")]
     pub voice_templates: VoiceTemplatesConfig,
     #[serde(default)]
@@ -157,6 +159,12 @@ pub struct ThinkingConfig {
     pub level: String,
 }
 
+impl Default for ThinkingConfig {
+    fn default() -> Self {
+        Self { enabled: false, budget: 1024, level: "LOW".to_string() }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptsConfig {
@@ -171,6 +179,26 @@ pub struct TranscribeConfig {
     pub model_id: String,
     pub thinking: ThinkingConfig,
     pub prompts: PromptsConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceLearningConfig {
+    pub model_id: String,
+    #[serde(default)]
+    pub thinking: ThinkingConfig,
+    #[serde(default)]
+    pub deepseek_reasoning_effort: Option<String>,
+}
+
+impl Default for VoiceLearningConfig {
+    fn default() -> Self {
+        Self {
+            model_id: "builtin-gemini-3-flash".to_string(),
+            thinking: ThinkingConfig::default(),
+            deepseek_reasoning_effort: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,6 +360,7 @@ impl Default for AppConfig {
                     vocabulary: String::new(),
                 },
             },
+            voice_learning: VoiceLearningConfig::default(),
             voice_templates: VoiceTemplatesConfig {
                 model_id: String::new(),
                 thinking: ThinkingConfig {
@@ -389,5 +418,16 @@ mod local_api_tests {
 
         assert!(!config.local_api.enabled);
         assert_eq!(config.local_api.port, 8765);
+    }
+
+    #[test]
+    fn existing_config_without_voice_learning_uses_default_model() {
+        let mut value = serde_json::to_value(AppConfig::default()).unwrap();
+        value.as_object_mut().unwrap().remove("voiceLearning");
+
+        let config: AppConfig = serde_json::from_value(value).unwrap();
+
+        assert_eq!(config.voice_learning.model_id, "builtin-gemini-3-flash");
+        assert!(!config.voice_learning.thinking.enabled);
     }
 }

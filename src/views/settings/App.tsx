@@ -8,6 +8,7 @@ import { ExtractTab } from './tabs/ExtractTab'
 import { VoicePromptsTab } from './tabs/VoicePromptsTab'
 import { ExtractPromptsTab } from './tabs/ExtractPromptsTab'
 import { BackupTab } from './tabs/BackupTab'
+import { VoiceLearningTab } from './tabs/VoiceLearningTab'
 import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
 import { getVersion } from '@tauri-apps/api/app'
 import { getConfig, saveConfig, onEvent, checkUpdate } from '../../lib/tauri-api'
@@ -27,6 +28,8 @@ const TABS: TabItem[] = [
   { type: 'group', label: '图像识别' },
   { type: 'tab', id: 'extract', label: '图像识别设置' },
   { type: 'tab', id: 'extract-prompts', label: '图像识别提示词' },
+  { type: 'group', label: '智能学习' },
+  { type: 'tab', id: 'voice-learning', label: '自动学习' },
   { type: 'divider' },
   { type: 'tab', id: 'backup', label: '备份与恢复' },
   { type: 'tab', id: 'about', label: '关于' },
@@ -205,6 +208,7 @@ export function App() {
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
         {activeTab === 'models' && <ModelsTab config={config} onSave={handleSave} />}
+        {activeTab === 'voice-learning' && <VoiceLearningTab config={config} onSave={handleSave} />}
         {activeTab === 'extract' && <ExtractTab config={config} onSave={handleSave} />}
         {activeTab === 'voice-prompts' && <VoicePromptsTab config={config} onSave={handleSave} />}
         {activeTab === 'extract-prompts' && <ExtractPromptsTab config={config} onSave={handleSave} />}
