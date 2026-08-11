@@ -316,7 +316,10 @@ pub fn retry_record(app: &AppHandle, record_id: u64) -> Result<(), String> {
     Ok(())
 }
 
-fn build_client(proxy_enabled: bool, proxy_url: &str) -> Result<reqwest::Client, String> {
+pub(crate) fn build_client(
+    proxy_enabled: bool,
+    proxy_url: &str,
+) -> Result<reqwest::Client, String> {
     if !proxy_enabled || proxy_url.is_empty() {
         reqwest::Client::builder()
             .build()
@@ -391,10 +394,11 @@ async fn run_pipeline(
     let config = app.state::<ConfigManager>().get();
 
     // Phase 3: Paste result
-    if let Err(e) =
-        crate::clipboard::paste_text(&output.final_text, config.general.overwrite_clipboard)
-    {
-        eprintln!("[TaskManager] Paste failed: {}", e);
+    match crate::clipboard::paste_text(&output.final_text, config.general.overwrite_clipboard) {
+        Ok(()) => app
+            .state::<crate::learning::VoiceLearningManager>()
+            .record_output(&output.final_text),
+        Err(e) => eprintln!("[TaskManager] Paste failed: {}", e),
     }
 
     // Success
@@ -417,12 +421,14 @@ async fn execute_pipeline(
     template_id: Option<String>,
     observer: Arc<dyn Fn(PipelineEvent) + Send + Sync>,
 ) -> Result<PipelineOutput, PipelineFailure> {
-    let (config, prompts_dir) = {
+    let (config, prompts_dir, learning_rules) = {
         let state = app.state::<SharedTaskManager>();
         let manager = state.lock().unwrap_or_else(|error| error.into_inner());
         (
             app.state::<ConfigManager>().get(),
             manager.prompts_dir.clone(),
+            app.state::<crate::learning::VoiceLearningManager>()
+                .rules_content(),
         )
     };
     let client = build_client(config.advanced.proxy_enabled, &config.advanced.proxy_url).map_err(
@@ -439,6 +445,7 @@ async fn execute_pipeline(
         let audio = audio_base64.clone();
         let config = config.clone();
         let prompts_dir = prompts_dir.clone();
+        let learning_rules = learning_rules.clone();
         tokio::select! {
             result = ai::retry::with_retry(
                 || {
@@ -446,7 +453,17 @@ async fn execute_pipeline(
                     let audio = audio.clone();
                     let config = config.clone();
                     let prompts_dir = prompts_dir.clone();
-                    async move { ai::transcribe(&client, &audio, &config, &prompts_dir).await }
+                    let learning_rules = learning_rules.clone();
+                    async move {
+                        ai::transcribe(
+                            &client,
+                            &audio,
+                            &config,
+                            &prompts_dir,
+                            &learning_rules,
+                        )
+                        .await
+                    }
                 },
                 config.advanced.max_retries,
                 config.advanced.transcribe_timeout,

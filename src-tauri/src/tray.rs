@@ -1,8 +1,9 @@
 use tauri::{
-    AppHandle, Emitter, Manager,
-    tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent},
     menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Emitter, Manager,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Show the settings window by moving it back on-screen and focusing it.
 fn show_settings(app: &AppHandle) {
@@ -22,41 +23,107 @@ fn show_settings(app: &AppHandle) {
 pub fn create(app: &AppHandle) -> Result<(), String> {
     let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)
         .map_err(|e| e.to_string())?;
-    let check_update_item = MenuItem::with_id(app, "check_update", "检查更新", true, None::<&str>)
+    let history_item = MenuItem::with_id(app, "history", "历史记录", true, None::<&str>)
         .map_err(|e| e.to_string())?;
-    let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)
+    let learning_item = MenuItem::with_id(app, "auto_learning", "自动学习", true, None::<&str>)
         .map_err(|e| e.to_string())?;
+    let about_item =
+        MenuItem::with_id(app, "about", "关于", true, None::<&str>).map_err(|e| e.to_string())?;
+    let quit_item =
+        MenuItem::with_id(app, "quit", "退出", true, None::<&str>).map_err(|e| e.to_string())?;
 
-    let menu = Menu::with_items(app, &[&settings_item, &check_update_item, &quit_item])
-        .map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &settings_item,
+            &history_item,
+            &learning_item,
+            &about_item,
+            &quit_item,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
 
     let icon_bytes = include_bytes!("../icons/tray-default.png");
     let icon = tauri::image::Image::from_bytes(icon_bytes)
         .map_err(|e| format!("Failed to load tray icon: {}", e))?;
 
+    let learning_status_item = learning_item.clone();
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .tooltip("ByeType")
         .menu(&menu)
-        .on_menu_event(|app, event| {
-            match event.id().as_ref() {
-                "settings" => show_settings(app),
-                "check_update" => {
-                    show_settings(app);
-                    let _ = app.emit("navigate-to-tab", crate::updater::NavigatePayload {
-                        tab: "about".to_string(),
-                    });
-                }
-                "quit" => app.exit(0),
-                _ => {}
+        .on_menu_event(move |app, event| match event.id().as_ref() {
+            "settings" => {
+                show_settings(app);
+                let _ = app.emit(
+                    "navigate-to-tab",
+                    crate::updater::NavigatePayload {
+                        tab: "general".to_string(),
+                    },
+                );
             }
+            "history" => {
+                show_settings(app);
+                let _ = app.emit(
+                    "navigate-to-tab",
+                    crate::updater::NavigatePayload {
+                        tab: "history".to_string(),
+                    },
+                );
+            }
+            "auto_learning" => {
+                let app_handle = app.clone();
+                let status_item = learning_status_item.clone();
+                let _ = status_item.set_enabled(false);
+                let _ = status_item.set_text("自动学习中…");
+                tauri::async_runtime::spawn(async move {
+                    let result = crate::learning::learn_from_clipboard(&app_handle).await;
+                    let _ = status_item.set_text("自动学习");
+                    let _ = status_item.set_enabled(true);
+
+                    let (message, kind) = match result {
+                        Ok(crate::learning::LearningOutcome::Updated { added, removed }) => (
+                            format!("学习完成：写入{}条，移除旧规则{}条。", added, removed),
+                            MessageDialogKind::Info,
+                        ),
+                        Ok(crate::learning::LearningOutcome::Unrelated) => (
+                            "剪贴板内容与最近一次语音结果不匹配，未写入学习规则。".to_string(),
+                            MessageDialogKind::Warning,
+                        ),
+                        Ok(crate::learning::LearningOutcome::NoChange) => (
+                            "没有发现新的纠正规则。".to_string(),
+                            MessageDialogKind::Info,
+                        ),
+                        Err(error) => (error, MessageDialogKind::Error),
+                    };
+                    app_handle
+                        .dialog()
+                        .message(message)
+                        .title("自动学习")
+                        .kind(kind)
+                        .show(|_| {});
+                });
+            }
+            "about" => {
+                show_settings(app);
+                let _ = app.emit(
+                    "navigate-to-tab",
+                    crate::updater::NavigatePayload {
+                        tab: "about".to_string(),
+                    },
+                );
+            }
+            "quit" => app.exit(0),
+            _ => {}
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
                 ..
-            } = event {
+            } = event
+            {
                 show_settings(tray.app_handle());
             }
         })

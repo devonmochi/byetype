@@ -11,6 +11,7 @@ mod tray;
 mod updater;
 mod backup;
 mod local_api;
+mod learning;
 #[cfg(target_os = "windows")]
 mod screenshot_win32;
 
@@ -78,6 +79,7 @@ pub fn run() {
                 .expect("Failed to resolve app_data_dir");
             let config_manager = ConfigManager::new(data_dir.clone());
             app.manage(config_manager);
+            app.manage(learning::VoiceLearningManager::new(&data_dir));
 
             tray::create(&app_handle)
                 .expect("Failed to create system tray");

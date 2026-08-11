@@ -24,9 +24,10 @@ pub async fn transcribe(
     audio_base64: &str,
     config: &AppConfig,
     prompts_dir: &Path,
+    learning_rules: &str,
 ) -> Result<String, String> {
     let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
-    let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir);
+    let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir, learning_rules);
 
     if is_deepseek(&resolved) {
         return deepseek::transcribe(
@@ -245,6 +246,79 @@ pub async fn optimize(
                 &resolved.model,
                 &resolved.base_url,
                 Some(&config.voice_templates.thinking),
+            )
+            .await
+        }
+    }
+}
+
+/// Analyze a user correction using the configured transcription model.
+pub async fn analyze_correction(
+    client: &reqwest::Client,
+    input: &str,
+    system_prompt: &str,
+    config: &AppConfig,
+) -> Result<String, String> {
+    let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
+
+    if is_deepseek(&resolved) {
+        return deepseek::optimize(
+            client,
+            input,
+            system_prompt,
+            &resolved.api_key,
+            &resolved.model,
+            &resolved.base_url,
+            &config.transcribe.thinking,
+            None,
+        )
+        .await;
+    }
+
+    match resolved.protocol.as_str() {
+        "gemini" => {
+            gemini::optimize(
+                client,
+                input,
+                system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+                &config.transcribe.thinking,
+            )
+            .await
+        }
+        "qwen-omni" => {
+            openai_compat::qwen_omni_optimize(
+                client,
+                input,
+                system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
+        "mimo" => {
+            mimo::optimize(
+                client,
+                input,
+                system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+            )
+            .await
+        }
+        _ => {
+            openai_compat::optimize(
+                client,
+                input,
+                system_prompt,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+                Some(&config.transcribe.thinking),
             )
             .await
         }

@@ -143,3 +143,42 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
 
     Err(format!("Model not found: {}", model_id))
 }
+
+pub fn supports_text(config: &AppConfig, model_id: &str) -> Result<bool, String> {
+    if let Some(builtin) = BUILTIN_MODELS.iter().find(|model| model.id == model_id) {
+        return Ok(builtin.supports_text);
+    }
+    if let Some(custom) = config
+        .models
+        .custom
+        .iter()
+        .find(|model| model.id == model_id)
+    {
+        return Ok(custom.supports_text);
+    }
+    Err(format!("Model not found: {}", model_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::types::CustomModelEntry;
+
+    #[test]
+    fn reports_custom_audio_only_model_as_not_text_capable() {
+        let mut config = AppConfig::default();
+        config.models.custom.push(CustomModelEntry {
+            id: "audio-only".to_string(),
+            provider: "custom".to_string(),
+            model: "audio-only".to_string(),
+            protocol: "openai-compat".to_string(),
+            base_url: "https://example.com".to_string(),
+            api_key: "test".to_string(),
+            supports_audio: true,
+            supports_text: false,
+            supports_vision: false,
+        });
+
+        assert!(!supports_text(&config, "audio-only").expect("model should resolve"));
+    }
+}

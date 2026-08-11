@@ -24,7 +24,11 @@ pub fn resolve_prompt_path(custom: &str, builtin: &str) -> String {
     }
 }
 
-pub fn build_transcribe_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
+pub fn build_transcribe_prompt(
+    config: &AppConfig,
+    prompts_dir: &Path,
+    learning_rules: &str,
+) -> String {
     let agent_path = resolve_prompt_path(
         &config.transcribe.prompts.agent,
         &prompts_dir.join("agent.md").to_string_lossy(),
@@ -46,6 +50,7 @@ pub fn build_transcribe_prompt(config: &AppConfig, prompts_dir: &Path) -> String
         wrap_document("agent", &agent_content),
         wrap_document("vocabulary", &vocabulary_content),
         wrap_document("rules", &rules_content),
+        wrap_document("voice-learning", learning_rules),
     ]
     .into_iter()
     .filter(|s| !s.is_empty())
@@ -106,4 +111,24 @@ pub fn load_template_prompt(
     }
 
     String::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn appends_learning_rules_to_transcription_prompt() {
+        let config = AppConfig::default();
+        let prompt = build_transcribe_prompt(
+            &config,
+            Path::new("/path/that/does/not/exist"),
+            "- 项目技能，不是项目智能",
+        );
+
+        assert_eq!(
+            prompt,
+            "<document name=\"voice-learning\">\n- 项目技能，不是项目智能\n</document>"
+        );
+    }
 }
