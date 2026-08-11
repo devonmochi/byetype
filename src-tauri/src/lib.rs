@@ -57,6 +57,7 @@ pub fn run() {
             commands::update_clipboard_text,
             learning::get_voice_learning_document,
             learning::save_voice_learning_document,
+            learning::get_voice_learning_prompt_path,
             local_api::get_local_api_status,
             task::get_screenshot_image,
             task::submit_screenshot_crop,

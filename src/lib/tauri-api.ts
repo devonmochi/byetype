@@ -50,6 +50,10 @@ export async function saveVoiceLearningDocument(
   return invoke<VoiceLearningDocument>('save_voice_learning_document', { content, baseContent })
 }
 
+export async function getVoiceLearningPromptPath(): Promise<string> {
+  return invoke<string>('get_voice_learning_prompt_path')
+}
+
 // File operations
 export async function selectFile(): Promise<string | null> {
   const result = await openDialog({

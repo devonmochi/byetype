@@ -6,20 +6,12 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const DOCUMENT_HEADER: &str = "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n";
-const LEARNING_SYSTEM_PROMPT: &str = r#"你负责从用户对语音转写结果的手动修改中提取简短纠错规则。
-
-输入包含：original（最近一次最终展示文本）、corrected（当前剪贴板文本）、existingRules（已有学习规则）。
-
-要求：
-1. 先判断corrected是否由original修改而来。主题或文本结构明显无关时，related为false，不输出任何规则操作。
-2. 只学习语音识别造成的词语错误。忽略标点、排版、语气、增删内容和改写表达。
-3. 每条规则只保留正确词及周围1至2个能说明语境的词，格式为“正确片段，不是错误片段”。例如：“项目技能，不是项目智能”。
-4. 与existingRules完全重复时不要添加。学习规则只累加，不删除或替换已有规则，remove始终返回空数组。
-5. 只返回JSON，不要使用Markdown或解释。格式必须是：{"related":true,"remove":[],"add":[]}。"#;
+const DEFAULT_LEARNING_PROMPT: &str = include_str!("../prompts/voice-learning-prompt.md");
 
 pub struct VoiceLearningManager {
     latest_output: Mutex<Option<String>>,
     rules_path: PathBuf,
+    prompt_path: PathBuf,
     document_lock: Mutex<()>,
     running: AtomicBool,
 }
@@ -27,12 +19,14 @@ pub struct VoiceLearningManager {
 impl VoiceLearningManager {
     pub fn new(data_dir: &Path) -> Self {
         let rules_path = data_dir.join("prompts").join("voice-learning.md");
+        let prompt_path = data_dir.join("prompts").join("voice-learning-prompt.md");
         if let Err(error) = recover_windows_backup(&rules_path) {
             eprintln!("[learning] {error}");
         }
         Self {
             latest_output: Mutex::new(None),
             rules_path,
+            prompt_path,
             document_lock: Mutex::new(()),
             running: AtomicBool::new(false),
         }
@@ -50,6 +44,24 @@ impl VoiceLearningManager {
             eprintln!("[learning] {error}");
             String::new()
         })
+    }
+
+    fn ensure_prompt_document(&self) -> Result<PathBuf, String> {
+        if self.prompt_path.exists() {
+            read_document(&self.prompt_path)?;
+            return Ok(self.prompt_path.clone());
+        }
+        write_document(&self.prompt_path, DEFAULT_LEARNING_PROMPT)?;
+        Ok(self.prompt_path.clone())
+    }
+
+    fn prompt_content(&self) -> Result<String, String> {
+        self.ensure_prompt_document()?;
+        let content = read_document(&self.prompt_path)?;
+        if content.trim().is_empty() {
+            return Err("自动学习提示词不能为空".to_string());
+        }
+        Ok(content)
     }
 
     fn ensure_document_unlocked(&self) -> Result<PathBuf, String> {
@@ -356,6 +368,7 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
         "existingRules": load_rules(&manager.rules_path)?,
     })
     .to_string();
+    let learning_prompt = manager.prompt_content()?;
     let config = app.state::<crate::config::ConfigManager>().get();
     if !crate::ai::models::supports_text(&config, &config.transcribe.model_id)? {
         return Err("当前语音转写模型不支持文本分析，无法执行自动学习".to_string());
@@ -366,10 +379,10 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
         || {
             let client = client.clone();
             let input = input.clone();
+            let learning_prompt = learning_prompt.clone();
             let config = config.clone();
             async move {
-                crate::ai::analyze_correction(&client, &input, LEARNING_SYSTEM_PROMPT, &config)
-                    .await
+                crate::ai::analyze_correction(&client, &input, &learning_prompt, &config).await
             }
         },
         config.advanced.max_retries,
@@ -405,6 +418,15 @@ pub fn save_voice_learning_document(
     base_content: String,
 ) -> Result<LearningDocument, String> {
     manager.save_document(&content, &base_content)
+}
+
+#[tauri::command]
+pub fn get_voice_learning_prompt_path(
+    manager: State<'_, VoiceLearningManager>,
+) -> Result<String, String> {
+    manager
+        .ensure_prompt_document()
+        .map(|path| path.to_string_lossy().to_string())
 }
 
 #[cfg(test)]
@@ -536,6 +558,43 @@ mod tests {
         assert_eq!(
             fs::read_to_string(&document_path).expect("learning document should be readable"),
             DOCUMENT_HEADER
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn creates_editable_learning_prompt_on_request() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+
+        let prompt_path = manager
+            .ensure_prompt_document()
+            .expect("learning prompt should be created");
+
+        assert_eq!(
+            fs::read_to_string(&prompt_path).expect("learning prompt should be readable"),
+            DEFAULT_LEARNING_PROMPT
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn reads_user_edited_learning_prompt() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        let prompt_path = manager
+            .ensure_prompt_document()
+            .expect("learning prompt should be created");
+        fs::write(&prompt_path, "用户修改后的学习提示词")
+            .expect("learning prompt should be editable");
+
+        assert_eq!(
+            manager
+                .prompt_content()
+                .expect("learning prompt should load"),
+            "用户修改后的学习提示词"
         );
         fs::remove_dir_all(data_dir).expect("test directory should be removed");
     }
