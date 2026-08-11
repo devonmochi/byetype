@@ -242,7 +242,7 @@ fn update_rule_lines(content: &str, old_rules: &[String], new_rules: &[String]) 
         .collect();
     if output.is_empty() && !missing.is_empty() {
         output.push_str(DOCUMENT_HEADER);
-    } else if !missing.is_empty() && !output.ends_with("\n\n") {
+    } else if !missing.is_empty() && !output.ends_with('\n') {
         output.push('\n');
     }
     for rule in missing {
@@ -502,7 +502,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(&path).expect("learning document should exist"),
-            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n\n- 项目技能，不是项目智能\n"
+            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n- 项目技能，不是项目智能\n"
         );
 
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
