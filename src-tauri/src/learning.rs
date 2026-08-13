@@ -23,6 +23,27 @@ const LEGACY_DEFAULT_LEARNING_PROMPT: &str = r#"你负责从用户对语音转�
 4. 与existingRules完全重复时不要添加。学习规则只累加，不删除或替换已有规则，remove始终返回空数组。
 5. 只返回JSON，不要使用Markdown或解释。格式必须是：{"related":true,"remove":[],"add":[]}。
 "#;
+const PREVIOUS_DEFAULT_LEARNING_PROMPT: &str = r#"你负责判断用户对语音转写结果的修改是否包含值得长期学习的内容，并提取可复用的学习项。
+
+输入包含：
+
+- original：最近一次最终展示文本。
+- corrected：当前剪贴板文本。
+- existingContent.transcriptionRules：当前使用的全部转录规则。
+- existingContent.vocabulary：当前使用的全部专有词汇。
+- existingContent.autoLearning：此前由自动学习追加的内容。
+
+要求：
+
+1. 由你完整判断corrected是否由original修改而来，以及修改中是否有内容值得长期学习。主题或文本结构明显无关时，related为false。
+2. 从两个方面判断是否值得学习：
+   - 专有词汇：人名、品牌名、产品名、行业术语、技术名词、固定写法等。
+   - 转录规则：能在后续语音转写中重复使用的纠错、格式或表达转换规则。
+3. 扫描existingContent中的全部内容，按含义比较。已有内容已经覆盖的词汇或规则不要重复添加；没有覆盖的内容才追加到add。
+4. 只提取本次修改能够明确证明的内容，不猜测。每项写成可直接用于后续转写的简短指令，并标明「词汇」或「规则」。例如：「词汇：ByeType」「规则：将项目智能纠正为项目技能」。
+5. 由你决定是否学习及学习哪些内容。add可以同时包含词汇和规则，也可以为空。已有内容只用于比较，不删除或改写，remove始终返回空数组。
+6. 只返回JSON，不要使用Markdown或解释。格式必须是：{"related":true,"remove":[],"add":[]}。
+"#;
 
 pub struct VoiceLearningManager {
     latest_output: Mutex<Option<String>>,
@@ -65,7 +86,9 @@ impl VoiceLearningManager {
     fn ensure_prompt_document(&self) -> Result<PathBuf, String> {
         if self.prompt_path.exists() {
             let content = read_document(&self.prompt_path)?;
-            if content == LEGACY_DEFAULT_LEARNING_PROMPT {
+            if content == LEGACY_DEFAULT_LEARNING_PROMPT
+                || content == PREVIOUS_DEFAULT_LEARNING_PROMPT
+            {
                 write_document(&self.prompt_path, DEFAULT_LEARNING_PROMPT)?;
             }
             return Ok(self.prompt_path.clone());
@@ -661,6 +684,32 @@ mod tests {
         let prompt_path = manager
             .ensure_prompt_document()
             .expect("legacy prompt should be upgraded");
+
+        assert_eq!(
+            fs::read_to_string(prompt_path).expect("prompt should be readable"),
+            DEFAULT_LEARNING_PROMPT
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn upgrades_previous_default_learning_prompt() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        fs::create_dir_all(
+            manager
+                .prompt_path
+                .parent()
+                .expect("prompt should have parent"),
+        )
+        .expect("prompt directory should be created");
+        fs::write(&manager.prompt_path, PREVIOUS_DEFAULT_LEARNING_PROMPT)
+            .expect("previous prompt should be written");
+
+        let prompt_path = manager
+            .ensure_prompt_document()
+            .expect("previous prompt should be upgraded");
 
         assert_eq!(
             fs::read_to_string(prompt_path).expect("prompt should be readable"),
