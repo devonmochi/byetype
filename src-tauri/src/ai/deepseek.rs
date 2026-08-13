@@ -1,25 +1,29 @@
 use reqwest::Client;
 
-use crate::config::types::ThinkingConfig;
 use super::types::*;
+use crate::config::types::ThinkingConfig;
 
 /// 根据 ThinkingConfig 与可选的 reasoning_effort 配置构造 DeepSeek 的请求参数。
 /// - enabled=false → thinking:disabled,不发 reasoning_effort
 /// - enabled=true  → thinking:enabled,reasoning_effort 直接使用配置值(默认 "high")。
-///   官方仅支持 "high" / "max" 两档,非法值由调用方保证。
+///   官方仅支持 "low" / "high" / "max" 三档,非法值由调用方保证。
 fn build_thinking_params(
     thinking: &ThinkingConfig,
     reasoning_effort: Option<&str>,
 ) -> (Option<ThinkingParam>, Option<String>) {
     if !thinking.enabled {
         return (
-            Some(ThinkingParam { thinking_type: "disabled".to_string() }),
+            Some(ThinkingParam {
+                thinking_type: "disabled".to_string(),
+            }),
             None,
         );
     }
     let effort = reasoning_effort.unwrap_or("high").to_string();
     (
-        Some(ThinkingParam { thinking_type: "enabled".to_string() }),
+        Some(ThinkingParam {
+            thinking_type: "enabled".to_string(),
+        }),
         Some(effort),
     )
 }
@@ -137,7 +141,9 @@ pub async fn test_connectivity(
         stream: None,
         max_tokens: Some(8),
         stream_options: None,
-        thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
+        thinking: Some(ThinkingParam {
+            thinking_type: "disabled".to_string(),
+        }),
         reasoning_effort: None,
         reasoning: None,
     };
@@ -159,4 +165,23 @@ pub async fn test_connectivity(
         return Err(format!("DeepSeek API error ({}): {}", status, body));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preserves_low_reasoning_effort_when_thinking_is_enabled() {
+        let thinking = ThinkingConfig {
+            enabled: true,
+            budget: 1024,
+            level: "LOW".to_string(),
+        };
+
+        let (thinking_param, reasoning_effort) = build_thinking_params(&thinking, Some("low"));
+
+        assert_eq!(thinking_param.unwrap().thinking_type, "enabled");
+        assert_eq!(reasoning_effort.as_deref(), Some("low"));
+    }
 }

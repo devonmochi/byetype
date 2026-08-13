@@ -150,13 +150,14 @@ export function TranscribeTab({ config, onSave }: Props) {
               />
             </SettingRow>
             {voiceTemplates.thinking.enabled && (
-              <SettingRow label="Reasoning Effort" description="DeepSeek 思考强度,max 更深更慢">
+              <SettingRow label="Reasoning Effort" description="DeepSeek思考强度，low更快，max更深">
                 <select
                   className="select"
                   value={voiceTemplates.deepseekReasoningEffort ?? 'high'}
-                  onChange={e => updateVoiceTemplates({ deepseekReasoningEffort: e.target.value as 'high' | 'max' })}
+                  onChange={e => updateVoiceTemplates({ deepseekReasoningEffort: e.target.value as 'low' | 'high' | 'max' })}
                   style={{ width: 120 }}
                 >
+                  <option value="low">low</option>
                   <option value="high">high</option>
                   <option value="max">max</option>
                 </select>

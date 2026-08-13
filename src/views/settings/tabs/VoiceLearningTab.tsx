@@ -58,7 +58,7 @@ export function VoiceLearningTab({ config, onSave }: Props) {
     })
   }
 
-  const updateDeepSeekEffort = (deepseekReasoningEffort: 'high' | 'max') => {
+  const updateDeepSeekEffort = (deepseekReasoningEffort: 'low' | 'high' | 'max') => {
     onSave({
       ...config,
       voiceLearning: { ...config.voiceLearning, deepseekReasoningEffort },
@@ -115,13 +115,14 @@ export function VoiceLearningTab({ config, onSave }: Props) {
           </SettingRow>
         )}
         {isDeepSeek && config.voiceLearning.thinking.enabled && (
-          <SettingRow label="Reasoning Effort" description="DeepSeek思考强度，max更深更慢">
+          <SettingRow label="Reasoning Effort" description="DeepSeek思考强度，low更快，max更深">
             <select
               className="select"
               value={config.voiceLearning.deepseekReasoningEffort ?? 'high'}
-              onChange={event => updateDeepSeekEffort(event.target.value as 'high' | 'max')}
+              onChange={event => updateDeepSeekEffort(event.target.value as 'low' | 'high' | 'max')}
               style={{ width: 120 }}
             >
+              <option value="low">low</option>
               <option value="high">high</option>
               <option value="max">max</option>
             </select>
