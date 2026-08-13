@@ -24,6 +24,34 @@ pub fn resolve_prompt_path(custom: &str, builtin: &str) -> String {
     }
 }
 
+pub fn load_transcription_reference_content(
+    config: &AppConfig,
+    prompts_dir: &Path,
+) -> Result<(String, String), String> {
+    let (rules_path, vocabulary_path) = resolve_transcription_reference_paths(config, prompts_dir);
+    let rules = std::fs::read_to_string(&rules_path)
+        .map_err(|error| format!("读取转录规则失败：{error}"))?;
+    let vocabulary = std::fs::read_to_string(&vocabulary_path)
+        .map_err(|error| format!("读取专有词汇失败：{error}"))?;
+    Ok((rules, vocabulary))
+}
+
+fn resolve_transcription_reference_paths(
+    config: &AppConfig,
+    prompts_dir: &Path,
+) -> (String, String) {
+    (
+        resolve_prompt_path(
+            &config.transcribe.prompts.rules,
+            &prompts_dir.join("rules.md").to_string_lossy(),
+        ),
+        resolve_prompt_path(
+            &config.transcribe.prompts.vocabulary,
+            &prompts_dir.join("vocabulary.md").to_string_lossy(),
+        ),
+    )
+}
+
 pub fn build_transcribe_prompt(
     config: &AppConfig,
     prompts_dir: &Path,
@@ -33,14 +61,7 @@ pub fn build_transcribe_prompt(
         &config.transcribe.prompts.agent,
         &prompts_dir.join("agent.md").to_string_lossy(),
     );
-    let vocabulary_path = resolve_prompt_path(
-        &config.transcribe.prompts.vocabulary,
-        &prompts_dir.join("vocabulary.md").to_string_lossy(),
-    );
-    let rules_path = resolve_prompt_path(
-        &config.transcribe.prompts.rules,
-        &prompts_dir.join("rules.md").to_string_lossy(),
-    );
+    let (rules_path, vocabulary_path) = resolve_transcription_reference_paths(config, prompts_dir);
 
     let agent_content = load_prompt(&agent_path);
     let vocabulary_content = load_prompt(&vocabulary_path);
@@ -69,11 +90,7 @@ pub fn load_optimize_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
 }
 
 pub fn build_extract_prompt(config: &AppConfig, prompts_dir: &Path, template_id: &str) -> String {
-    load_template_prompt(
-        &config.extract.templates,
-        template_id,
-        prompts_dir,
-    )
+    load_template_prompt(&config.extract.templates, template_id, prompts_dir)
 }
 
 /// Map builtin template ID to builtin prompt filename
@@ -130,5 +147,16 @@ mod tests {
             prompt,
             "<document name=\"voice-learning\">\n- 项目技能，不是项目智能\n</document>"
         );
+    }
+
+    #[test]
+    fn reference_content_read_failure_is_reported() {
+        let config = AppConfig::default();
+
+        let error =
+            load_transcription_reference_content(&config, Path::new("/path/that/does/not/exist"))
+                .expect_err("missing reference content should fail");
+
+        assert!(error.starts_with("读取转录规则失败"));
     }
 }

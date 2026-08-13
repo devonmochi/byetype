@@ -7,6 +7,22 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const DOCUMENT_HEADER: &str = "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n";
 const DEFAULT_LEARNING_PROMPT: &str = include_str!("../prompts/voice-learning-prompt.md");
+const LEGACY_DEFAULT_LEARNING_PROMPT: &str = r#"你负责从用户对语音转写结果的手动修改中提取简短纠错规则。
+
+输入包含：
+
+- original：最近一次最终展示文本。
+- corrected：当前剪贴板文本。
+- existingRules：已有学习规则。
+
+要求：
+
+1. 先判断corrected是否由original修改而来。主题或文本结构明显无关时，related为false，不输出任何规则。
+2. 只学习语音识别造成的词语错误。忽略标点、排版、语气、增删内容和改写表达。
+3. 每条规则只保留正确词及周围1至2个能说明语境的词，格式为「正确片段，不是错误片段」。例如：「项目技能，不是项目智能」。
+4. 与existingRules完全重复时不要添加。学习规则只累加，不删除或替换已有规则，remove始终返回空数组。
+5. 只返回JSON，不要使用Markdown或解释。格式必须是：{"related":true,"remove":[],"add":[]}。
+"#;
 
 pub struct VoiceLearningManager {
     latest_output: Mutex<Option<String>>,
@@ -48,7 +64,10 @@ impl VoiceLearningManager {
 
     fn ensure_prompt_document(&self) -> Result<PathBuf, String> {
         if self.prompt_path.exists() {
-            read_document(&self.prompt_path)?;
+            let content = read_document(&self.prompt_path)?;
+            if content == LEGACY_DEFAULT_LEARNING_PROMPT {
+                write_document(&self.prompt_path, DEFAULT_LEARNING_PROMPT)?;
+            }
             return Ok(self.prompt_path.clone());
         }
         write_document(&self.prompt_path, DEFAULT_LEARNING_PROMPT)?;
@@ -175,23 +194,12 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
     }
 
     let existing = read_document(path)?;
-    let mut rules = parse_rules(&existing);
-    let original_rules = rules.clone();
-
     let additions: Vec<String> = analysis
         .add
         .iter()
         .filter_map(|rule| normalize_rule(rule))
         .collect();
-    let mut added = 0;
-    for rule in additions {
-        if !rules.contains(&rule) {
-            rules.push(rule);
-            added += 1;
-        }
-    }
-
-    if rules == original_rules {
+    if additions.is_empty() {
         return Ok(LearningOutcome::NoChange);
     }
 
@@ -199,10 +207,30 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
         .parent()
         .ok_or_else(|| "学习文档路径无效".to_string())?;
     fs::create_dir_all(parent).map_err(|error| format!("创建学习目录失败: {error}"))?;
-    let document = update_rule_lines(&existing, &original_rules, &rules);
+    let document = append_learning_items(&existing, &additions);
     write_document(path, &document)?;
 
-    Ok(LearningOutcome::Updated { added, removed: 0 })
+    Ok(LearningOutcome::Updated {
+        added: additions.len(),
+        removed: 0,
+    })
+}
+
+fn append_learning_items(content: &str, additions: &[String]) -> String {
+    let mut output = if content.is_empty() {
+        DOCUMENT_HEADER.to_string()
+    } else {
+        content.to_string()
+    };
+    if !output.ends_with('\n') {
+        output.push('\n');
+    }
+    for item in additions {
+        output.push_str("- ");
+        output.push_str(item);
+        output.push('\n');
+    }
+    output
 }
 
 fn write_document(path: &Path, content: &str) -> Result<(), String> {
@@ -341,8 +369,23 @@ fn parse_rules(content: &str) -> Vec<String> {
         .collect()
 }
 
-fn load_rules(path: &Path) -> Result<Vec<String>, String> {
-    read_document(path).map(|content| parse_rules(&content))
+fn build_learning_input(
+    original: &str,
+    corrected: &str,
+    transcription_rules: &str,
+    vocabulary: &str,
+    auto_learning: &str,
+) -> String {
+    serde_json::json!({
+        "original": original,
+        "corrected": corrected,
+        "existingContent": {
+            "transcriptionRules": transcription_rules,
+            "vocabulary": vocabulary,
+            "autoLearning": auto_learning,
+        },
+    })
+    .to_string()
 }
 
 pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, String> {
@@ -358,18 +401,19 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
     if corrected.trim().is_empty() {
         return Err("剪贴板中没有文本".to_string());
     }
-    if corrected.trim() == original.trim() {
-        return Ok(LearningOutcome::NoChange);
-    }
-
-    let input = serde_json::json!({
-        "original": original,
-        "corrected": corrected,
-        "existingRules": load_rules(&manager.rules_path)?,
-    })
-    .to_string();
-    let learning_prompt = manager.prompt_content()?;
     let config = app.state::<crate::config::ConfigManager>().get();
+    let prompts_dir = crate::commands::resolve_prompts_dir_pub(app)?;
+    let (transcription_rules, vocabulary) =
+        crate::ai::prompt::load_transcription_reference_content(&config, &prompts_dir)?;
+    let auto_learning = read_document(&manager.rules_path)?;
+    let input = build_learning_input(
+        &original,
+        &corrected,
+        &transcription_rules,
+        &vocabulary,
+        &auto_learning,
+    );
+    let learning_prompt = manager.prompt_content()?;
     if !crate::ai::models::supports_text(&config, &config.voice_learning.model_id)? {
         return Err("当前语音转写模型不支持文本分析，无法执行自动学习".to_string());
     }
@@ -382,13 +426,7 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
             let learning_prompt = learning_prompt.clone();
             let config = config.clone();
             async move {
-                crate::ai::analyze_correction(
-                    &client,
-                    &input,
-                    &learning_prompt,
-                    &config,
-                )
-                .await
+                crate::ai::analyze_correction(&client, &input, &learning_prompt, &config).await
             }
         },
         config.advanced.max_retries,
@@ -470,7 +508,7 @@ mod tests {
     }
 
     #[test]
-    fn appends_new_rule_and_deduplicates_additions() {
+    fn appends_every_item_selected_by_ai() {
         let path = test_file("voice-learning.md");
         fs::create_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be created");
@@ -496,13 +534,13 @@ mod tests {
         assert_eq!(
             outcome,
             LearningOutcome::Updated {
-                added: 1,
+                added: 2,
                 removed: 0
             }
         );
         assert_eq!(
             fs::read_to_string(&path).expect("learning document should exist"),
-            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n- 项目技能，不是项目智能\n"
+            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n- 项目技能，不是项目智能\n- 保持API大写\n"
         );
 
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
@@ -603,6 +641,51 @@ mod tests {
             "用户修改后的学习提示词"
         );
         fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn upgrades_legacy_default_learning_prompt() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        fs::create_dir_all(
+            manager
+                .prompt_path
+                .parent()
+                .expect("prompt should have parent"),
+        )
+        .expect("prompt directory should be created");
+        fs::write(&manager.prompt_path, LEGACY_DEFAULT_LEARNING_PROMPT)
+            .expect("legacy prompt should be written");
+
+        let prompt_path = manager
+            .ensure_prompt_document()
+            .expect("legacy prompt should be upgraded");
+
+        assert_eq!(
+            fs::read_to_string(prompt_path).expect("prompt should be readable"),
+            DEFAULT_LEARNING_PROMPT
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn learning_input_contains_all_reference_content() {
+        let input = build_learning_input(
+            "原始文本",
+            "修正文本",
+            "规则内容",
+            "词汇内容",
+            "自动学习内容",
+        );
+        let value: serde_json::Value =
+            serde_json::from_str(&input).expect("learning input should be valid JSON");
+
+        assert_eq!(value["original"], "原始文本");
+        assert_eq!(value["corrected"], "修正文本");
+        assert_eq!(value["existingContent"]["transcriptionRules"], "规则内容");
+        assert_eq!(value["existingContent"]["vocabulary"], "词汇内容");
+        assert_eq!(value["existingContent"]["autoLearning"], "自动学习内容");
     }
 
     #[test]

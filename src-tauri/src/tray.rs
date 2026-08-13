@@ -83,18 +83,7 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
                     let _ = status_item.set_enabled(true);
 
                     let (message, kind) = match result {
-                        Ok(crate::learning::LearningOutcome::Updated { added, removed }) => (
-                            format!("学习完成：写入{}条，移除旧规则{}条。", added, removed),
-                            MessageDialogKind::Info,
-                        ),
-                        Ok(crate::learning::LearningOutcome::Unrelated) => (
-                            "剪贴板内容与最近一次语音结果不匹配，未写入学习规则。".to_string(),
-                            MessageDialogKind::Warning,
-                        ),
-                        Ok(crate::learning::LearningOutcome::NoChange) => (
-                            "没有发现新的纠正规则。".to_string(),
-                            MessageDialogKind::Info,
-                        ),
+                        Ok(_) => ("学习完成".to_string(), MessageDialogKind::Info),
                         Err(error) => (error, MessageDialogKind::Error),
                     };
                     app_handle
