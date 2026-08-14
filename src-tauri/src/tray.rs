@@ -82,16 +82,14 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
                     let _ = status_item.set_text("自动学习");
                     let _ = status_item.set_enabled(true);
 
-                    let (message, kind) = match result {
-                        Ok(_) => ("学习完成".to_string(), MessageDialogKind::Info),
-                        Err(error) => (error, MessageDialogKind::Error),
-                    };
-                    app_handle
-                        .dialog()
-                        .message(message)
-                        .title("自动学习")
-                        .kind(kind)
-                        .show(|_| {});
+                    if let Err(error) = result {
+                        app_handle
+                            .dialog()
+                            .message(error)
+                            .title("自动学习")
+                            .kind(MessageDialogKind::Error)
+                            .show(|_| {});
+                    }
                 });
             }
             "about" => {

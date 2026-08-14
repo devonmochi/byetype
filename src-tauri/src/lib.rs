@@ -58,6 +58,10 @@ pub fn run() {
             learning::get_voice_learning_document,
             learning::save_voice_learning_document,
             learning::get_voice_learning_prompt_path,
+            learning::get_voice_learning_draft,
+            learning::regenerate_voice_learning,
+            learning::apply_voice_learning_generated,
+            learning::close_voice_learning_window,
             local_api::get_local_api_status,
             task::get_screenshot_image,
             task::submit_screenshot_crop,
@@ -119,6 +123,9 @@ pub fn run() {
             if let Some(win) = app.get_webview_window("settings") {
                 let _ = win.hide();
             }
+            if let Some(win) = app.get_webview_window("learning") {
+                let _ = win.hide();
+            }
 
             // Auto-check for updates after a short delay
             let update_handle = app_handle.clone();
@@ -131,7 +138,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             // Intercept settings window close: hide instead of destroy
-            if window.label() == "settings" {
+            if window.label() == "settings" || window.label() == "learning" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();

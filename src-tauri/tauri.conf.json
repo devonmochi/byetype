@@ -21,6 +21,17 @@
         "minHeight": 450,
         "resizable": true,
         "visible": false
+      },
+      {
+        "label": "learning",
+        "title": "自动学习",
+        "url": "learning.html",
+        "width": 1180,
+        "height": 700,
+        "minWidth": 760,
+        "minHeight": 560,
+        "resizable": true,
+        "visible": false
       }
     ],
     "security": {

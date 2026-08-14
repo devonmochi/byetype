@@ -7,6 +7,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const DOCUMENT_HEADER: &str = "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n";
 const DEFAULT_LEARNING_PROMPT: &str = include_str!("../prompts/voice-learning-prompt.md");
+const LAST_DEFAULT_LEARNING_PROMPT: &str =
+    include_str!("../prompts/legacy/voice-learning-prompt-1.16.1.md");
 const LEGACY_DEFAULT_LEARNING_PROMPT: &str = r#"你负责从用户对语音转写结果的手动修改中提取简短纠错规则。
 
 输入包含：
@@ -51,6 +53,7 @@ pub struct VoiceLearningManager {
     prompt_path: PathBuf,
     document_lock: Mutex<()>,
     running: AtomicBool,
+    draft: Mutex<Option<LearningDraft>>,
 }
 
 impl VoiceLearningManager {
@@ -66,6 +69,7 @@ impl VoiceLearningManager {
             prompt_path,
             document_lock: Mutex::new(()),
             running: AtomicBool::new(false),
+            draft: Mutex::new(None),
         }
     }
 
@@ -88,6 +92,7 @@ impl VoiceLearningManager {
             let content = read_document(&self.prompt_path)?;
             if content == LEGACY_DEFAULT_LEARNING_PROMPT
                 || content == PREVIOUS_DEFAULT_LEARNING_PROMPT
+                || content == LAST_DEFAULT_LEARNING_PROMPT
             {
                 write_document(&self.prompt_path, DEFAULT_LEARNING_PROMPT)?;
             }
@@ -166,6 +171,17 @@ impl VoiceLearningManager {
             .map_err(|_| "自动学习正在进行，请稍候".to_string())?;
         Ok(LearningRun(&self.running))
     }
+
+    fn draft(&self) -> Option<LearningDraft> {
+        self.draft
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+
+    fn set_draft(&self, draft: LearningDraft) {
+        *self.draft.lock().unwrap_or_else(|error| error.into_inner()) = Some(draft);
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -173,6 +189,21 @@ impl VoiceLearningManager {
 pub struct LearningDocument {
     path: String,
     content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningDraft {
+    original: String,
+    corrected: String,
+    generated: String,
+    notice: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningApplyResult {
+    added: usize,
 }
 
 struct LearningRun<'a>(&'a AtomicBool);
@@ -206,11 +237,16 @@ pub fn parse_analysis(response: &str) -> Result<LearningAnalysis, String> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LearningOutcome {
+    #[cfg(test)]
     Unrelated,
     NoChange,
-    Updated { added: usize, removed: usize },
+    Updated {
+        added: usize,
+        removed: usize,
+    },
 }
 
+#[cfg(test)]
 pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<LearningOutcome, String> {
     if !analysis.related {
         return Ok(LearningOutcome::Unrelated);
@@ -237,6 +273,72 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
         added: additions.len(),
         removed: 0,
     })
+}
+
+fn apply_generated_text(path: &Path, generated: &str) -> Result<LearningOutcome, String> {
+    let existing = read_document(path)?;
+    let existing_rules = parse_rules(&existing);
+    let mut additions = Vec::new();
+
+    for item in parse_generated_items(generated)? {
+        let item = item.into_document_text();
+        if !existing_rules.contains(&item) && !additions.contains(&item) {
+            additions.push(item);
+        }
+    }
+
+    if additions.is_empty() {
+        return Ok(LearningOutcome::NoChange);
+    }
+
+    write_document(path, &append_learning_items(&existing, &additions))?;
+    Ok(LearningOutcome::Updated {
+        added: additions.len(),
+        removed: 0,
+    })
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum LearningItem {
+    Vocabulary(String),
+    Rule(String),
+}
+
+impl LearningItem {
+    fn into_document_text(self) -> String {
+        match self {
+            Self::Vocabulary(value) => format!("词汇：{value}"),
+            Self::Rule(value) => format!("规则：{value}"),
+        }
+    }
+}
+
+fn parse_generated_items(generated: &str) -> Result<Vec<LearningItem>, String> {
+    let mut items = Vec::new();
+    for (index, line) in generated.lines().enumerate() {
+        let line = line.trim().strip_prefix('-').unwrap_or(line.trim()).trim();
+        if line.is_empty() {
+            continue;
+        }
+        let item = if let Some(value) = line.strip_prefix("词汇：") {
+            LearningItem::Vocabulary(value.trim().to_string())
+        } else if let Some(value) = line.strip_prefix("规则：") {
+            LearningItem::Rule(value.trim().to_string())
+        } else {
+            return Err(format!(
+                "学习结果第{}行格式不正确，请以「词汇：」或「规则：」开头",
+                index + 1
+            ));
+        };
+        let is_empty = match &item {
+            LearningItem::Vocabulary(value) | LearningItem::Rule(value) => value.is_empty(),
+        };
+        if is_empty {
+            return Err(format!("学习结果第{}行内容不能为空", index + 1));
+        }
+        items.push(item);
+    }
+    Ok(items)
 }
 
 fn append_learning_items(content: &str, additions: &[String]) -> String {
@@ -411,18 +513,15 @@ fn build_learning_input(
     .to_string()
 }
 
-pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, String> {
+async fn generate_draft(
+    app: &AppHandle,
+    original: String,
+    corrected: String,
+) -> Result<LearningDraft, String> {
     let manager = app.state::<VoiceLearningManager>();
     let _run = manager.begin()?;
-    let original = manager
-        .latest_output()
-        .ok_or_else(|| "还没有可学习的语音转写结果".to_string())?;
-
-    let corrected = arboard::Clipboard::new()
-        .and_then(|mut clipboard| clipboard.get_text())
-        .map_err(|error| format!("读取剪贴板失败: {error}"))?;
     if corrected.trim().is_empty() {
-        return Err("剪贴板中没有文本".to_string());
+        return Err("用户修订不能为空".to_string());
     }
     let config = app.state::<crate::config::ConfigManager>().get();
     let prompts_dir = crate::commands::resolve_prompts_dir_pub(app)?;
@@ -458,17 +557,133 @@ pub async fn learn_from_clipboard(app: &AppHandle) -> Result<LearningOutcome, St
     )
     .await?;
     let analysis = parse_analysis(&response)?;
+    let (generated, notice) = if !analysis.related {
+        (
+            String::new(),
+            "没有识别到可学习的修改，可以编辑前两栏后重新生成。".to_string(),
+        )
+    } else if analysis.add.is_empty() {
+        (
+            String::new(),
+            "已有规则覆盖了本次修改，也可以在右栏手动填写。".to_string(),
+        )
+    } else {
+        (
+            analysis.add.join("\n"),
+            format!("AI生成了{}条学习内容，确认后才会录入。", analysis.add.len()),
+        )
+    };
+    Ok(LearningDraft {
+        original,
+        corrected,
+        generated,
+        notice,
+    })
+}
+
+pub async fn learn_from_clipboard(app: &AppHandle) -> Result<(), String> {
+    let manager = app.state::<VoiceLearningManager>();
+    let original = manager.latest_output().unwrap_or_default();
+    let corrected = arboard::Clipboard::new()
+        .map_err(|error| format!("读取剪贴板失败：{error}"))?
+        .get_text()
+        .unwrap_or_default();
+    if corrected.trim().is_empty() {
+        let draft = LearningDraft {
+            original,
+            corrected: String::new(),
+            generated: String::new(),
+            notice: "请在中栏输入自然语言新增要求，再点击重新生成。".to_string(),
+        };
+        manager.set_draft(draft.clone());
+        let _ = app.emit_to("learning", "voice-learning-draft", &draft);
+        show_learning_window(app)?;
+        return Ok(());
+    }
+
+    let draft = generate_draft(app, original, corrected).await?;
+    manager.set_draft(draft.clone());
+    let _ = app.emit_to("learning", "voice-learning-draft", &draft);
+    show_learning_window(app)?;
+    Ok(())
+}
+
+fn show_learning_window(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("learning")
+        .ok_or_else(|| "学习窗口未初始化".to_string())?;
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+    #[cfg(target_os = "windows")]
+    let _ = window.set_skip_taskbar(false);
+    let _ = window.center();
+    window
+        .show()
+        .map_err(|error| format!("显示学习窗口失败：{error}"))?;
+    window
+        .set_focus()
+        .map_err(|error| format!("聚焦学习窗口失败：{error}"))
+}
+
+#[tauri::command]
+pub fn get_voice_learning_draft(
+    manager: State<'_, VoiceLearningManager>,
+) -> Result<Option<LearningDraft>, String> {
+    Ok(manager.draft())
+}
+
+#[tauri::command]
+pub async fn regenerate_voice_learning(
+    app: AppHandle,
+    original: String,
+    corrected: String,
+) -> Result<LearningDraft, String> {
+    let draft = generate_draft(&app, original, corrected).await?;
+    app.state::<VoiceLearningManager>().set_draft(draft.clone());
+    Ok(draft)
+}
+
+#[tauri::command]
+pub fn apply_voice_learning_generated(
+    app: AppHandle,
+    manager: State<'_, VoiceLearningManager>,
+    generated: String,
+) -> Result<LearningApplyResult, String> {
+    if generated.trim().is_empty() {
+        return Err("学习内容不能为空".to_string());
+    }
     let outcome = {
         let _guard = manager
             .document_lock
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        apply_analysis(&manager.rules_path, analysis)?
+        apply_generated_text(&manager.rules_path, &generated)?
     };
-    if matches!(outcome, LearningOutcome::Updated { .. }) {
+    let added = match outcome {
+        LearningOutcome::Updated { added, .. } => added,
+        LearningOutcome::NoChange => 0,
+        #[cfg(test)]
+        LearningOutcome::Unrelated => 0,
+    };
+    if added > 0 {
         let _ = app.emit("voice-learning-updated", ());
     }
-    Ok(outcome)
+    Ok(LearningApplyResult { added })
+}
+
+#[tauri::command]
+pub fn close_voice_learning_window(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("learning")
+        .ok_or_else(|| "学习窗口未初始化".to_string())?;
+    window
+        .hide()
+        .map_err(|error| format!("关闭学习窗口失败：{error}"))?;
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+    #[cfg(target_os = "windows")]
+    let _ = window.set_skip_taskbar(true);
+    Ok(())
 }
 
 #[tauri::command]
@@ -716,6 +931,71 @@ mod tests {
             DEFAULT_LEARNING_PROMPT
         );
         fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn upgrades_last_default_learning_prompt() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        fs::create_dir_all(
+            manager
+                .prompt_path
+                .parent()
+                .expect("prompt should have parent"),
+        )
+        .expect("prompt directory should be created");
+        fs::write(&manager.prompt_path, LAST_DEFAULT_LEARNING_PROMPT)
+            .expect("last prompt should be written");
+
+        let prompt_path = manager
+            .ensure_prompt_document()
+            .expect("last prompt should be upgraded");
+
+        assert_eq!(
+            fs::read_to_string(prompt_path).expect("prompt should be readable"),
+            DEFAULT_LEARNING_PROMPT
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn applies_only_unique_lines_from_edited_generated_text() {
+        let path = test_file("voice-learning.md");
+        fs::create_dir_all(path.parent().expect("test path should have parent"))
+            .expect("test directory should be created");
+        fs::write(&path, format!("{DOCUMENT_HEADER}- 词汇：ByeType\n"))
+            .expect("fixture should be written");
+
+        let outcome = apply_generated_text(
+            &path,
+            "- 词汇：ByeType\n规则：项目智能→项目技能\n规则：项目智能→项目技能\n",
+        )
+        .expect("generated text should be applied");
+
+        assert_eq!(
+            outcome,
+            LearningOutcome::Updated {
+                added: 1,
+                removed: 0,
+            }
+        );
+        let content = fs::read_to_string(&path).expect("learning document should exist");
+        assert_eq!(content.matches("词汇：ByeType").count(), 1);
+        assert_eq!(content.matches("规则：项目智能→项目技能").count(), 1);
+        fs::remove_dir_all(path.parent().expect("test path should have parent"))
+            .expect("test directory should be removed");
+    }
+
+    #[test]
+    fn rejects_untyped_generated_lines() {
+        let error = parse_generated_items("帮我记住ByeType")
+            .expect_err("untyped learning content should be rejected");
+
+        assert_eq!(
+            error,
+            "学习结果第1行格式不正确，请以「词汇：」或「规则：」开头"
+        );
     }
 
     #[test]
