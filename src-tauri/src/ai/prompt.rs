@@ -2,6 +2,8 @@ use std::path::Path;
 
 use crate::config::types::{AppConfig, TemplateEntry};
 
+const OPTIMIZE_CONTEXT_INSTRUCTION: &str = "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 voice-learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。";
+
 pub fn load_prompt(file_path: &str) -> String {
     if file_path.is_empty() {
         return String::new();
@@ -80,13 +82,38 @@ pub fn build_transcribe_prompt(
     parts.join("\n\n")
 }
 
-pub fn load_optimize_prompt(config: &AppConfig, prompts_dir: &Path) -> String {
-    let content = load_template_prompt(
-        &config.voice_templates.templates,
-        "voice-optimize",
-        prompts_dir,
-    );
-    wrap_document("text-optimize", &content)
+pub fn build_optimize_prompt(
+    config: &AppConfig,
+    prompts_dir: &Path,
+    template_id: &str,
+    learning_rules: &str,
+) -> String {
+    let optimize_content =
+        load_template_prompt(&config.voice_templates.templates, template_id, prompts_dir);
+    if optimize_content.is_empty() {
+        return String::new();
+    }
+
+    let (rules_path, vocabulary_path) = resolve_transcription_reference_paths(config, prompts_dir);
+    let rules_content = load_prompt(&rules_path);
+    let vocabulary_content = load_prompt(&vocabulary_path);
+
+    let reference_parts: Vec<String> = [
+        wrap_document("rules", &rules_content),
+        wrap_document("vocabulary", &vocabulary_content),
+        wrap_document("voice-learning", learning_rules),
+    ]
+    .into_iter()
+    .filter(|s| !s.is_empty())
+    .collect();
+
+    let mut parts = vec![wrap_document("text-optimize", &optimize_content)];
+    if !reference_parts.is_empty() {
+        parts.insert(0, OPTIMIZE_CONTEXT_INSTRUCTION.to_string());
+        parts.extend(reference_parts);
+    }
+
+    parts.join("\n\n")
 }
 
 pub fn build_extract_prompt(config: &AppConfig, prompts_dir: &Path, template_id: &str) -> String {
@@ -134,6 +161,13 @@ pub fn load_template_prompt(
 mod tests {
     use super::*;
 
+    fn test_prompts_dir(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("byetype-prompt-test-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("test prompt directory should be created");
+        dir
+    }
+
     #[test]
     fn appends_learning_rules_to_transcription_prompt() {
         let config = AppConfig::default();
@@ -158,5 +192,33 @@ mod tests {
                 .expect_err("missing reference content should fail");
 
         assert!(error.starts_with("读取转录规则失败"));
+    }
+
+    #[test]
+    fn optimize_prompt_reuses_transcription_references_without_agent_role() {
+        let prompts_dir = test_prompts_dir("optimize-context");
+        std::fs::write(prompts_dir.join("agent.md"), "角色定义").unwrap();
+        std::fs::write(prompts_dir.join("rules.md"), "转录规则").unwrap();
+        std::fs::write(prompts_dir.join("vocabulary.md"), "专有词汇").unwrap();
+        std::fs::write(prompts_dir.join("text-optimize.md"), "文本优化提示词").unwrap();
+
+        let prompt = build_optimize_prompt(
+            &AppConfig::default(),
+            &prompts_dir,
+            "voice-optimize",
+            "自动学习结果",
+        );
+
+        assert_eq!(
+            prompt,
+            "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 voice-learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。\n\n\
+<document name=\"text-optimize\">\n文本优化提示词\n</document>\n\n\
+<document name=\"rules\">\n转录规则\n</document>\n\n\
+<document name=\"vocabulary\">\n专有词汇\n</document>\n\n\
+<document name=\"voice-learning\">\n自动学习结果\n</document>"
+        );
+        assert!(!prompt.contains("角色定义"));
+
+        std::fs::remove_dir_all(prompts_dir).unwrap();
     }
 }

@@ -495,6 +495,7 @@ async fn execute_pipeline(
         let text = transcribe.clone();
         let config = config.clone();
         let prompts_dir = prompts_dir.clone();
+        let learning_rules = learning_rules.clone();
         tokio::select! {
             result = ai::retry::with_retry(
                 || {
@@ -503,7 +504,18 @@ async fn execute_pipeline(
                     let config = config.clone();
                     let prompts_dir = prompts_dir.clone();
                     let template_id = template_id.clone();
-                    async move { ai::optimize(&client, &text, &config, &prompts_dir, &template_id).await }
+                    let learning_rules = learning_rules.clone();
+                    async move {
+                        ai::optimize(
+                            &client,
+                            &text,
+                            &config,
+                            &prompts_dir,
+                            &template_id,
+                            &learning_rules,
+                        )
+                        .await
+                    }
                 },
                 config.advanced.max_retries,
                 config.advanced.optimize_timeout,
