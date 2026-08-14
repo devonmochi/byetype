@@ -1,11 +1,34 @@
-use tauri::{AppHandle, Manager, Emitter, WebviewUrl, WebviewWindowBuilder, WebviewWindow};
 use std::sync::atomic::{AtomicU32, Ordering};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const BUBBLE_WIDTH: f64 = 140.0;
 const BUBBLE_HEIGHT: f64 = 64.0;
 const OFFSET_X: f64 = 10.0;
 const OFFSET_Y: f64 = 10.0;
 const MAX_BUBBLES: u32 = 3;
+const LEARNING_BUBBLE_LABEL: &str = "bubble-learning";
+
+#[derive(Debug, PartialEq, Eq)]
+enum BubbleStart {
+    Preparing { task_id: u32 },
+    Learning,
+}
+
+impl BubbleStart {
+    fn task_id(&self) -> Option<u32> {
+        match self {
+            Self::Preparing { task_id } => Some(*task_id),
+            Self::Learning => None,
+        }
+    }
+
+    fn status(&self) -> &'static str {
+        match self {
+            Self::Preparing { .. } => "preparing",
+            Self::Learning => "learning",
+        }
+    }
+}
 
 /// Generation counter per bubble slot — prevents stale delayed hides
 static SHOW_GEN: [AtomicU32; 3] = [
@@ -58,11 +81,14 @@ fn label_for(task_id: u32) -> String {
 pub fn init(app: &AppHandle) -> Result<(), String> {
     for i in 1..=MAX_BUBBLES {
         let label = label_for(i);
-        let mut builder = WebviewWindowBuilder::new(
-            app,
-            &label,
-            WebviewUrl::App("bubble.html".into()),
-        )
+        create_window(app, &label)?;
+    }
+    create_window(app, LEARNING_BUBBLE_LABEL)
+}
+
+fn create_window(app: &AppHandle, label: &str) -> Result<(), String> {
+    let mut builder =
+        WebviewWindowBuilder::new(app, label, WebviewUrl::App("bubble.html".into()))
         .title("")
         .inner_size(BUBBLE_WIDTH, BUBBLE_HEIGHT)
         .position(-200.0, -200.0)
@@ -73,13 +99,12 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
         .focused(false)
         .visible(false);
 
-        builder = builder.transparent(true).shadow(false);
+    builder = builder.transparent(true).shadow(false);
 
-        builder
-            .build()
-            .map_err(|e| format!("Failed to pre-create bubble-{}: {}", i, e))?;
-    }
-    Ok(())
+    builder
+        .build()
+        .map(|_| ())
+        .map_err(|error| format!("预创建气泡{label}失败：{error}"))
 }
 
 pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
@@ -89,15 +114,19 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     let idx = gen_index(task_id);
     SHOW_GEN[idx].fetch_add(1, Ordering::SeqCst);
 
+    show_status(app, &label, BubbleStart::Preparing { task_id })
+}
+
+pub fn show_learning(app: &AppHandle) -> Result<(), String> {
+    show_status(app, LEARNING_BUBBLE_LABEL, BubbleStart::Learning)
+}
+
+fn show_status(app: &AppHandle, label: &str, start: BubbleStart) -> Result<(), String> {
     let (cx, cy) = cursor_position();
 
-    if let Some(win) = app.get_webview_window(&label) {
+    if let Some(win) = app.get_webview_window(label) {
         // Clear old content first to prevent flash of stale state
-        let _ = app.emit_to(
-            &label,
-            "clear-bubble",
-            serde_json::json!({}),
-        );
+        let _ = app.emit_to(label, "clear-bubble", serde_json::json!({}));
 
         // 光标右下偏移,超出屏幕则反向贴边
         position_near_cursor(&win, cx, cy);
@@ -125,16 +154,43 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
             let _ = win.show();
         }
         let _ = app.emit_to(
-            &label,
+            label,
             "show-bubble",
-            // 先渲染 preparing（灰点），等麦克风真正送出首帧音频后由
-            // shortcut.rs 的等待线程 update 成 recording（红点）。
-            serde_json::json!({ "taskNumber": task_id, "status": "preparing" }),
+            serde_json::json!({ "taskNumber": start.task_id(), "status": start.status() }),
         );
     } else {
         eprintln!("[Bubble] Window {} not found in pool", label);
     }
 
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BubbleStart;
+
+    #[test]
+    fn learning_bubble_has_no_task_id_and_uses_learning_status() {
+        let start = BubbleStart::Learning;
+
+        assert_eq!(start.task_id(), None);
+        assert_eq!(start.status(), "learning");
+    }
+}
+
+pub fn hide_learning(app: &AppHandle) -> Result<(), String> {
+    hide_window(app, LEARNING_BUBBLE_LABEL)
+}
+
+fn hide_window(app: &AppHandle, label: &str) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window(label) {
+        let _ = app.emit_to(label, "clear-bubble", serde_json::json!({}));
+        win.hide()
+            .map_err(|error| format!("隐藏气泡{label}失败：{error}"))?;
+        let _ = win.set_position(tauri::Position::Logical(
+            tauri::LogicalPosition::new(-200.0, -200.0),
+        ));
+    }
     Ok(())
 }
 

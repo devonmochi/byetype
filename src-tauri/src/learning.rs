@@ -214,6 +214,25 @@ impl Drop for LearningRun<'_> {
     }
 }
 
+struct LearningBubble<'a>(&'a AppHandle);
+
+impl<'a> LearningBubble<'a> {
+    fn show(app: &'a AppHandle) -> Self {
+        if let Err(error) = crate::bubble::show_learning(app) {
+            eprintln!("[learning] {error}");
+        }
+        Self(app)
+    }
+}
+
+impl Drop for LearningBubble<'_> {
+    fn drop(&mut self) {
+        if let Err(error) = crate::bubble::hide_learning(self.0) {
+            eprintln!("[learning] {error}");
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct LearningAnalysis {
     pub related: bool,
@@ -523,6 +542,7 @@ async fn generate_draft(
     if corrected.trim().is_empty() {
         return Err("用户修订不能为空".to_string());
     }
+    let _bubble = LearningBubble::show(app);
     let config = app.state::<crate::config::ConfigManager>().get();
     let prompts_dir = crate::commands::resolve_prompts_dir_pub(app)?;
     let (transcription_rules, vocabulary) =

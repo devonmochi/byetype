@@ -248,6 +248,18 @@ textarea:focus {
   background: var(--surface);
 }
 
+.button-clear {
+  min-width: 64px;
+  color: var(--danger);
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.button-clear:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: var(--surface-muted);
+}
+
 .button-secondary:hover:not(:disabled),
 .button-quiet:hover:not(:disabled) {
   background: var(--surface-muted);

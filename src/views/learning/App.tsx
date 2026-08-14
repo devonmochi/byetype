@@ -88,6 +88,15 @@ export default function App() {
     }
   }
 
+  const clearDraft = () => {
+    setOriginal('')
+    setCorrected('')
+    setGenerated('')
+    setSaved(false)
+    setError('')
+    setNotice('当前三栏已清空，已保存的学习记录不受影响。')
+  }
+
   const close = () => invoke('close_voice_learning_window')
 
   return (
@@ -133,6 +142,13 @@ export default function App() {
           {error || notice}
         </div>
         <div className="actions">
+          <button
+            className="button button-clear"
+            onClick={clearDraft}
+            disabled={busy !== null || (original === '' && corrected === '' && generated === '')}
+          >
+            清空
+          </button>
           <button
             className="button button-secondary"
             onClick={regenerate}
