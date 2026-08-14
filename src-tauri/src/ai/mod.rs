@@ -175,16 +175,13 @@ pub async fn optimize(
     config: &AppConfig,
     prompts_dir: &Path,
     template_id: &str,
+    learning_rules: &str,
 ) -> Result<String, String> {
-    let system_prompt = prompt::load_template_prompt(
-        &config.voice_templates.templates,
-        template_id,
-        prompts_dir,
-    );
+    let system_prompt =
+        prompt::build_optimize_prompt(config, prompts_dir, template_id, learning_rules);
     if system_prompt.is_empty() {
         return Ok(text.to_string());
     }
-    let system_prompt = prompt::wrap_document("text-optimize", &system_prompt);
 
     let resolved = models::resolve_model(config, &config.voice_templates.model_id)?;
 
