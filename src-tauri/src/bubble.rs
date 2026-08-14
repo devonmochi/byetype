@@ -6,29 +6,6 @@ const BUBBLE_HEIGHT: f64 = 64.0;
 const OFFSET_X: f64 = 10.0;
 const OFFSET_Y: f64 = 10.0;
 const MAX_BUBBLES: u32 = 3;
-const LEARNING_BUBBLE_LABEL: &str = "bubble-learning";
-
-#[derive(Debug, PartialEq, Eq)]
-enum BubbleStart {
-    Preparing { task_id: u32 },
-    Learning,
-}
-
-impl BubbleStart {
-    fn task_id(&self) -> Option<u32> {
-        match self {
-            Self::Preparing { task_id } => Some(*task_id),
-            Self::Learning => None,
-        }
-    }
-
-    fn status(&self) -> &'static str {
-        match self {
-            Self::Preparing { .. } => "preparing",
-            Self::Learning => "learning",
-        }
-    }
-}
 
 /// Generation counter per bubble slot — prevents stale delayed hides
 static SHOW_GEN: [AtomicU32; 3] = [
@@ -83,7 +60,7 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
         let label = label_for(i);
         create_window(app, &label)?;
     }
-    create_window(app, LEARNING_BUBBLE_LABEL)
+    Ok(())
 }
 
 fn create_window(app: &AppHandle, label: &str) -> Result<(), String> {
@@ -114,14 +91,10 @@ pub fn show(app: &AppHandle, task_id: u32) -> Result<(), String> {
     let idx = gen_index(task_id);
     SHOW_GEN[idx].fetch_add(1, Ordering::SeqCst);
 
-    show_status(app, &label, BubbleStart::Preparing { task_id })
+    show_status(app, &label, task_id)
 }
 
-pub fn show_learning(app: &AppHandle) -> Result<(), String> {
-    show_status(app, LEARNING_BUBBLE_LABEL, BubbleStart::Learning)
-}
-
-fn show_status(app: &AppHandle, label: &str, start: BubbleStart) -> Result<(), String> {
+fn show_status(app: &AppHandle, label: &str, task_id: u32) -> Result<(), String> {
     let (cx, cy) = cursor_position();
 
     if let Some(win) = app.get_webview_window(label) {
@@ -156,41 +129,12 @@ fn show_status(app: &AppHandle, label: &str, start: BubbleStart) -> Result<(), S
         let _ = app.emit_to(
             label,
             "show-bubble",
-            serde_json::json!({ "taskNumber": start.task_id(), "status": start.status() }),
+            serde_json::json!({ "taskNumber": task_id, "status": "preparing" }),
         );
     } else {
         eprintln!("[Bubble] Window {} not found in pool", label);
     }
 
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::BubbleStart;
-
-    #[test]
-    fn learning_bubble_has_no_task_id_and_uses_learning_status() {
-        let start = BubbleStart::Learning;
-
-        assert_eq!(start.task_id(), None);
-        assert_eq!(start.status(), "learning");
-    }
-}
-
-pub fn hide_learning(app: &AppHandle) -> Result<(), String> {
-    hide_window(app, LEARNING_BUBBLE_LABEL)
-}
-
-fn hide_window(app: &AppHandle, label: &str) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window(label) {
-        let _ = app.emit_to(label, "clear-bubble", serde_json::json!({}));
-        win.hide()
-            .map_err(|error| format!("隐藏气泡{label}失败：{error}"))?;
-        let _ = win.set_position(tauri::Position::Logical(
-            tauri::LogicalPosition::new(-200.0, -200.0),
-        ));
-    }
     Ok(())
 }
 

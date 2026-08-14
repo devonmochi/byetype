@@ -121,8 +121,9 @@ export default function App() {
           onChange={value => { setOriginal(value); setSaved(false) }}
         />
         <EditorPanel
-          label="用户修订"
-          helper="剪贴板文本，也可直接输入新增要求"
+          label="用户修订／新增要求"
+          helper="可粘贴修订文本，也可直接输入要学习的词汇或规则"
+          placeholder="例如：新增词汇：ByeType"
           value={corrected}
           onChange={value => { setCorrected(value); setSaved(false) }}
         />
@@ -135,8 +136,9 @@ export default function App() {
         />
         {busy === 'regenerate' && (
           <div className="generating-layer" role="status">
+            <strong className="generating-title">Learning…</strong>
             <div className="generating-bar" />
-            <span>AI正在生成学习内容…</span>
+            <span>AI正在分析并生成学习内容…</span>
           </div>
         )}
       </section>
@@ -179,9 +181,10 @@ interface EditorPanelProps {
   value: string
   onChange: (value: string) => void
   result?: boolean
+  placeholder?: string
 }
 
-function EditorPanel({ label, helper, value, onChange, result = false }: EditorPanelProps) {
+function EditorPanel({ label, helper, value, onChange, result = false, placeholder }: EditorPanelProps) {
   return (
     <label className={result ? 'editor-panel result-panel' : 'editor-panel'}>
       <span className="panel-heading">
@@ -191,6 +194,7 @@ function EditorPanel({ label, helper, value, onChange, result = false }: EditorP
       <span className="panel-helper">{helper}</span>
       <textarea
         value={value}
+        placeholder={placeholder}
         onChange={event => onChange(event.target.value)}
         spellCheck={false}
       />

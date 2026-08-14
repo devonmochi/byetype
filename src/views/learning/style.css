@@ -164,6 +164,13 @@ textarea:focus {
   font-size: 12px;
 }
 
+.generating-title {
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+}
+
 .generating-bar {
   width: min(260px, 45%);
   height: 4px;

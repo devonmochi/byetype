@@ -215,25 +215,6 @@ impl Drop for LearningRun<'_> {
     }
 }
 
-struct LearningBubble<'a>(&'a AppHandle);
-
-impl<'a> LearningBubble<'a> {
-    fn show(app: &'a AppHandle) -> Self {
-        if let Err(error) = crate::bubble::show_learning(app) {
-            eprintln!("[learning] {error}");
-        }
-        Self(app)
-    }
-}
-
-impl Drop for LearningBubble<'_> {
-    fn drop(&mut self) {
-        if let Err(error) = crate::bubble::hide_learning(self.0) {
-            eprintln!("[learning] {error}");
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct LearningAnalysis {
     pub related: bool,
@@ -543,7 +524,6 @@ async fn generate_draft(
     if corrected.trim().is_empty() {
         return Err("用户修订不能为空".to_string());
     }
-    let _bubble = LearningBubble::show(app);
     let config = app.state::<crate::config::ConfigManager>().get();
     let prompts_dir = crate::commands::resolve_prompts_dir_pub(app)?;
     let (transcription_rules, vocabulary) =
@@ -578,22 +558,7 @@ async fn generate_draft(
     )
     .await?;
     let analysis = parse_analysis(&response)?;
-    let (generated, notice) = if !analysis.related {
-        (
-            String::new(),
-            "没有识别到可学习的修改，可以编辑前两栏后重新生成。".to_string(),
-        )
-    } else if analysis.add.is_empty() {
-        (
-            String::new(),
-            "已有规则覆盖了本次修改，也可以在右栏手动填写。".to_string(),
-        )
-    } else {
-        (
-            analysis.add.join("\n"),
-            format!("AI生成了{}条学习内容，确认后才会录入。", analysis.add.len()),
-        )
-    };
+    let (generated, notice) = build_generated_result(&analysis);
     Ok(LearningDraft {
         original,
         corrected,
@@ -601,6 +566,26 @@ async fn generate_draft(
         notice,
         generated_once: true,
     })
+}
+
+fn build_generated_result(analysis: &LearningAnalysis) -> (String, String) {
+    let (generated, notice) = if !analysis.related {
+        (
+            String::new(),
+            "本次没有学到新内容，可以编辑前两栏后重新生成。".to_string(),
+        )
+    } else if analysis.add.is_empty() {
+        (
+            String::new(),
+            "本次没有学到新内容，已有规则可能已覆盖，也可以在右栏手动填写。".to_string(),
+        )
+    } else {
+        (
+            analysis.add.join("\n"),
+            format!("AI生成了{}条学习内容，确认后才会录入。", analysis.add.len()),
+        )
+    };
+    (generated, notice)
 }
 
 pub fn open_learning_review(app: &AppHandle) -> Result<(), String> {
@@ -1048,6 +1033,18 @@ mod tests {
                 .expect("overlapping learning action should be blocked"),
             "自动学习正在进行，请稍候"
         );
+    }
+
+    #[test]
+    fn empty_learning_result_reports_that_nothing_was_learned() {
+        let (generated, notice) = build_generated_result(&LearningAnalysis {
+            related: true,
+            remove: vec![],
+            add: vec![],
+        });
+
+        assert!(generated.is_empty());
+        assert!(notice.starts_with("本次没有学到新内容"));
     }
 
     #[test]

@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 const bubble = document.getElementById('bubble')!
 const currentWindow = getCurrentWindow()
-let currentTaskId: number | null = null
+let currentTaskId: number = 0
 
 type Look = {
   shape: 'is-round' | 'is-pill'
@@ -24,7 +24,6 @@ const looks: Record<string, Look> = {
   extracting:   { shape: 'is-pill', color: 'c-thinking', label: 'Thinking...', cancel: true },
   optimizing:   { shape: 'is-pill', color: 'c-optimizing', label: 'Thinking...', cancel: true },
   retrying:     { shape: 'is-pill', color: 'c-retrying', label: 'Thinking...', cancel: true },
-  learning:     { shape: 'is-pill', color: 'c-thinking', label: 'Learning...' },
   completed:    { shape: 'is-round', color: 'c-completed', glyph: '✓' },
   failed:       { shape: 'is-round', color: 'c-failed', glyph: '✕' },
 }
@@ -67,9 +66,7 @@ function render(status: string) {
   el.querySelector('.cancel-btn')!.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (currentTaskId !== null) {
-      invoke('cancel_task', { taskId: currentTaskId }).catch((err) => console.error('cancel_task failed:', err))
-    }
+    invoke('cancel_task', { taskId: currentTaskId }).catch((err) => console.error('cancel_task failed:', err))
   })
   bubble.appendChild(el)
 }
@@ -77,10 +74,10 @@ function render(status: string) {
 // Window-scoped listeners — each bubble only receives events targeted to it
 currentWindow.listen('clear-bubble', () => {
   bubble.innerHTML = ''
-  currentTaskId = null
+  currentTaskId = 0
 })
 
-currentWindow.listen<{ taskNumber: number | null; status: string }>('show-bubble', (event) => {
+currentWindow.listen<{ taskNumber: number; status: string }>('show-bubble', (event) => {
   const { taskNumber, status } = event.payload
   currentTaskId = taskNumber
   render(status)
