@@ -2,6 +2,8 @@ use std::path::Path;
 
 use crate::config::types::{AppConfig, TemplateEntry};
 
+const OPTIMIZE_CONTEXT_INSTRUCTION: &str = "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 voice-learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。";
+
 pub fn load_prompt(file_path: &str) -> String {
     if file_path.is_empty() {
         return String::new();
@@ -96,8 +98,7 @@ pub fn build_optimize_prompt(
     let rules_content = load_prompt(&rules_path);
     let vocabulary_content = load_prompt(&vocabulary_path);
 
-    let parts: Vec<String> = [
-        wrap_document("text-optimize", &optimize_content),
+    let reference_parts: Vec<String> = [
         wrap_document("rules", &rules_content),
         wrap_document("vocabulary", &vocabulary_content),
         wrap_document("voice-learning", learning_rules),
@@ -105,6 +106,12 @@ pub fn build_optimize_prompt(
     .into_iter()
     .filter(|s| !s.is_empty())
     .collect();
+
+    let mut parts = vec![wrap_document("text-optimize", &optimize_content)];
+    if !reference_parts.is_empty() {
+        parts.insert(0, OPTIMIZE_CONTEXT_INSTRUCTION.to_string());
+        parts.extend(reference_parts);
+    }
 
     parts.join("\n\n")
 }
@@ -204,7 +211,8 @@ mod tests {
 
         assert_eq!(
             prompt,
-            "<document name=\"text-optimize\">\n文本优化提示词\n</document>\n\n\
+            "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 voice-learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。\n\n\
+<document name=\"text-optimize\">\n文本优化提示词\n</document>\n\n\
 <document name=\"rules\">\n转录规则\n</document>\n\n\
 <document name=\"vocabulary\">\n专有词汇\n</document>\n\n\
 <document name=\"voice-learning\">\n自动学习结果\n</document>"
