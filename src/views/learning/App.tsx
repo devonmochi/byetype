@@ -7,6 +7,7 @@ interface LearningDraft {
   corrected: string
   generated: string
   notice: string
+  generatedOnce: boolean
 }
 
 interface LearningApplyResult {
@@ -23,12 +24,14 @@ export default function App() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<BusyAction>(null)
   const [saved, setSaved] = useState(false)
+  const [generatedOnce, setGeneratedOnce] = useState(false)
 
   const loadDraft = (draft: LearningDraft) => {
     setOriginal(draft.original)
     setCorrected(draft.corrected)
     setGenerated(draft.generated)
     setNotice(draft.notice)
+    setGeneratedOnce(draft.generatedOnce)
     setSaved(false)
     setError('')
   }
@@ -92,6 +95,7 @@ export default function App() {
     setOriginal('')
     setCorrected('')
     setGenerated('')
+    setGeneratedOnce(false)
     setSaved(false)
     setError('')
     setNotice('当前三栏已清空，已保存的学习记录不受影响。')
@@ -104,7 +108,7 @@ export default function App() {
       <header className="learning-header">
         <div>
           <h1>确认学习内容</h1>
-          <p>核对前两栏，必要时重新生成。只有右栏会录入系统。</p>
+          <p>先核对前两栏，再开始学习。只有右栏会录入系统。</p>
         </div>
         <button className="button button-quiet" onClick={close} disabled={busy !== null}>取消</button>
       </header>
@@ -132,7 +136,7 @@ export default function App() {
         {busy === 'regenerate' && (
           <div className="generating-layer" role="status">
             <div className="generating-bar" />
-            <span>AI正在重新生成学习内容…</span>
+            <span>AI正在生成学习内容…</span>
           </div>
         )}
       </section>
@@ -154,7 +158,7 @@ export default function App() {
             onClick={regenerate}
             disabled={busy !== null || corrected.trim() === ''}
           >
-            {busy === 'regenerate' ? '正在生成…' : '重新生成'}
+            {busy === 'regenerate' ? '正在学习…' : generatedOnce ? '重新生成' : '开始学习'}
           </button>
           <button
             className="button button-primary"

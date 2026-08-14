@@ -198,6 +198,7 @@ pub struct LearningDraft {
     corrected: String,
     generated: String,
     notice: String,
+    generated_once: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -598,34 +599,38 @@ async fn generate_draft(
         corrected,
         generated,
         notice,
+        generated_once: true,
     })
 }
 
-pub async fn learn_from_clipboard(app: &AppHandle) -> Result<(), String> {
+pub fn open_learning_review(app: &AppHandle) -> Result<(), String> {
     let manager = app.state::<VoiceLearningManager>();
+    let _run = manager.begin()?;
     let original = manager.latest_output().unwrap_or_default();
     let corrected = arboard::Clipboard::new()
         .map_err(|error| format!("读取剪贴板失败：{error}"))?
         .get_text()
         .unwrap_or_default();
-    if corrected.trim().is_empty() {
-        let draft = LearningDraft {
-            original,
-            corrected: String::new(),
-            generated: String::new(),
-            notice: "请在中栏输入自然语言新增要求，再点击重新生成。".to_string(),
-        };
-        manager.set_draft(draft.clone());
-        let _ = app.emit_to("learning", "voice-learning-draft", &draft);
-        show_learning_window(app)?;
-        return Ok(());
-    }
-
-    let draft = generate_draft(app, original, corrected).await?;
+    let draft = build_review_draft(original, corrected);
     manager.set_draft(draft.clone());
     let _ = app.emit_to("learning", "voice-learning-draft", &draft);
     show_learning_window(app)?;
     Ok(())
+}
+
+fn build_review_draft(original: String, corrected: String) -> LearningDraft {
+    let notice = if corrected.trim().is_empty() {
+        "请在中栏输入修订文本或自然语言新增要求，再点击开始学习。"
+    } else {
+        "请核对前两栏，确认后点击开始学习。"
+    };
+    LearningDraft {
+        original,
+        corrected,
+        generated: String::new(),
+        notice: notice.to_string(),
+        generated_once: false,
+    }
 }
 
 fn show_learning_window(app: &AppHandle) -> Result<(), String> {
@@ -1015,6 +1020,33 @@ mod tests {
         assert_eq!(
             error,
             "学习结果第1行格式不正确，请以「词汇：」或「规则：」开头"
+        );
+    }
+
+    #[test]
+    fn opening_review_creates_an_unstarted_draft() {
+        let draft = build_review_draft("原始输出".to_string(), "用户修订".to_string());
+
+        assert_eq!(draft.original, "原始输出");
+        assert_eq!(draft.corrected, "用户修订");
+        assert_eq!(draft.generated, "");
+        assert!(!draft.generated_once);
+        assert!(draft.notice.contains("开始学习"));
+    }
+
+    #[test]
+    fn learning_run_guard_blocks_overlapping_review_or_generation() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        let _run = manager.begin().expect("first learning run should start");
+
+        assert_eq!(
+            manager
+                .begin()
+                .err()
+                .expect("overlapping learning action should be blocked"),
+            "自动学习正在进行，请稍候"
         );
     }
 

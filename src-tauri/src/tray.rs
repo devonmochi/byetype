@@ -48,7 +48,6 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
     let icon = tauri::image::Image::from_bytes(icon_bytes)
         .map_err(|e| format!("Failed to load tray icon: {}", e))?;
 
-    let learning_status_item = learning_item.clone();
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .tooltip("ByeType")
@@ -73,24 +72,13 @@ pub fn create(app: &AppHandle) -> Result<(), String> {
                 );
             }
             "auto_learning" => {
-                let app_handle = app.clone();
-                let status_item = learning_status_item.clone();
-                let _ = status_item.set_enabled(false);
-                let _ = status_item.set_text("自动学习中…");
-                tauri::async_runtime::spawn(async move {
-                    let result = crate::learning::learn_from_clipboard(&app_handle).await;
-                    let _ = status_item.set_text("自动学习");
-                    let _ = status_item.set_enabled(true);
-
-                    if let Err(error) = result {
-                        app_handle
-                            .dialog()
-                            .message(error)
-                            .title("自动学习")
-                            .kind(MessageDialogKind::Error)
-                            .show(|_| {});
-                    }
-                });
+                if let Err(error) = crate::learning::open_learning_review(app) {
+                    app.dialog()
+                        .message(error)
+                        .title("自动学习")
+                        .kind(MessageDialogKind::Error)
+                        .show(|_| {});
+                }
             }
             "about" => {
                 show_settings(app);
