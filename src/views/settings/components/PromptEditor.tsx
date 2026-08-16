@@ -85,9 +85,11 @@ interface Props {
   onSave: (config: AppConfig) => void
   promptFiles: PromptFileEntry[]
   showTabs?: boolean
+  /** 固定编辑器高度（px）。不传时撑满父容器剩余空间 */
+  editorHeight?: number
 }
 
-export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: Props) {
+export function PromptEditor({ config, onSave, promptFiles, showTabs = true, editorHeight }: Props) {
   const [activeFile, setActiveFile] = useState(promptFiles[0]?.key ?? '')
   const [content, setContent] = useState('')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
@@ -363,8 +365,16 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
 
   if (promptFiles.length === 0) return null
 
+  const isFixedHeight = typeof editorHeight === 'number'
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div
+      style={
+        isFixedHeight
+          ? { display: 'flex', flexDirection: 'column', minHeight: 0 }
+          : { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }
+      }
+    >
       {showTabs && promptFiles.length > 1 && (
         <div className="prompt-tabs">
           {promptFiles.map(f => (
@@ -392,7 +402,11 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true }: P
       </div>
 
       <div className="prompt-editor-container" ref={editorRef}
-        style={{ opacity: loading ? 0.5 : 1, flex: 1, minHeight: 150 }} />
+        style={
+          isFixedHeight
+            ? { opacity: loading ? 0.5 : 1, height: editorHeight, flex: 'none' }
+            : { opacity: loading ? 0.5 : 1, flex: 1, minHeight: 150 }
+        } />
 
       <div className={`prompt-save-status ${saveStatus}`}>
         {saveStatus === 'saving' && '保存中...'}

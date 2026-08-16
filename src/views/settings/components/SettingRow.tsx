@@ -9,7 +9,7 @@ interface SettingRowProps {
 export function SettingRow({ label, description, children }: SettingRowProps) {
   return (
     <div className="setting-row">
-      <div>
+      <div className="setting-row-main">
         <div className="setting-row-label">{label}</div>
         {description && <div className="setting-row-description">{description}</div>}
       </div>

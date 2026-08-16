@@ -96,10 +96,15 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
-      <h2 className="content-title">转写提示词</h2>
-      <PromptEditor config={config} onSave={onSave} promptFiles={TRANSCRIBE_PROMPT_FILES} />
+      <h2 className="content-title" style={{ flexShrink: 0 }}>转写提示词</h2>
+      <PromptEditor
+        config={config}
+        onSave={onSave}
+        promptFiles={TRANSCRIBE_PROMPT_FILES}
+        editorHeight={300}
+      />
 
-      <h2 className="content-title" style={{ marginTop: 24 }}>文本优化提示词</h2>
+      <h2 className="content-title" style={{ marginTop: 24, flexShrink: 0 }}>文本优化提示词</h2>
       <div>
         {templates.map(template => {
           const isBuiltin = BUILTIN_VOICE_TEMPLATE_IDS.includes(template.id)
@@ -120,7 +125,6 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
                 border: '1px solid var(--border)',
                 borderRadius: 10,
                 marginBottom: 10,
-                overflow: 'hidden',
               }}
             >
               <div
@@ -130,6 +134,11 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
                   padding: '10px 14px',
                   gap: 10,
                   cursor: 'pointer',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 2,
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '10px 10px 0 0',
                 }}
                 onClick={() => toggleExpand(template.id)}
               >
@@ -179,6 +188,7 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
                     onSave={onSave}
                     promptFiles={[promptFile]}
                     showTabs={false}
+                    editorHeight={260}
                   />
                 </div>
               )}

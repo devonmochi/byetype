@@ -66,8 +66,8 @@ export function VoiceLearningTab({ config, onSave }: Props) {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <h2 className="content-title">自动学习</h2>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
+      <h2 className="content-title" style={{ flexShrink: 0 }}>自动学习</h2>
 
       <SettingGroup title="模型">
         <SettingRow label="学习模型" description="用于对比原始转写与用户修改文本，并归纳纠错规则">
@@ -131,7 +131,7 @@ export function VoiceLearningTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <h3 className="section-title">学习文档</h3>
-      <PromptEditor config={config} onSave={onSave} promptFiles={LEARNING_FILES} />
+      <PromptEditor config={config} onSave={onSave} promptFiles={LEARNING_FILES} editorHeight={320} />
     </div>
   )
 }

@@ -234,7 +234,7 @@ export function BackupTab({ config, onSave }: Props) {
           </button>
         </SettingRow>
         {backups.length > 0 && (
-          <div style={{ margin: '8px 16px' }}>
+          <div style={{ margin: '8px 16px', maxHeight: 260, overflow: 'auto' }}>
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color-light)' }}>
