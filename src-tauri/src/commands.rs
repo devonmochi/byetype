@@ -319,7 +319,13 @@ pub async fn test_model_connectivity(
             ai::mimo::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
         }
         _ => {
-            ai::openai_compat::test_connectivity(&client, &resolved.api_key, &resolved.model, &resolved.base_url).await
+            ai::openai_compat::test_connectivity(
+                &client,
+                &resolved.api_key,
+                &resolved.model,
+                &resolved.base_url,
+                resolved.chat_template_kwargs.as_ref(),
+            ).await
         }
     };
 

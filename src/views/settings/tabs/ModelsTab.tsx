@@ -13,7 +13,17 @@ interface TestResults {
 }
 
 const EMPTY_FORM: Omit<CustomModelEntry, 'id'> = {
-  provider: '', model: '', protocol: 'gemini', baseUrl: '', apiKey: '', supportsAudio: true, supportsText: true, supportsVision: true,
+  provider: '', model: '', protocol: 'gemini', baseUrl: '', apiKey: '', audioInputMode: 'input_audio', chatTemplateKwargs: {}, supportsAudio: true, supportsText: true, supportsVision: true,
+}
+
+function validateChatTemplateKwargs(value: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') return '必须填写 JSON 对象，例如 {}'
+    return null
+  } catch {
+    return 'JSON 格式不正确'
+  }
 }
 
 export function ModelsTab({ config, onSave }: Props) {
@@ -21,6 +31,8 @@ export function ModelsTab({ config, onSave }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [chatTemplateKwargsText, setChatTemplateKwargsText] = useState('{}')
+  const [chatTemplateKwargsError, setChatTemplateKwargsError] = useState<string | null>(null)
 
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
   const [showCustom, setShowCustom] = useState(false)
@@ -65,13 +77,18 @@ export function ModelsTab({ config, onSave }: Props) {
   }
 
   const saveCustomModel = () => {
+    const kwargsError = validateChatTemplateKwargs(chatTemplateKwargsText)
+    if (kwargsError) {
+      setChatTemplateKwargsError(kwargsError)
+      return
+    }
     const id = editingId || crypto.randomUUID()
-    const entry: CustomModelEntry = { ...form, id }
+    const entry: CustomModelEntry = { ...form, id, chatTemplateKwargs: JSON.parse(chatTemplateKwargsText) as Record<string, unknown> }
     const custom = editingId
       ? config.models.custom.map(m => (m.id === editingId ? entry : m))
       : [...config.models.custom, entry]
     onSave({ ...config, models: { ...config.models, custom } })
-    setShowForm(false); setEditingId(null); setForm(EMPTY_FORM)
+    setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setChatTemplateKwargsText('{}'); setChatTemplateKwargsError(null)
   }
 
   const deleteCustomModel = (id: string) => {
@@ -81,11 +98,14 @@ export function ModelsTab({ config, onSave }: Props) {
 
   const startEdit = (entry: CustomModelEntry) => {
     setEditingId(entry.id)
-    setForm({ provider: entry.provider, model: entry.model, protocol: entry.protocol, baseUrl: entry.baseUrl, apiKey: entry.apiKey, supportsAudio: entry.supportsAudio, supportsText: entry.supportsText, supportsVision: entry.supportsVision })
+    const chatTemplateKwargs = entry.chatTemplateKwargs ?? {}
+    setForm({ provider: entry.provider, model: entry.model, protocol: entry.protocol, baseUrl: entry.baseUrl, apiKey: entry.apiKey, audioInputMode: entry.audioInputMode ?? 'input_audio', chatTemplateKwargs, supportsAudio: entry.supportsAudio, supportsText: entry.supportsText, supportsVision: entry.supportsVision })
+    setChatTemplateKwargsText(JSON.stringify(chatTemplateKwargs, null, 2))
+    setChatTemplateKwargsError(null)
     setShowForm(true)
   }
 
-  const cancelForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM) }
+  const cancelForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setChatTemplateKwargsText('{}'); setChatTemplateKwargsError(null) }
 
   const renderTestResult = (modelId: string) => {
     const t = testResults[modelId]
@@ -216,9 +236,38 @@ export function ModelsTab({ config, onSave }: Props) {
               </label>
             </div>
           </div>
+          {form.protocol === 'openai-compat' && form.supportsAudio && (
+            <div className="model-form-row">
+              <label>音频请求格式</label>
+              <select className="input" value={form.audioInputMode} onChange={e => setForm(f => ({ ...f, audioInputMode: e.target.value as CustomModelEntry['audioInputMode'] }))} style={{ flex: 1, maxWidth: 400 }}>
+                <option value="input_audio">input_audio（OpenAI 标准）</option>
+                <option value="audio_url">audio_url（URL / Data URI 兼容）</option>
+              </select>
+            </div>
+          )}
           <div className="model-form-row"><label>Provider</label><input className="input" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} placeholder="提供商名称" style={{ flex: 1, maxWidth: 300 }} /></div>
           <div className="model-form-row"><label>Base URL</label><input className="input" value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.example.com/v1" style={{ flex: 1, maxWidth: 400 }} /></div>
           <div className="model-form-row"><label>Model ID</label><input className="input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="gemini-3-flash-preview" style={{ flex: 1, maxWidth: 300 }} /></div>
+          {form.protocol === 'openai-compat' && (
+            <div className="model-form-row" style={{ alignItems: 'flex-start' }}>
+              <label style={{ paddingTop: 7 }}>chat_template_kwargs</label>
+              <div style={{ flex: 1, maxWidth: 400 }}>
+                <textarea
+                  className="input"
+                  rows={4}
+                  value={chatTemplateKwargsText}
+                  onChange={e => {
+                    const value = e.target.value
+                    setChatTemplateKwargsText(value)
+                    setChatTemplateKwargsError(validateChatTemplateKwargs(value))
+                  }}
+                  spellCheck={false}
+                  style={{ width: '100%', resize: 'vertical', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+                />
+                {chatTemplateKwargsError && <div style={{ color: '#ff453a', fontSize: 11, marginTop: 4 }}>{chatTemplateKwargsError}</div>}
+              </div>
+            </div>
+          )}
           <div className="model-form-row">
             <label>API Key</label>
             <div className="api-key-wrapper" style={{ maxWidth: 400 }}>
@@ -232,11 +281,11 @@ export function ModelsTab({ config, onSave }: Props) {
           </div>
           <div className="model-form-actions">
             <button className="model-form-btn" onClick={cancelForm}>取消</button>
-            <button className="model-form-btn primary" onClick={saveCustomModel} disabled={!form.provider || !form.baseUrl || !form.model || (!form.supportsAudio && !form.supportsText && !form.supportsVision)}>保存</button>
+            <button className="model-form-btn primary" onClick={saveCustomModel} disabled={!!chatTemplateKwargsError || !form.provider || !form.baseUrl || !form.model || (!form.supportsAudio && !form.supportsText && !form.supportsVision)}>保存</button>
           </div>
         </div>
       ) : (
-        <button className="add-model-btn" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true) }}>+ 添加自定义模型</button>
+        <button className="add-model-btn" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setChatTemplateKwargsText('{}'); setChatTemplateKwargsError(null); setShowForm(true) }}>+ 添加自定义模型</button>
       )}
         </>
       ) : (

@@ -62,6 +62,7 @@ pub async fn optimize(
         thinking: thinking_param,
         reasoning_effort,
         reasoning: None,
+        chat_template_kwargs: None,
     };
 
     let resp = client
@@ -146,6 +147,7 @@ pub async fn test_connectivity(
         }),
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: None,
     };
 
     let resp = client
