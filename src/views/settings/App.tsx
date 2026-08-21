@@ -31,6 +31,7 @@ const TABS: TabItem[] = [
   { type: 'group', label: '智能学习' },
   { type: 'tab', id: 'voice-learning', label: '自动学习' },
   { type: 'divider' },
+  { type: 'tab', id: 'history', label: '历史记录' },
   { type: 'tab', id: 'backup', label: '备份与恢复' },
   { type: 'tab', id: 'about', label: '关于' },
 ]
