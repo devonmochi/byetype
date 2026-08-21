@@ -40,12 +40,19 @@ impl AppConfig {
         if self.local_api.port < 1024 {
             return Err("本机接口端口必须在 1024 到 65535 之间".to_string());
         }
+        if self.models.custom.iter().any(|model| !model.chat_template_kwargs.is_object()) {
+            return Err("chat_template_kwargs 必须是 JSON 对象".to_string());
+        }
         Ok(())
     }
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_chat_template_kwargs() -> serde_json::Value {
+    serde_json::json!({})
 }
 
 fn default_max_recording_seconds() -> u32 {
@@ -145,10 +152,22 @@ pub struct CustomModelEntry {
     pub protocol: String,
     pub base_url: String,
     pub api_key: String,
+    #[serde(default)]
+    pub audio_input_mode: AudioInputMode,
+    #[serde(default = "default_chat_template_kwargs")]
+    pub chat_template_kwargs: serde_json::Value,
     pub supports_audio: bool,
     pub supports_text: bool,
     #[serde(default = "default_true")]
     pub supports_vision: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioInputMode {
+    #[default]
+    InputAudio,
+    AudioUrl,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -429,5 +448,70 @@ mod local_api_tests {
 
         assert_eq!(config.voice_learning.model_id, "builtin-gemini-3-flash");
         assert!(!config.voice_learning.thinking.enabled);
+    }
+
+    #[test]
+    fn existing_custom_model_defaults_to_input_audio() {
+        let value = serde_json::json!({
+            "id": "legacy-model",
+            "provider": "custom",
+            "model": "audio-model",
+            "protocol": "openai-compat",
+            "baseUrl": "https://example.com/v1",
+            "apiKey": "test",
+            "supportsAudio": true,
+            "supportsText": true,
+            "supportsVision": false
+        });
+
+        let model: CustomModelEntry = serde_json::from_value(value).unwrap();
+
+        assert_eq!(model.audio_input_mode, AudioInputMode::InputAudio);
+        assert_eq!(model.chat_template_kwargs, serde_json::json!({}));
+    }
+
+    #[test]
+    fn custom_model_accepts_audio_url_mode() {
+        let value = serde_json::json!({
+            "id": "url-model",
+            "provider": "custom",
+            "model": "audio-model",
+            "protocol": "openai-compat",
+            "baseUrl": "https://example.com/v1",
+            "apiKey": "test",
+            "audioInputMode": "audio_url",
+            "chatTemplateKwargs": {"enable_thinking": false},
+            "supportsAudio": true,
+            "supportsText": true,
+            "supportsVision": false
+        });
+
+        let model: CustomModelEntry = serde_json::from_value(value).unwrap();
+
+        assert_eq!(model.audio_input_mode, AudioInputMode::AudioUrl);
+        assert_eq!(model.chat_template_kwargs, serde_json::json!({"enable_thinking": false}));
+    }
+
+    #[test]
+    fn rejects_non_object_chat_template_kwargs() {
+        let mut config = AppConfig::default();
+        let value = serde_json::json!({
+            "id": "invalid-kwargs",
+            "provider": "custom",
+            "model": "audio-model",
+            "protocol": "openai-compat",
+            "baseUrl": "https://example.com/v1",
+            "apiKey": "test",
+            "chatTemplateKwargs": [],
+            "supportsAudio": true,
+            "supportsText": true,
+            "supportsVision": false
+        });
+        config.models.custom.push(serde_json::from_value(value).unwrap());
+
+        assert_eq!(
+            config.validate(),
+            Err("chat_template_kwargs 必须是 JSON 对象".to_string())
+        );
     }
 }

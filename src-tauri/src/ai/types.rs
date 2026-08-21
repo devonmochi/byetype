@@ -90,6 +90,8 @@ pub struct ChatCompletionRequest {
     pub reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<OpenRouterReasoning>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_template_kwargs: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -123,6 +125,8 @@ pub enum ChatContentPart {
     Text { text: String },
     #[serde(rename = "input_audio")]
     InputAudio { input_audio: AudioData },
+    #[serde(rename = "audio_url")]
+    AudioUrl { audio_url: AudioUrlData },
     #[serde(rename = "image_url")]
     ImageUrl { image_url: ImageUrlData },
 }
@@ -135,6 +139,11 @@ pub struct AudioData {
     pub format: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sample_rate: Option<u32>,
+}
+
+#[derive(Serialize)]
+pub struct AudioUrlData {
+    pub url: String,
 }
 
 #[derive(Serialize)]
@@ -178,4 +187,58 @@ pub struct StreamChunkChoice {
 #[derive(Deserialize)]
 pub struct StreamDelta {
     pub content: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serializes_audio_url_content_part_as_data_uri() {
+        let part = ChatContentPart::AudioUrl {
+            audio_url: AudioUrlData {
+                url: "data:audio/flac;base64,ZmFrZQ==".to_string(),
+            },
+        };
+
+        assert_eq!(
+            serde_json::to_value(part).unwrap(),
+            serde_json::json!({
+                "type": "audio_url",
+                "audio_url": {
+                    "url": "data:audio/flac;base64,ZmFrZQ=="
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn serializes_chat_template_kwargs_as_an_object() {
+        let request = ChatCompletionRequest {
+            model: "test-model".to_string(),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Text("hi".to_string()),
+            }],
+            modalities: None,
+            output_modalities: None,
+            stream: None,
+            max_tokens: None,
+            stream_options: None,
+            thinking: None,
+            reasoning_effort: None,
+            reasoning: None,
+            chat_template_kwargs: Some(serde_json::json!({
+                "enable_thinking": false,
+                "custom_flag": "value"
+            })),
+        };
+
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(
+            value["chat_template_kwargs"],
+            serde_json::json!({"enable_thinking": false, "custom_flag": "value"})
+        );
+    }
 }
