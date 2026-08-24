@@ -42,6 +42,7 @@ pub fn run() {
             commands::get_builtin_prompt_path,
             commands::copy_builtin_prompt,
             commands::is_builtin_prompt_path,
+            commands::create_user_prompt_file,
             commands::open_file,
             commands::get_recording_state,
             commands::set_launch_at_login,

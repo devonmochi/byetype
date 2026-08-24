@@ -160,6 +160,25 @@ pub fn copy_builtin_prompt(
     Ok(dest_path.to_string_lossy().to_string())
 }
 
+/// 为用户新建模板创建空白提示词文件，返回文件路径。
+/// 文件名由调用方传入（模板 id），需保证唯一；已存在时不覆盖，直接返回现有路径。
+#[tauri::command]
+pub fn create_user_prompt_file(
+    app: tauri::AppHandle,
+    filename: String,
+) -> Result<String, String> {
+    let safe_name = sanitize_prompt_filename(&filename)?;
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?;
+    let dest_dir = data_dir.join("prompts");
+    std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+    let dest_path = dest_dir.join(format!("{}.md", safe_name));
+    if !dest_path.exists() {
+        std::fs::write(&dest_path, "").map_err(|e| e.to_string())?;
+    }
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub fn is_builtin_prompt_path(
     app: tauri::AppHandle,

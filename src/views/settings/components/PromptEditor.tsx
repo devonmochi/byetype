@@ -8,6 +8,7 @@ import { keymap } from '@codemirror/view'
 import {
   isBuiltinPromptPath,
   copyBuiltinPrompt,
+  createUserPromptFile,
   readPromptFile,
   writePromptFile,
   selectFile,
@@ -187,7 +188,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true, edi
       return filePath
     }
 
-    if (!prompt.configPath || !prompt.builtinFilename) {
+    if (!prompt.configPath) {
       throw new Error('提示词文件配置不完整')
     }
     const currentConfig = configRef.current
@@ -198,6 +199,18 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true, edi
         setResolvedPath(customPath)
         return customPath
       }
+    }
+    // 没有内置文件的用户模板：customPath 为空时（旧版本创建的坏模板）现场创建文件并回写配置
+    if (!prompt.builtinFilename) {
+      if (!customPath) {
+        const createdPath = await createUserPromptFile(prompt.key)
+        setResolvedPath(createdPath)
+        const fixedConfig = setConfigValue(currentConfig, prompt.configPath, createdPath)
+        onSave(fixedConfig)
+        return createdPath
+      }
+      setResolvedPath(customPath)
+      return customPath
     }
     const destPath = await copyBuiltinPrompt(prompt.builtinFilename)
     setResolvedPath(destPath)
@@ -396,7 +409,9 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true, edi
         {!activePrompt?.resolvePath && !activePrompt?.loadContent && (
           <>
             <button className="file-picker-btn" onClick={handleBrowse}>选择文件</button>
-            <button className="file-picker-btn" onClick={handleResetToBuiltin}>重置为内置</button>
+            {activePrompt?.builtinFilename && (
+              <button className="file-picker-btn" onClick={handleResetToBuiltin}>重置为内置</button>
+            )}
           </>
         )}
       </div>

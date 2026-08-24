@@ -1,6 +1,7 @@
 import { memo, useState } from 'react'
 import { AppConfig } from '../../../core/types'
 import { PromptEditor, PromptFileEntry } from '../components/PromptEditor'
+import { createUserPromptFile } from '../../../lib/tauri-api'
 
 const TRANSCRIBE_PROMPT_FILES: PromptFileEntry[] = [
   { key: 'agent', label: '角色定义', configPath: 'transcribe.prompts.agent', builtinFilename: 'agent.md' },
@@ -81,15 +82,23 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
     })
   }
 
-  const addTemplate = () => {
-    const newTemplate = { id: `voice-user-${Date.now()}`, name: '新模板', prompt: '' }
-    onSave({
-      ...config,
-      voiceTemplates: {
-        ...config.voiceTemplates,
-        templates: [...config.voiceTemplates.templates, newTemplate],
-      },
-    })
+  const addTemplate = async () => {
+    const id = `voice-user-${Date.now()}`
+    try {
+      // 先创建空白提示词文件，编辑器才有真实文件可读写
+      const promptPath = await createUserPromptFile(id)
+      const newTemplate = { id, name: '新模板', prompt: promptPath }
+      onSave({
+        ...config,
+        voiceTemplates: {
+          ...config.voiceTemplates,
+          templates: [...config.voiceTemplates.templates, newTemplate],
+        },
+      })
+      setExpandedTemplates(prev => new Set(prev).add(id))
+    } catch {
+      // 文件创建失败时不添加模板，避免出现保存不了的空白模板
+    }
   }
 
   const templates = config.voiceTemplates.templates ?? []

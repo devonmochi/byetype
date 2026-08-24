@@ -34,6 +34,10 @@ export async function isBuiltinPromptPath(path: string): Promise<boolean> {
   return invoke<boolean>('is_builtin_prompt_path', { path })
 }
 
+export async function createUserPromptFile(filename: string): Promise<string> {
+  return invoke<string>('create_user_prompt_file', { filename })
+}
+
 export interface VoiceLearningDocument {
   path: string
   content: string
