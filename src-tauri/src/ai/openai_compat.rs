@@ -7,6 +7,15 @@ fn is_openrouter(base_url: &str) -> bool {
     base_url.contains("openrouter.ai")
 }
 
+/// 空对象 {} 视为未配置,不发送该字段。
+/// OpenAI 官方等严格服务会拒绝未知参数,空对象原样发送会导致所有请求报错。
+fn effective_kwargs(kwargs: Option<&serde_json::Value>) -> Option<serde_json::Value> {
+    match kwargs {
+        Some(v) if v.is_object() && !v.as_object().unwrap().is_empty() => Some(v.clone()),
+        _ => None,
+    }
+}
+
 /// OpenRouter 没有真正的 "关闭思考" 开关; thinking.enabled=false 时映射到 effort=minimal,
 /// 这是 Gemini 3 系列最低的思考档位,最接近 "尽量不思考" 的语义。
 fn openrouter_reasoning(thinking: Option<&ThinkingConfig>) -> Option<OpenRouterReasoning> {
@@ -78,7 +87,7 @@ pub async fn transcribe(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
-        chat_template_kwargs: chat_template_kwargs.cloned(),
+        chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
     let mut req = client
@@ -153,7 +162,7 @@ pub async fn optimize(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
-        chat_template_kwargs: chat_template_kwargs.cloned(),
+        chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
     let mut req = client
@@ -236,7 +245,7 @@ pub async fn extract_text(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
-        chat_template_kwargs: chat_template_kwargs.cloned(),
+        chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
     let mut req = client
@@ -362,7 +371,7 @@ pub async fn test_connectivity(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
-        chat_template_kwargs: chat_template_kwargs.cloned(),
+        chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
     let resp = client
@@ -583,4 +592,22 @@ pub async fn qwen_omni_test_connectivity(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod kwargs_tests {
+    use super::effective_kwargs;
+    use serde_json::json;
+
+    #[test]
+    fn empty_object_kwargs_is_not_sent() {
+        assert!(effective_kwargs(Some(&json!({}))).is_none());
+        assert!(effective_kwargs(None).is_none());
+    }
+
+    #[test]
+    fn non_empty_object_kwargs_is_sent() {
+        let kwargs = json!({"enable_thinking": false});
+        assert_eq!(effective_kwargs(Some(&kwargs)), Some(kwargs));
+    }
 }
