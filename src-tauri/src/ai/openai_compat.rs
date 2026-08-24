@@ -1,7 +1,7 @@
 use reqwest::Client;
 
 use super::types::*;
-use crate::config::types::ThinkingConfig;
+use crate::config::types::{AudioInputMode, ThinkingConfig};
 
 fn is_openrouter(base_url: &str) -> bool {
     base_url.contains("openrouter.ai")
@@ -29,15 +29,33 @@ pub async fn transcribe(
     api_key: &str,
     model: &str,
     base_url: &str,
-    bare_base64: bool,
+    audio_input_mode: AudioInputMode,
+    chat_template_kwargs: Option<&serde_json::Value>,
     thinking: Option<&ThinkingConfig>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
-    let data = if bare_base64 {
-        audio_base64.to_string()
-    } else {
-        format!("data:;base64,{}", audio_base64)
+    let audio_part = match audio_input_mode {
+        AudioInputMode::AudioUrl => ChatContentPart::AudioUrl {
+            audio_url: AudioUrlData {
+                url: format!("data:audio/flac;base64,{}", audio_base64),
+            },
+        },
+        AudioInputMode::InputAudio => {
+            let data = if is_openrouter(base_url) {
+                audio_base64.to_string()
+            } else {
+                format!("data:;base64,{}", audio_base64)
+            };
+            ChatContentPart::InputAudio {
+                input_audio: AudioData {
+                    audio_type: None,
+                    data,
+                    format: "flac".to_string(),
+                    sample_rate: None,
+                },
+            }
+        }
     };
 
     let request = ChatCompletionRequest {
@@ -49,14 +67,7 @@ pub async fn transcribe(
             },
             ChatMessage {
                 role: "user".to_string(),
-                content: ChatContent::Parts(vec![ChatContentPart::InputAudio {
-                    input_audio: AudioData {
-                        audio_type: None,
-                        data,
-                        format: "flac".to_string(),
-                        sample_rate: None,
-                    },
-                }]),
+                content: ChatContent::Parts(vec![audio_part]),
             },
         ],
         modalities: Some(vec!["text".to_string()]),
@@ -67,6 +78,7 @@ pub async fn transcribe(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
+        chat_template_kwargs: chat_template_kwargs.cloned(),
     };
 
     let mut req = client
@@ -114,6 +126,7 @@ pub async fn optimize(
     api_key: &str,
     model: &str,
     base_url: &str,
+    chat_template_kwargs: Option<&serde_json::Value>,
     thinking: Option<&ThinkingConfig>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
@@ -140,6 +153,7 @@ pub async fn optimize(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
+        chat_template_kwargs: chat_template_kwargs.cloned(),
     };
 
     let mut req = client
@@ -193,6 +207,7 @@ pub async fn extract_text(
     api_key: &str,
     model: &str,
     base_url: &str,
+    chat_template_kwargs: Option<&serde_json::Value>,
     thinking: Option<&ThinkingConfig>,
 ) -> Result<String, String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
@@ -221,6 +236,7 @@ pub async fn extract_text(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
+        chat_template_kwargs: chat_template_kwargs.cloned(),
     };
 
     let mut req = client
@@ -295,6 +311,7 @@ pub async fn qwen_omni_extract_text(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: None,
     };
 
     let resp = client
@@ -327,6 +344,7 @@ pub async fn test_connectivity(
     api_key: &str,
     model: &str,
     base_url: &str,
+    chat_template_kwargs: Option<&serde_json::Value>,
 ) -> Result<(), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
@@ -344,6 +362,7 @@ pub async fn test_connectivity(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: chat_template_kwargs.cloned(),
     };
 
     let resp = client
@@ -433,6 +452,7 @@ pub async fn qwen_omni_transcribe(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: None,
     };
 
     let resp = client
@@ -492,6 +512,7 @@ pub async fn qwen_omni_optimize(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: None,
     };
 
     let resp = client
@@ -541,6 +562,7 @@ pub async fn qwen_omni_test_connectivity(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: None,
     };
 
     let resp = client

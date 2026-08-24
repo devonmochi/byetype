@@ -50,6 +50,8 @@ export interface CustomModelEntry {
   protocol: 'gemini' | 'openai-compat' | 'qwen-omni' | 'mimo'
   baseUrl: string
   apiKey: string
+  audioInputMode: 'input_audio' | 'audio_url'
+  chatTemplateKwargs: Record<string, unknown>
   supportsAudio: boolean
   supportsText: boolean
   supportsVision: boolean

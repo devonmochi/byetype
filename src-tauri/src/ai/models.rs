@@ -1,4 +1,4 @@
-use crate::config::types::AppConfig;
+use crate::config::types::{AppConfig, AudioInputMode};
 
 pub struct BuiltinModel {
     pub id: &'static str,
@@ -109,6 +109,8 @@ pub struct ResolvedModel {
     pub base_url: String,
     pub model: String,
     pub api_key: String,
+    pub audio_input_mode: AudioInputMode,
+    pub chat_template_kwargs: Option<serde_json::Value>,
 }
 
 pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel, String> {
@@ -129,6 +131,8 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
             base_url: builtin.base_url.to_string(),
             model: builtin.model.to_string(),
             api_key: api_key.clone(),
+            audio_input_mode: AudioInputMode::InputAudio,
+            chat_template_kwargs: None,
         });
     }
 
@@ -138,6 +142,8 @@ pub fn resolve_model(config: &AppConfig, model_id: &str) -> Result<ResolvedModel
             base_url: custom.base_url.clone(),
             model: custom.model.clone(),
             api_key: custom.api_key.clone(),
+            audio_input_mode: custom.audio_input_mode,
+            chat_template_kwargs: Some(custom.chat_template_kwargs.clone()),
         });
     }
 
@@ -174,6 +180,8 @@ mod tests {
             protocol: "openai-compat".to_string(),
             base_url: "https://example.com".to_string(),
             api_key: "test".to_string(),
+            audio_input_mode: AudioInputMode::InputAudio,
+            chat_template_kwargs: serde_json::json!({}),
             supports_audio: true,
             supports_text: false,
             supports_vision: false,
