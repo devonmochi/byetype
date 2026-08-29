@@ -7,7 +7,17 @@ pub fn build_thinking_config(
     model: &str,
     thinking: &ThinkingConfig,
 ) -> Option<GeminiGenerationConfig> {
+    // Gemini 3.7 系列强制思考且不支持 minimal;关闭开关时也要显式发 low,
+    // 否则省略参数会让 Google 按默认 medium 档思考,比开开关的 LOW 更慢。
     if !thinking.enabled {
+        if model.contains("gemini-3.7") {
+            return Some(GeminiGenerationConfig {
+                thinking_config: Some(GeminiThinkingConfig {
+                    include_thoughts: false,
+                    thinking_level: "low".to_string(),
+                }),
+            });
+        }
         return None;
     }
     // Gemini 的 thinkingLevel 只接受小写值 (minimal/low/medium/high)。
@@ -312,5 +322,19 @@ mod tests {
     fn minimal_stays_on_older_gemini() {
         let cfg = build_thinking_config("gemini-3.1-flash-lite-preview", &thinking("MINIMAL"));
         assert_eq!(cfg.unwrap().thinking_config.unwrap().thinking_level, "minimal");
+    }
+
+    #[test]
+    fn disabled_still_sends_low_on_gemini_3_7() {
+        // 3.7 强制思考:关闭开关必须显式发 low,省略参数会落到默认 medium 更慢
+        let off = ThinkingConfig { enabled: false, budget: 1024, level: "LOW".to_string() };
+        let cfg = build_thinking_config("gemini-3.7-flash", &off);
+        assert_eq!(cfg.unwrap().thinking_config.unwrap().thinking_level, "low");
+    }
+
+    #[test]
+    fn disabled_sends_nothing_on_optional_thinking_gemini() {
+        let off = ThinkingConfig { enabled: false, budget: 1024, level: "LOW".to_string() };
+        assert!(build_thinking_config("gemini-3.5-flash-lite", &off).is_none());
     }
 }
