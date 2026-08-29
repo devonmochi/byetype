@@ -18,16 +18,20 @@ fn effective_kwargs(kwargs: Option<&serde_json::Value>) -> Option<serde_json::Va
 
 /// OpenRouter 没有真正的 "关闭思考" 开关; thinking.enabled=false 时映射到 effort=minimal,
 /// 这是 Gemini 3 系列最低的思考档位,最接近 "尽量不思考" 的语义。
-fn openrouter_reasoning(thinking: Option<&ThinkingConfig>) -> Option<OpenRouterReasoning> {
+/// Gemini 3.7 系列(如 google/gemini-3.7-flash)不支持 minimal,降级为 low。
+fn openrouter_reasoning(thinking: Option<&ThinkingConfig>, model: &str) -> Option<OpenRouterReasoning> {
     // OpenRouter 的 effort 取值要小写: minimal / low / medium / high。
     // ByeType 的 ThinkingConfig.level 在前端以大写存储 (MINIMAL/LOW/MEDIUM/HIGH),需要转小写。
-    let effort = match thinking {
+    let mut effort = match thinking {
         Some(cfg) if cfg.enabled => {
             let lvl = cfg.level.trim().to_lowercase();
             if lvl.is_empty() { "medium".to_string() } else { lvl }
         }
         _ => "minimal".to_string(),
     };
+    if effort == "minimal" && model.contains("gemini-3.7") {
+        effort = "low".to_string();
+    }
     Some(OpenRouterReasoning { effort })
 }
 
@@ -86,7 +90,7 @@ pub async fn transcribe(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
-        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
+        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
@@ -161,7 +165,7 @@ pub async fn optimize(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
-        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
+        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
@@ -244,7 +248,7 @@ pub async fn extract_text(
         stream_options: None,
         thinking: None,
         reasoning_effort: None,
-        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking) } else { None },
+        reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 

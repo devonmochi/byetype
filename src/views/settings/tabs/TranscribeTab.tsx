@@ -1,5 +1,5 @@
 import type { AppConfig, ThinkingConfig } from '../../../core/types'
-import { getAudioModels, getTextModels, findModel } from '../../../core/models'
+import { getAudioModels, getTextModels, findModel, supportsMinimalThinking } from '../../../core/models'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
@@ -20,6 +20,9 @@ export function TranscribeTab({ config, onSave }: Props) {
     m?.protocol === 'openai-compat' && (m?.baseUrl?.includes('openrouter.ai') ?? false)
   const isTranscribeGemini = transcribeModel?.protocol === 'gemini' || isOpenRouter(transcribeModel)
   const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini' || isOpenRouter(voiceTemplatesModel)
+  // Gemini 3.7 系列不支持 MINIMAL 思考档位，隐藏该选项并按 LOW 显示
+  const transcribeSupportsMinimal = supportsMinimalThinking(transcribeModel?.model)
+  const voiceTemplatesSupportsMinimal = supportsMinimalThinking(voiceTemplatesModel?.model)
   const isVoiceTemplatesDeepSeek =
     voiceTemplatesModel?.protocol === 'openai-compat' &&
     voiceTemplatesModel?.baseUrl?.includes('api.deepseek.com')
@@ -80,11 +83,11 @@ export function TranscribeTab({ config, onSave }: Props) {
               <SettingRow label="Thinking Level" description="思考深度级别">
                 <select
                   className="select"
-                  value={transcribe.thinking.level}
+                  value={transcribeSupportsMinimal || transcribe.thinking.level !== 'MINIMAL' ? transcribe.thinking.level : 'LOW'}
                   onChange={e => updateTranscribeThinking({ level: e.target.value as ThinkingConfig['level'] })}
                   style={{ width: 120 }}
                 >
-                  <option value="MINIMAL">MINIMAL</option>
+                  {transcribeSupportsMinimal && <option value="MINIMAL">MINIMAL</option>}
                   <option value="LOW">LOW</option>
                   <option value="MEDIUM">MEDIUM</option>
                   <option value="HIGH">HIGH</option>
@@ -128,11 +131,11 @@ export function TranscribeTab({ config, onSave }: Props) {
               <SettingRow label="Thinking Level" description="思考深度级别">
                 <select
                   className="select"
-                  value={voiceTemplates.thinking.level}
+                  value={voiceTemplatesSupportsMinimal || voiceTemplates.thinking.level !== 'MINIMAL' ? voiceTemplates.thinking.level : 'LOW'}
                   onChange={e => updateVoiceTemplatesThinking({ level: e.target.value as ThinkingConfig['level'] })}
                   style={{ width: 120 }}
                 >
-                  <option value="MINIMAL">MINIMAL</option>
+                  {voiceTemplatesSupportsMinimal && <option value="MINIMAL">MINIMAL</option>}
                   <option value="LOW">LOW</option>
                   <option value="MEDIUM">MEDIUM</option>
                   <option value="HIGH">HIGH</option>
@@ -165,6 +168,18 @@ export function TranscribeTab({ config, onSave }: Props) {
             )}
           </>
         )}
+      </SettingGroup>
+
+      {/* 区域三：其他 */}
+      <h3 className="section-title">其他</h3>
+
+      <SettingGroup>
+        <SettingRow label="规则增强" description="文本优化时再次注入所有音频转写规则，适合音频转写能力较弱的模型">
+          <Toggle
+            checked={voiceTemplates.reuseTranscribeReferences ?? false}
+            onChange={checked => updateVoiceTemplates({ reuseTranscribeReferences: checked })}
+          />
+        </SettingRow>
       </SettingGroup>
 
     </div>

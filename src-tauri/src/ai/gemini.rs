@@ -4,7 +4,7 @@ use super::types::*;
 use crate::config::types::ThinkingConfig;
 
 pub fn build_thinking_config(
-    _model: &str,
+    model: &str,
     thinking: &ThinkingConfig,
 ) -> Option<GeminiGenerationConfig> {
     if !thinking.enabled {
@@ -13,11 +13,15 @@ pub fn build_thinking_config(
     // Gemini 的 thinkingLevel 只接受小写值 (minimal/low/medium/high)。
     // ThinkingConfig.level 在前端以大写存储,需要转小写,与 openai_compat.rs 保持一致。
     let level = thinking.level.trim().to_lowercase();
-    let thinking_level = if level.is_empty() {
+    let mut thinking_level = if level.is_empty() {
         "medium".to_string()
     } else {
         level
     };
+    // Gemini 3.7 系列(如 gemini-3.7-flash)不支持 minimal 档位,官方 API 会返回错误,降级为 low。
+    if thinking_level == "minimal" && model.contains("gemini-3.7") {
+        thinking_level = "low".to_string();
+    }
     Some(GeminiGenerationConfig {
         thinking_config: Some(GeminiThinkingConfig {
             include_thoughts: false,
@@ -288,4 +292,25 @@ fn extract_gemini_text(resp: &GeminiResponse) -> Result<String, String> {
         .ok_or_else(|| "No text found in Gemini response parts".to_string())?;
 
     Ok(text.trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn thinking(level: &str) -> ThinkingConfig {
+        ThinkingConfig { enabled: true, budget: 1024, level: level.to_string() }
+    }
+
+    #[test]
+    fn minimal_downgrades_to_low_on_gemini_3_7() {
+        let cfg = build_thinking_config("gemini-3.7-flash", &thinking("MINIMAL"));
+        assert_eq!(cfg.unwrap().thinking_config.unwrap().thinking_level, "low");
+    }
+
+    #[test]
+    fn minimal_stays_on_older_gemini() {
+        let cfg = build_thinking_config("gemini-3.1-flash-lite-preview", &thinking("MINIMAL"));
+        assert_eq!(cfg.unwrap().thinking_config.unwrap().thinking_level, "minimal");
+    }
 }

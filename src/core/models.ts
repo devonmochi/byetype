@@ -37,20 +37,9 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-gemini-3-flash',
+    id: 'builtin-gemini-3.7-flash',
     provider: 'Google Gemini',
-    model: 'gemini-3-flash-preview',
-    protocol: 'gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com',
-    builtin: true,
-    supportsAudio: true,
-    supportsText: true,
-    supportsVision: true,
-  },
-  {
-    id: 'builtin-gemini-3.1-flash-lite',
-    provider: 'Google Gemini',
-    model: 'gemini-3.1-flash-lite-preview',
+    model: 'gemini-3.7-flash',
     protocol: 'gemini',
     baseUrl: 'https://generativelanguage.googleapis.com',
     builtin: true,
@@ -70,9 +59,9 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-or-gemini-3-flash',
+    id: 'builtin-or-gemini-3.7-flash',
     provider: 'OpenRouter',
-    model: 'google/gemini-3-flash-preview',
+    model: 'google/gemini-3.7-flash',
     protocol: 'openai-compat',
     baseUrl: 'https://openrouter.ai/api/v1',
     builtin: true,
@@ -81,9 +70,9 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-or-gemini-3.1-flash-lite',
+    id: 'builtin-or-gemini-3.5-flash-lite',
     provider: 'OpenRouter',
-    model: 'google/gemini-3.1-flash-lite-preview',
+    model: 'google/gemini-3.5-flash-lite',
     protocol: 'openai-compat',
     baseUrl: 'https://openrouter.ai/api/v1',
     builtin: true,
@@ -114,6 +103,11 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: false,
   },
 ]
+
+/** Gemini 3.7 系列（如 gemini-3.7-flash）不支持 MINIMAL 思考档位，官方 API 会直接报错 */
+export function supportsMinimalThinking(modelName?: string): boolean {
+  return !(modelName ?? '').includes('gemini-3.7')
+}
 
 export function getAllModels(config: AppConfig): ModelEntry[] {
   const builtins: ModelEntry[] = BUILTIN_MODELS.map(b => {

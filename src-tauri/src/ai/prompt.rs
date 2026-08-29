@@ -94,6 +94,12 @@ pub fn build_optimize_prompt(
         return String::new();
     }
 
+    // 强模型转写阶段已按规则纠对,优化阶段默认只带优化模板本身;
+    // 弱模型可开启 reuse_transcribe_references,优化阶段再带一遍参考文档做二次纠错。
+    if !config.voice_templates.reuse_transcribe_references {
+        return wrap_document("text-optimize", &optimize_content);
+    }
+
     let (rules_path, vocabulary_path) = resolve_transcription_reference_paths(config, prompts_dir);
     let rules_content = load_prompt(&rules_path);
     let vocabulary_content = load_prompt(&vocabulary_path);
@@ -202,8 +208,11 @@ mod tests {
         std::fs::write(prompts_dir.join("vocabulary.md"), "专有词汇").unwrap();
         std::fs::write(prompts_dir.join("text-optimize.md"), "文本优化提示词").unwrap();
 
+        let mut config = AppConfig::default();
+        config.voice_templates.reuse_transcribe_references = true;
+
         let prompt = build_optimize_prompt(
-            &AppConfig::default(),
+            &config,
             &prompts_dir,
             "voice-optimize",
             "自动学习结果",
@@ -217,6 +226,34 @@ mod tests {
 <document name=\"vocabulary\">\n专有词汇\n</document>\n\n\
 <document name=\"voice-learning\">\n自动学习结果\n</document>"
         );
+        assert!(!prompt.contains("角色定义"));
+
+        std::fs::remove_dir_all(prompts_dir).unwrap();
+    }
+
+    #[test]
+    fn optimize_prompt_omits_transcription_references_by_default() {
+        let prompts_dir = test_prompts_dir("optimize-lean");
+        std::fs::write(prompts_dir.join("agent.md"), "角色定义").unwrap();
+        std::fs::write(prompts_dir.join("rules.md"), "转录规则").unwrap();
+        std::fs::write(prompts_dir.join("vocabulary.md"), "专有词汇").unwrap();
+        std::fs::write(prompts_dir.join("text-optimize.md"), "文本优化提示词").unwrap();
+
+        let prompt = build_optimize_prompt(
+            &AppConfig::default(),
+            &prompts_dir,
+            "voice-optimize",
+            "自动学习结果",
+        );
+
+        // 默认(开关关闭)时优化阶段只带优化模板本身,不重复带入转写参考。
+        assert_eq!(
+            prompt,
+            "<document name=\"text-optimize\">\n文本优化提示词\n</document>"
+        );
+        assert!(!prompt.contains("转录规则"));
+        assert!(!prompt.contains("专有词汇"));
+        assert!(!prompt.contains("自动学习结果"));
         assert!(!prompt.contains("角色定义"));
 
         std::fs::remove_dir_all(prompts_dir).unwrap();

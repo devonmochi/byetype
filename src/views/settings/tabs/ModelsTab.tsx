@@ -247,7 +247,7 @@ export function ModelsTab({ config, onSave }: Props) {
           )}
           <div className="model-form-row"><label>Provider</label><input className="input" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} placeholder="提供商名称" style={{ flex: 1, maxWidth: 300 }} /></div>
           <div className="model-form-row"><label>Base URL</label><input className="input" value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.example.com/v1" style={{ flex: 1, maxWidth: 400 }} /></div>
-          <div className="model-form-row"><label>Model ID</label><input className="input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="gemini-3-flash-preview" style={{ flex: 1, maxWidth: 300 }} /></div>
+          <div className="model-form-row"><label>Model ID</label><input className="input" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="gemini-3.7-flash" style={{ flex: 1, maxWidth: 300 }} /></div>
           {form.protocol === 'openai-compat' && (
             <div className="model-form-row" style={{ alignItems: 'flex-start' }}>
               <label style={{ paddingTop: 7 }}>chat_template_kwargs</label>

@@ -94,6 +94,8 @@ export interface VoiceTemplatesConfig {
   templates: TemplateEntry[]
   /** DeepSeek 专用 reasoning_effort,取值 'low' | 'high' | 'max'。仅在选中 DeepSeek 模型且 thinking.enabled=true 时生效 */
   deepseekReasoningEffort?: 'low' | 'high' | 'max'
+  /** 优化阶段是否再带一遍转写参考（专有词汇/转写规则/学习结果）做二次纠错。弱模型建议开启，强模型默认关闭 */
+  reuseTranscribeReferences?: boolean
 }
 
 export interface ExtractConfig {

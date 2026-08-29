@@ -213,7 +213,7 @@ pub struct VoiceLearningConfig {
 impl Default for VoiceLearningConfig {
     fn default() -> Self {
         Self {
-            model_id: "builtin-gemini-3-flash".to_string(),
+            model_id: "builtin-gemini-3.7-flash".to_string(),
             thinking: ThinkingConfig::default(),
             deepseek_reasoning_effort: None,
         }
@@ -240,6 +240,10 @@ pub struct VoiceTemplatesConfig {
     /// 仅在 model_id 指向 DeepSeek 且 thinking.enabled=true 时生效。
     #[serde(default)]
     pub deepseek_reasoning_effort: Option<String>,
+    /// 优化阶段是否再带一遍转写参考(规则/专有词汇/自动学习结果)做二次纠错。
+    /// 适合转写纠错较弱的模型;强模型转写阶段已纠对,关闭可省 token 并避免过度改写。
+    #[serde(default)]
+    pub reuse_transcribe_references: bool,
 }
 
 fn default_voice_templates() -> Vec<TemplateEntry> {
@@ -367,7 +371,7 @@ impl Default for AppConfig {
                 custom: Vec::new(),
             },
             transcribe: TranscribeConfig {
-                model_id: "builtin-gemini-3-flash".to_string(),
+                model_id: "builtin-gemini-3.7-flash".to_string(),
                 thinking: ThinkingConfig {
                     enabled: false,
                     budget: 1024,
@@ -389,6 +393,7 @@ impl Default for AppConfig {
                 },
                 templates: default_voice_templates(),
                 deepseek_reasoning_effort: None,
+                reuse_transcribe_references: false,
             },
             extract: ExtractConfig::default(),
             advanced: AdvancedConfig {
@@ -446,7 +451,7 @@ mod local_api_tests {
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
 
-        assert_eq!(config.voice_learning.model_id, "builtin-gemini-3-flash");
+        assert_eq!(config.voice_learning.model_id, "builtin-gemini-3.7-flash");
         assert!(!config.voice_learning.thinking.enabled);
     }
 

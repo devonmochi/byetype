@@ -1,5 +1,5 @@
 import type { AppConfig } from '../../../core/types'
-import { findModel, getTextModels } from '../../../core/models'
+import { findModel, getTextModels, supportsMinimalThinking } from '../../../core/models'
 import {
   getVoiceLearningDocument,
   getVoiceLearningPromptPath,
@@ -38,6 +38,8 @@ export function VoiceLearningTab({ config, onSave }: Props) {
   const isOpenRouter = selectedModel?.protocol === 'openai-compat'
     && (selectedModel.baseUrl?.includes('openrouter.ai') ?? false)
   const isGemini = selectedModel?.protocol === 'gemini' || isOpenRouter
+  // Gemini 3.7 系列不支持 MINIMAL 思考档位，隐藏该选项并按 LOW 显示
+  const supportsMinimal = supportsMinimalThinking(selectedModel?.model)
   const isDeepSeek = selectedModel?.protocol === 'openai-compat'
     && (selectedModel.baseUrl?.includes('api.deepseek.com') ?? false)
 
@@ -103,11 +105,11 @@ export function VoiceLearningTab({ config, onSave }: Props) {
           <SettingRow label="Thinking Level" description="思考深度级别">
             <select
               className="select"
-              value={config.voiceLearning.thinking.level}
+              value={supportsMinimal || config.voiceLearning.thinking.level !== 'MINIMAL' ? config.voiceLearning.thinking.level : 'LOW'}
               onChange={event => updateThinking({ level: event.target.value as AppConfig['voiceLearning']['thinking']['level'] })}
               style={{ width: 120 }}
             >
-              <option value="MINIMAL">MINIMAL</option>
+              {supportsMinimal && <option value="MINIMAL">MINIMAL</option>}
               <option value="LOW">LOW</option>
               <option value="MEDIUM">MEDIUM</option>
               <option value="HIGH">HIGH</option>
