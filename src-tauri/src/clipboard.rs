@@ -211,6 +211,17 @@ pub fn paste_text(text: &str, overwrite_clipboard: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    /// macOS 的 NSPasteboard 类型缓存非线程安全,多个测试并行触达系统剪贴板时
+    /// objc_msgSend 会段错误(崩溃堆栈落在 -[NSPasteboard _updateTypeCacheIfNeeded])。
+    /// 用全局锁把所有剪贴板测试串行化,cargo test 默认并行执行不再崩溃。
+    fn clipboard_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 
     fn clipboard_available() -> bool {
         Clipboard::new().is_ok()
@@ -218,6 +229,7 @@ mod tests {
 
     #[test]
     fn snapshot_then_restore_text_roundtrip() {
+        let _guard = clipboard_lock();
         if !clipboard_available() {
             eprintln!("clipboard unavailable, skipping");
             return;
@@ -238,6 +250,7 @@ mod tests {
 
     #[test]
     fn snapshot_returns_none_when_only_unsupported_present() {
+        let _guard = clipboard_lock();
         if !clipboard_available() {
             eprintln!("clipboard unavailable, skipping");
             return;
