@@ -91,6 +91,8 @@ pub struct ChatCompletionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<OpenRouterReasoning>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<OpenRouterProvider>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub chat_template_kwargs: Option<serde_json::Value>,
 }
 
@@ -103,6 +105,12 @@ pub struct ThinkingParam {
 #[derive(Serialize)]
 pub struct OpenRouterReasoning {
     pub effort: String,
+}
+
+#[derive(Serialize)]
+pub struct OpenRouterProvider {
+    pub order: Vec<String>,
+    pub allow_fallbacks: bool,
 }
 
 #[derive(Serialize)]
@@ -228,6 +236,7 @@ mod tests {
             thinking: None,
             reasoning_effort: None,
             reasoning: None,
+            provider: None,
             chat_template_kwargs: Some(serde_json::json!({
                 "enable_thinking": false,
                 "custom_flag": "value"

@@ -213,7 +213,7 @@ pub struct VoiceLearningConfig {
 impl Default for VoiceLearningConfig {
     fn default() -> Self {
         Self {
-            model_id: "builtin-gemini-3.7-flash".to_string(),
+            model_id: "builtin-gemini-3.8-flash".to_string(),
             thinking: ThinkingConfig::default(),
             deepseek_reasoning_effort: None,
         }
@@ -371,7 +371,7 @@ impl Default for AppConfig {
                 custom: Vec::new(),
             },
             transcribe: TranscribeConfig {
-                model_id: "builtin-gemini-3.7-flash".to_string(),
+                model_id: "builtin-gemini-3.8-flash".to_string(),
                 thinking: ThinkingConfig {
                     enabled: false,
                     budget: 1024,
@@ -451,7 +451,7 @@ mod local_api_tests {
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
 
-        assert_eq!(config.voice_learning.model_id, "builtin-gemini-3.7-flash");
+        assert_eq!(config.voice_learning.model_id, "builtin-gemini-3.8-flash");
         assert!(!config.voice_learning.thinking.enabled);
     }
 

@@ -62,6 +62,7 @@ pub async fn optimize(
         thinking: thinking_param,
         reasoning_effort,
         reasoning: None,
+        provider: None,
         chat_template_kwargs: None,
     };
 
@@ -147,6 +148,7 @@ pub async fn test_connectivity(
         }),
         reasoning_effort: None,
         reasoning: None,
+        provider: None,
         chat_template_kwargs: None,
     };
 

@@ -39,6 +39,7 @@ pub async fn transcribe(
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
         reasoning_effort: None,
         reasoning: None,
+        provider: None,
         chat_template_kwargs: None,
     };
 
@@ -106,6 +107,7 @@ pub async fn optimize(
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
         reasoning_effort: None,
         reasoning: None,
+        provider: None,
         chat_template_kwargs: None,
     };
 
@@ -180,6 +182,7 @@ pub async fn extract_text(
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
         reasoning_effort: None,
         reasoning: None,
+        provider: None,
         chat_template_kwargs: None,
     };
 
@@ -237,6 +240,7 @@ pub async fn test_connectivity(
         thinking: Some(ThinkingParam { thinking_type: "disabled".to_string() }),
         reasoning_effort: None,
         reasoning: None,
+        provider: None,
         chat_template_kwargs: None,
     };
 

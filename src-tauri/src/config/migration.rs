@@ -81,7 +81,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
             .and_then(|value| value.as_str())
             .filter(|value| !value.is_empty())
             .or_else(|| raw.get("transcribe").and_then(|section| section.get("modelId")).and_then(|value| value.as_str()).filter(|value| !value.is_empty()))
-            .unwrap_or("builtin-gemini-3.7-flash")
+            .unwrap_or("builtin-gemini-3.8-flash")
             .to_string();
         raw["voiceLearning"] = serde_json::json!({
             "modelId": model_id,
@@ -164,30 +164,34 @@ fn migrate_optimize_to_voice_templates(raw: &mut Value) {
 
 fn model_name_to_builtin_id(model_name: &str) -> String {
     match model_name {
-        "gemini-3.7-flash" => "builtin-gemini-3.7-flash".to_string(),
-        // 旧的 Gemini 3 Flash 已被 3.7 Flash 取代,统一升级
-        "gemini-3-flash-preview" => "builtin-gemini-3.7-flash".to_string(),
-        // 3.1 Flash Lite 已下架,直连用户升级到 3.7 Flash
-        "gemini-3.1-flash-lite-preview" => "builtin-gemini-3.7-flash".to_string(),
-        _ => "builtin-gemini-3.7-flash".to_string(),
+        "gemini-3.7-flash" => "builtin-gemini-3.8-flash".to_string(),
+        // 旧的 Gemini 3 Flash 已被 3.8 Flash 取代,统一升级
+        "gemini-3-flash-preview" => "builtin-gemini-3.8-flash".to_string(),
+        // 3.1 Flash Lite 已下架,直连用户升级到 3.8 Flash
+        "gemini-3.1-flash-lite-preview" => "builtin-gemini-3.8-flash".to_string(),
+        _ => "builtin-gemini-3.8-flash".to_string(),
     }
 }
 
 /// 迁移旧 model_id 引用:
 /// - builtin-deepseek-chat  → builtin-deepseek-v4-flash
 /// - builtin-mimo-v2-omni   → builtin-mimo-v2.5
-/// - builtin-gemini-3-flash → builtin-gemini-3.7-flash (Gemini 3.7 Flash 取代 3 Flash)
-/// - builtin-or-gemini-3-flash → builtin-or-gemini-3.7-flash
-/// - builtin-gemini-3.1-flash-lite → builtin-gemini-3.7-flash (3.1 下架)
+/// - builtin-gemini-3-flash → builtin-gemini-3.8-flash (Gemini 3.8 Flash 取代 3 Flash)
+/// - builtin-or-gemini-3-flash → builtin-or-gemini-3.8-flash
+/// - builtin-gemini-3.1-flash-lite → builtin-gemini-3.8-flash (3.1 下架)
 /// - builtin-or-gemini-3.1-flash-lite → builtin-or-gemini-3.5-flash-lite (OpenRouter 低成本档改为 3.5)
+/// - builtin-gemini-3.7-flash → builtin-gemini-3.8-flash (Gemini 3.8 Flash 取代 3.7)
+/// - builtin-or-gemini-3.7-flash → builtin-or-gemini-3.8-flash
 fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
     let mappings: &[(&str, &str)] = &[
         ("builtin-deepseek-chat", "builtin-deepseek-v4-flash"),
         ("builtin-mimo-v2-omni", "builtin-mimo-v2.5"),
-        ("builtin-gemini-3-flash", "builtin-gemini-3.7-flash"),
-        ("builtin-or-gemini-3-flash", "builtin-or-gemini-3.7-flash"),
-        ("builtin-gemini-3.1-flash-lite", "builtin-gemini-3.7-flash"),
+        ("builtin-gemini-3-flash", "builtin-gemini-3.8-flash"),
+        ("builtin-or-gemini-3-flash", "builtin-or-gemini-3.8-flash"),
+        ("builtin-gemini-3.1-flash-lite", "builtin-gemini-3.8-flash"),
         ("builtin-or-gemini-3.1-flash-lite", "builtin-or-gemini-3.5-flash-lite"),
+        ("builtin-gemini-3.7-flash", "builtin-gemini-3.8-flash"),
+        ("builtin-or-gemini-3.7-flash", "builtin-or-gemini-3.8-flash"),
     ];
 
     let targets = ["transcribe", "extract", "voiceTemplates", "voiceLearning"];
@@ -236,14 +240,25 @@ mod tests {
     }
 
     #[test]
-    fn migrates_gemini_3_flash_to_3_7() {
+    fn migrates_gemini_3_flash_to_3_8() {
         let mut raw = json!({
             "transcribe": { "modelId": "builtin-gemini-3-flash" },
             "voiceTemplates": { "modelId": "builtin-or-gemini-3-flash" },
         });
         assert!(migrate_legacy_model_ids(&mut raw));
-        assert_eq!(raw["transcribe"]["modelId"], "builtin-gemini-3.7-flash");
-        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-or-gemini-3.7-flash");
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-gemini-3.8-flash");
+        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-or-gemini-3.8-flash");
+    }
+
+    #[test]
+    fn migrates_gemini_3_7_flash_to_3_8() {
+        let mut raw = json!({
+            "transcribe": { "modelId": "builtin-gemini-3.7-flash" },
+            "voiceTemplates": { "modelId": "builtin-or-gemini-3.7-flash" },
+        });
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-gemini-3.8-flash");
+        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-or-gemini-3.8-flash");
     }
 
     #[test]
@@ -253,15 +268,15 @@ mod tests {
             "voiceTemplates": { "modelId": "builtin-or-gemini-3.1-flash-lite" },
         });
         assert!(migrate_legacy_model_ids(&mut raw));
-        // 直连 3.1 用户升级到 3.7;OpenRouter 3.1 用户换到同档位的 3.5 Flash Lite
-        assert_eq!(raw["transcribe"]["modelId"], "builtin-gemini-3.7-flash");
+        // 直连 3.1 用户升级到 3.8;OpenRouter 3.1 用户换到同档位的 3.5 Flash Lite
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-gemini-3.8-flash");
         assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-or-gemini-3.5-flash-lite");
     }
 
     #[test]
     fn no_change_when_ids_current() {
         let mut raw = json!({
-            "transcribe": { "modelId": "builtin-gemini-3.7-flash" },
+            "transcribe": { "modelId": "builtin-gemini-3.8-flash" },
             "extract": { "modelId": "builtin-deepseek-v4-flash" },
         });
         assert!(!migrate_legacy_model_ids(&mut raw));

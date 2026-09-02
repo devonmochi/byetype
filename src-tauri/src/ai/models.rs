@@ -33,9 +33,9 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_vision: true,
     },
     BuiltinModel {
-        id: "builtin-gemini-3.7-flash",
+        id: "builtin-gemini-3.8-flash",
         provider: "Google Gemini",
-        model: "gemini-3.7-flash",
+        model: "gemini-3.8-flash",
         protocol: "gemini",
         base_url: "https://generativelanguage.googleapis.com",
         supports_audio: true,
@@ -53,9 +53,9 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_vision: true,
     },
     BuiltinModel {
-        id: "builtin-or-gemini-3.7-flash",
+        id: "builtin-or-gemini-3.8-flash",
         provider: "OpenRouter",
-        model: "google/gemini-3.7-flash",
+        model: "google/gemini-3.8-flash",
         protocol: "openai-compat",
         base_url: "https://openrouter.ai/api/v1",
         supports_audio: true,

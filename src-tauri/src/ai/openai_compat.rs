@@ -7,6 +7,21 @@ fn is_openrouter(base_url: &str) -> bool {
     base_url.contains("openrouter.ai")
 }
 
+/// OpenRouter 上的 Google 模型锁定 google-vertex/global 服务商。
+/// OpenRouter 默认按价格加权分流,容易路由到 flex 省钱档(首字中位 12 秒以上);
+/// 锁定标准档后实测转写延迟减半,且 30 分钟/24 小时可用率均为 100%。
+/// allow_fallbacks=false: 失败不兜底,依赖上层 retry.rs 的重试逻辑。
+fn openrouter_provider(base_url: &str, model: &str) -> Option<OpenRouterProvider> {
+    if is_openrouter(base_url) && model.starts_with("google/") {
+        Some(OpenRouterProvider {
+            order: vec!["google-vertex/global".to_string()],
+            allow_fallbacks: false,
+        })
+    } else {
+        None
+    }
+}
+
 /// 空对象 {} 视为未配置,不发送该字段。
 /// OpenAI 官方等严格服务会拒绝未知参数,空对象原样发送会导致所有请求报错。
 fn effective_kwargs(kwargs: Option<&serde_json::Value>) -> Option<serde_json::Value> {
@@ -91,6 +106,7 @@ pub async fn transcribe(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
@@ -166,6 +182,7 @@ pub async fn optimize(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
@@ -249,6 +266,7 @@ pub async fn extract_text(
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
@@ -324,6 +342,7 @@ pub async fn qwen_omni_extract_text(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: None,
     };
 
@@ -375,6 +394,7 @@ pub async fn test_connectivity(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
@@ -465,6 +485,7 @@ pub async fn qwen_omni_transcribe(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: None,
     };
 
@@ -525,6 +546,7 @@ pub async fn qwen_omni_optimize(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: None,
     };
 
@@ -575,6 +597,7 @@ pub async fn qwen_omni_test_connectivity(
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
+        provider: openrouter_provider(base_url, model),
         chat_template_kwargs: None,
     };
 

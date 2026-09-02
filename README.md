@@ -17,7 +17,7 @@ ByeType 是一个 Markdown 驱动的 AI 语音输入工具。通过编辑 Markdo
 
 | 快捷指令 | 模型 | 安装 |
 |---------|------|------|
-| ByeType Gemini | Gemini 3.7 Flash | [添加到快捷指令](https://www.icloud.com/shortcuts/85403a4e55a0487c985109f944f46ae8) |
+| ByeType Gemini | Gemini 3.8 Flash | [添加到快捷指令](https://www.icloud.com/shortcuts/85403a4e55a0487c985109f944f46ae8) |
 
 > 安装后需要在快捷指令中填写你自己的 API Key和规则词汇等，和桌面版共用同一个 Key。
 
@@ -170,12 +170,12 @@ fn main() {
 | Qwen 3.5 Omni Plus | `qwen3.5-omni-plus` | [阿里云百炼](https://bailian.console.aliyun.com/) | ⭐ **推荐**，国内直连，效果好 |
 | Qwen 3.5 Omni Flash | `qwen3.5-omni-flash` | 同上 | 国内直连，速度更快 |
 | MiMo v2.5 | `mimo-v2.5` | [小米 MiMo](https://api.xiaomimimo.com/) | 国内直连，Qwen 的替代方案 |
-| Gemini 3.7 Flash | `gemini-3.7-flash` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理（思考档位仅支持 LOW/MEDIUM/HIGH） |
+| Gemini 3.8 Flash | `gemini-3.8-flash` | [Google AI Studio](https://aistudio.google.com/) | 速度和质量均衡，需代理（思考档位仅支持 LOW/MEDIUM/HIGH） |
 | DeepSeek V4 Flash | `deepseek-v4-flash` | [DeepSeek](https://platform.deepseek.com/) | 仅文本优化，速度快、成本低 |
 | DeepSeek V4 Pro | `deepseek-v4-pro` | 同上 | 仅文本优化，质量更高 |
 
-> **OpenRouter 中转**：如果无法直接访问 Gemini，可通过 [OpenRouter](https://openrouter.ai/) 中转使用以下模型，无需代理：
-> - `google/gemini-3.7-flash`
+> **OpenRouter 中转**：如果无法直接访问 Gemini，可通过 [OpenRouter](https://openrouter.ai/) 中转使用以下模型，无需代理（Gemini 系列已锁定 `google-vertex/global` 服务商，避免默认路由被分到高延迟的 flex 端点）：
+> - `google/gemini-3.8-flash`
 > - `google/gemini-3.5-flash-lite`
 
 ## ✏️ 自定义你的语音输入

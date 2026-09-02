@@ -37,9 +37,9 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-gemini-3.7-flash',
+    id: 'builtin-gemini-3.8-flash',
     provider: 'Google Gemini',
-    model: 'gemini-3.7-flash',
+    model: 'gemini-3.8-flash',
     protocol: 'gemini',
     baseUrl: 'https://generativelanguage.googleapis.com',
     builtin: true,
@@ -59,9 +59,9 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
     supportsVision: true,
   },
   {
-    id: 'builtin-or-gemini-3.7-flash',
+    id: 'builtin-or-gemini-3.8-flash',
     provider: 'OpenRouter',
-    model: 'google/gemini-3.7-flash',
+    model: 'google/gemini-3.8-flash',
     protocol: 'openai-compat',
     baseUrl: 'https://openrouter.ai/api/v1',
     builtin: true,
@@ -104,9 +104,15 @@ export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
   },
 ]
 
-/** Gemini 3.7 系列（如 gemini-3.7-flash）不支持 MINIMAL 思考档位，官方 API 会直接报错 */
+/**
+ * Gemini 3.7 系列与直连的 Gemini 3.8（模型名不带 google/ 前缀）不支持 MINIMAL 思考档位，
+ * 官方 API 会直接报错;OpenRouter 的 Gemini（模型名带 google/ 前缀）实测支持 minimal。
+ */
 export function supportsMinimalThinking(modelName?: string): boolean {
-  return !(modelName ?? '').includes('gemini-3.7')
+  const name = modelName ?? ''
+  if (name.includes('gemini-3.7')) return false
+  if (name.includes('gemini-3.8') && !name.includes('google/')) return false
+  return true
 }
 
 export function getAllModels(config: AppConfig): ModelEntry[] {
