@@ -9,7 +9,7 @@ pub async fn transcribe(
     api_key: &str,
     model: &str,
     base_url: &str,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let request = ChatCompletionRequest {
@@ -72,7 +72,12 @@ pub async fn transcribe(
         .and_then(|msg| msg.content.as_ref())
         .ok_or_else(|| "No text in MiMo transcribe response".to_string())?;
 
-    Ok(text.trim().to_string())
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
+    Ok((text.trim().to_string(), usage))
 }
 
 pub async fn optimize(
@@ -82,7 +87,7 @@ pub async fn optimize(
     api_key: &str,
     model: &str,
     base_url: &str,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
@@ -141,11 +146,17 @@ pub async fn optimize(
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
 
+    // 空响应时返回原文，但调用确实发生，用量照常上报
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
     if result.is_empty() {
-        return Ok(text.to_string());
+        return Ok((text.to_string(), usage));
     }
 
-    Ok(result)
+    Ok((result, usage))
 }
 
 pub async fn extract_text(
@@ -155,7 +166,7 @@ pub async fn extract_text(
     api_key: &str,
     model: &str,
     base_url: &str,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let request = ChatCompletionRequest {
@@ -215,7 +226,12 @@ pub async fn extract_text(
         .and_then(|msg| msg.content.as_ref())
         .ok_or_else(|| "No text in MiMo extract_text response".to_string())?;
 
-    Ok(text.trim().to_string())
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
+    Ok((text.trim().to_string(), usage))
 }
 
 pub async fn test_connectivity(

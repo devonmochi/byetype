@@ -53,7 +53,7 @@ pub async fn transcribe(
     model: &str,
     base_url: &str,
     thinking: &ThinkingConfig,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!(
         "{}/v1beta/models/{}:generateContent?key={}",
         base_url.trim_end_matches('/'),
@@ -106,7 +106,13 @@ pub async fn transcribe(
     let gemini_resp: GeminiResponse =
         serde_json::from_str(&body).map_err(|e| format!("Failed to parse Gemini response: {}", e))?;
 
-    extract_gemini_text(&gemini_resp)
+    let text = extract_gemini_text(&gemini_resp)?;
+    let usage = gemini_resp
+        .usage_metadata
+        .as_ref()
+        .map(TokenUsage::from_gemini)
+        .unwrap_or_default();
+    Ok((text, usage))
 }
 
 pub async fn optimize(
@@ -117,7 +123,7 @@ pub async fn optimize(
     model: &str,
     base_url: &str,
     thinking: &ThinkingConfig,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!(
         "{}/v1beta/models/{}:generateContent?key={}",
         base_url.trim_end_matches('/'),
@@ -169,7 +175,13 @@ pub async fn optimize(
     let gemini_resp: GeminiResponse =
         serde_json::from_str(&body).map_err(|e| format!("Failed to parse Gemini response: {}", e))?;
 
-    extract_gemini_text(&gemini_resp)
+    let text = extract_gemini_text(&gemini_resp)?;
+    let usage = gemini_resp
+        .usage_metadata
+        .as_ref()
+        .map(TokenUsage::from_gemini)
+        .unwrap_or_default();
+    Ok((text, usage))
 }
 
 pub async fn test_connectivity(
@@ -223,7 +235,7 @@ pub async fn extract_text(
     model: &str,
     base_url: &str,
     thinking: &ThinkingConfig,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!(
         "{}/v1beta/models/{}:generateContent?key={}",
         base_url.trim_end_matches('/'),
@@ -276,7 +288,13 @@ pub async fn extract_text(
     let gemini_resp: GeminiResponse =
         serde_json::from_str(&body).map_err(|e| format!("Failed to parse Gemini response: {}", e))?;
 
-    extract_gemini_text(&gemini_resp)
+    let text = extract_gemini_text(&gemini_resp)?;
+    let usage = gemini_resp
+        .usage_metadata
+        .as_ref()
+        .map(TokenUsage::from_gemini)
+        .unwrap_or_default();
+    Ok((text, usage))
 }
 
 fn extract_gemini_text(resp: &GeminiResponse) -> Result<String, String> {

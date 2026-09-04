@@ -165,6 +165,18 @@ export interface RetryStatusUpdate {
   status: 'transcribing' | 'optimizing' | 'retrying' | 'cancelled' | 'completed' | 'failed'
 }
 
+export type UsageScene = 'transcribe' | 'extract' | 'optimize' | 'learn'
+
+export interface UsageRecord {
+  /** 毫秒时间戳 */
+  ts: number
+  scene: UsageScene
+  model: string
+  provider: string
+  inputTokens: number
+  outputTokens: number
+}
+
 export interface UpdateInfo {
   version: string
   body: string | null

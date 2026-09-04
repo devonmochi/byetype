@@ -3,6 +3,7 @@ import { GeneralTab } from './tabs/GeneralTab'
 import { TranscribeTab } from './tabs/TranscribeTab'
 import { ModelsTab } from './tabs/ModelsTab'
 import { HistoryTab } from './tabs/HistoryTab'
+import { UsageTab } from './tabs/UsageTab'
 import { AboutTab } from './tabs/AboutTab'
 import { ExtractTab } from './tabs/ExtractTab'
 import { VoicePromptsTab } from './tabs/VoicePromptsTab'
@@ -32,6 +33,7 @@ const TABS: TabItem[] = [
   { type: 'tab', id: 'voice-learning', label: '自动学习' },
   { type: 'divider' },
   { type: 'tab', id: 'history', label: '历史记录' },
+  { type: 'tab', id: 'usage', label: '用量统计' },
   { type: 'tab', id: 'backup', label: '备份与恢复' },
   { type: 'tab', id: 'about', label: '关于' },
 ]
@@ -206,6 +208,7 @@ export function App() {
           </span>
         )}
         {activeTab === 'history' && <HistoryTab />}
+        {activeTab === 'usage' && <UsageTab />}
         {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
         {activeTab === 'models' && <ModelsTab config={config} onSave={handleSave} />}

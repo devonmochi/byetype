@@ -8,7 +8,9 @@ pub mod prompt;
 pub mod models;
 
 use crate::config::types::AppConfig;
+use crate::usage;
 use std::path::Path;
+use types::TokenUsage;
 
 /// 判断 resolved model 是否走 DeepSeek 官方 API。
 /// 条件:协议是 openai-compat 且 base_url 指向 api.deepseek.com。
@@ -16,6 +18,17 @@ use std::path::Path;
 pub(crate) fn is_deepseek(resolved: &models::ResolvedModel) -> bool {
     resolved.protocol == "openai-compat"
         && resolved.base_url.contains("api.deepseek.com")
+}
+
+/// 把一次成功调用的用量写入统计。失败调用不记录，重试中的失败也不记录。
+fn record_usage(scene: &str, resolved: &models::ResolvedModel, usage: TokenUsage) {
+    usage::record(
+        scene,
+        &resolved.model,
+        &resolved.provider_label,
+        usage.prompt_tokens,
+        usage.completion_tokens,
+    );
 }
 
 /// Transcribe audio using the configured provider.
@@ -29,8 +42,8 @@ pub async fn transcribe(
     let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
     let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir, learning_rules);
 
-    if is_deepseek(&resolved) {
-        return deepseek::transcribe(
+    let outcome: Result<(String, TokenUsage), String> = if is_deepseek(&resolved) {
+        deepseek::transcribe(
             client,
             audio_base64,
             &system_prompt,
@@ -38,59 +51,64 @@ pub async fn transcribe(
             &resolved.model,
             &resolved.base_url,
         )
-        .await;
-    }
+        .await
+    } else {
+        match resolved.protocol.as_str() {
+            "gemini" => {
+                gemini::transcribe(
+                    client,
+                    audio_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    &config.transcribe.thinking,
+                )
+                .await
+            }
+            "qwen-omni" => {
+                openai_compat::qwen_omni_transcribe(
+                    client,
+                    audio_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            "mimo" => {
+                mimo::transcribe(
+                    client,
+                    audio_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            _ => {
+                openai_compat::transcribe(
+                    client,
+                    audio_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    resolved.audio_input_mode,
+                    resolved.chat_template_kwargs.as_ref(),
+                    Some(&config.transcribe.thinking),
+                )
+                .await
+            }
+        }
+    };
 
-    match resolved.protocol.as_str() {
-        "gemini" => {
-            gemini::transcribe(
-                client,
-                audio_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                &config.transcribe.thinking,
-            )
-            .await
-        }
-        "qwen-omni" => {
-            openai_compat::qwen_omni_transcribe(
-                client,
-                audio_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        "mimo" => {
-            mimo::transcribe(
-                client,
-                audio_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        _ => {
-            openai_compat::transcribe(
-                client,
-                audio_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                resolved.audio_input_mode,
-                resolved.chat_template_kwargs.as_ref(),
-                Some(&config.transcribe.thinking),
-            )
-            .await
-        }
+    if let Ok((_, usage)) = &outcome {
+        record_usage("transcribe", &resolved, *usage);
     }
+    outcome.map(|(text, _)| text)
 }
 
 /// Extract text from an image using the configured provider.
@@ -106,8 +124,8 @@ pub async fn extract_text(
     let thinking = config.extract.thinking.as_ref().unwrap_or(&config.transcribe.thinking);
     let system_prompt = prompt::build_extract_prompt(config, prompts_dir, template_id);
 
-    if is_deepseek(&resolved) {
-        return deepseek::extract_text(
+    let outcome: Result<(String, TokenUsage), String> = if is_deepseek(&resolved) {
+        deepseek::extract_text(
             client,
             image_base64,
             &system_prompt,
@@ -115,58 +133,63 @@ pub async fn extract_text(
             &resolved.model,
             &resolved.base_url,
         )
-        .await;
-    }
+        .await
+    } else {
+        match resolved.protocol.as_str() {
+            "gemini" => {
+                gemini::extract_text(
+                    client,
+                    image_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    thinking,
+                )
+                .await
+            }
+            "qwen-omni" => {
+                openai_compat::qwen_omni_extract_text(
+                    client,
+                    image_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            "mimo" => {
+                mimo::extract_text(
+                    client,
+                    image_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            _ => {
+                openai_compat::extract_text(
+                    client,
+                    image_base64,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    resolved.chat_template_kwargs.as_ref(),
+                    Some(thinking),
+                )
+                .await
+            }
+        }
+    };
 
-    match resolved.protocol.as_str() {
-        "gemini" => {
-            gemini::extract_text(
-                client,
-                image_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                thinking,
-            )
-            .await
-        }
-        "qwen-omni" => {
-            openai_compat::qwen_omni_extract_text(
-                client,
-                image_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        "mimo" => {
-            mimo::extract_text(
-                client,
-                image_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        _ => {
-            openai_compat::extract_text(
-                client,
-                image_base64,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                resolved.chat_template_kwargs.as_ref(),
-                Some(thinking),
-            )
-            .await
-        }
+    if let Ok((_, usage)) = &outcome {
+        record_usage("extract", &resolved, *usage);
     }
+    outcome.map(|(text, _)| text)
 }
 
 /// Optimize text using the configured provider.
@@ -181,13 +204,14 @@ pub async fn optimize(
     let system_prompt =
         prompt::build_optimize_prompt(config, prompts_dir, template_id, learning_rules);
     if system_prompt.is_empty() {
+        // 提示词为空时不会发起 API 调用，不计入用量
         return Ok(text.to_string());
     }
 
     let resolved = models::resolve_model(config, &config.voice_templates.model_id)?;
 
-    if is_deepseek(&resolved) {
-        return deepseek::optimize(
+    let outcome: Result<(String, TokenUsage), String> = if is_deepseek(&resolved) {
+        deepseek::optimize(
             client,
             text,
             &system_prompt,
@@ -197,58 +221,63 @@ pub async fn optimize(
             &config.voice_templates.thinking,
             config.voice_templates.deepseek_reasoning_effort.as_deref(),
         )
-        .await;
-    }
+        .await
+    } else {
+        match resolved.protocol.as_str() {
+            "gemini" => {
+                gemini::optimize(
+                    client,
+                    text,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    &config.voice_templates.thinking,
+                )
+                .await
+            }
+            "qwen-omni" => {
+                openai_compat::qwen_omni_optimize(
+                    client,
+                    text,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            "mimo" => {
+                mimo::optimize(
+                    client,
+                    text,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            _ => {
+                openai_compat::optimize(
+                    client,
+                    text,
+                    &system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    resolved.chat_template_kwargs.as_ref(),
+                    Some(&config.voice_templates.thinking),
+                )
+                .await
+            }
+        }
+    };
 
-    match resolved.protocol.as_str() {
-        "gemini" => {
-            gemini::optimize(
-                client,
-                text,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                &config.voice_templates.thinking,
-            )
-            .await
-        }
-        "qwen-omni" => {
-            openai_compat::qwen_omni_optimize(
-                client,
-                text,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        "mimo" => {
-            mimo::optimize(
-                client,
-                text,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        _ => {
-            openai_compat::optimize(
-                client,
-                text,
-                &system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                resolved.chat_template_kwargs.as_ref(),
-                Some(&config.voice_templates.thinking),
-            )
-            .await
-        }
+    if let Ok((_, usage)) = &outcome {
+        record_usage("optimize", &resolved, *usage);
     }
+    outcome.map(|(text, _)| text)
 }
 
 /// Analyze a user correction using the configured learning model.
@@ -261,8 +290,8 @@ pub async fn analyze_correction(
     let resolved = models::resolve_model(config, &config.voice_learning.model_id)?;
     let thinking = &config.voice_learning.thinking;
 
-    if is_deepseek(&resolved) {
-        return deepseek::optimize(
+    let outcome: Result<(String, TokenUsage), String> = if is_deepseek(&resolved) {
+        deepseek::optimize(
             client,
             input,
             system_prompt,
@@ -272,56 +301,61 @@ pub async fn analyze_correction(
             thinking,
             config.voice_learning.deepseek_reasoning_effort.as_deref(),
         )
-        .await;
-    }
+        .await
+    } else {
+        match resolved.protocol.as_str() {
+            "gemini" => {
+                gemini::optimize(
+                    client,
+                    input,
+                    system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    thinking,
+                )
+                .await
+            }
+            "qwen-omni" => {
+                openai_compat::qwen_omni_optimize(
+                    client,
+                    input,
+                    system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            "mimo" => {
+                mimo::optimize(
+                    client,
+                    input,
+                    system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                )
+                .await
+            }
+            _ => {
+                openai_compat::optimize(
+                    client,
+                    input,
+                    system_prompt,
+                    &resolved.api_key,
+                    &resolved.model,
+                    &resolved.base_url,
+                    resolved.chat_template_kwargs.as_ref(),
+                    Some(thinking),
+                )
+                .await
+            }
+        }
+    };
 
-    match resolved.protocol.as_str() {
-        "gemini" => {
-            gemini::optimize(
-                client,
-                input,
-                system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                thinking,
-            )
-            .await
-        }
-        "qwen-omni" => {
-            openai_compat::qwen_omni_optimize(
-                client,
-                input,
-                system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        "mimo" => {
-            mimo::optimize(
-                client,
-                input,
-                system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-            )
-            .await
-        }
-        _ => {
-            openai_compat::optimize(
-                client,
-                input,
-                system_prompt,
-                &resolved.api_key,
-                &resolved.model,
-                &resolved.base_url,
-                resolved.chat_template_kwargs.as_ref(),
-                Some(thinking),
-            )
-            .await
-        }
+    if let Ok((_, usage)) = &outcome {
+        record_usage("learn", &resolved, *usage);
     }
+    outcome.map(|(text, _)| text)
 }

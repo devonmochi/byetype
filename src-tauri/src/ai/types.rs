@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+/// 一次模型调用的 Token 用量。服务商未返回时保持 0，调用次数仍计入统计。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TokenUsage {
+    pub prompt_tokens: u64,
+    pub completion_tokens: u64,
+}
+
 // === Gemini types ===
 
 #[derive(Serialize)]
@@ -49,8 +56,22 @@ pub struct GeminiThinkingConfig {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GeminiResponse {
     pub candidates: Option<Vec<GeminiCandidate>>,
+    #[serde(default)]
+    pub usage_metadata: Option<GeminiUsageMetadata>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeminiUsageMetadata {
+    #[serde(default)]
+    pub prompt_token_count: Option<u64>,
+    #[serde(default)]
+    pub candidates_token_count: Option<u64>,
+    #[serde(default)]
+    pub total_token_count: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -162,6 +183,43 @@ pub struct ImageUrlData {
 #[derive(Deserialize)]
 pub struct ChatCompletionResponse {
     pub choices: Option<Vec<ChatChoice>>,
+    #[serde(default)]
+    pub usage: Option<ChatUsage>,
+}
+
+/// OpenAI 兼容接口的 usage 字段。各服务商字段一致（snake_case）。
+#[derive(Deserialize, Clone, Copy)]
+pub struct ChatUsage {
+    #[serde(default)]
+    pub prompt_tokens: Option<u64>,
+    #[serde(default)]
+    pub completion_tokens: Option<u64>,
+    #[serde(default)]
+    pub total_tokens: Option<u64>,
+}
+
+impl TokenUsage {
+    /// Gemini 的 totalTokenCount 包含思考 Token，输出 = total - prompt；
+    /// 缺失 total 时退回 candidatesTokenCount。
+    pub fn from_gemini(meta: &GeminiUsageMetadata) -> Self {
+        let prompt = meta.prompt_token_count.unwrap_or(0);
+        let completion = match (meta.total_token_count, meta.candidates_token_count) {
+            (Some(total), _) => total.saturating_sub(prompt),
+            (None, Some(candidates)) => candidates,
+            (None, None) => 0,
+        };
+        Self {
+            prompt_tokens: prompt,
+            completion_tokens: completion,
+        }
+    }
+
+    pub fn from_chat(usage: &ChatUsage) -> Self {
+        Self {
+            prompt_tokens: usage.prompt_tokens.unwrap_or(0),
+            completion_tokens: usage.completion_tokens.unwrap_or(0),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -185,6 +243,9 @@ pub struct StreamOptions {
 #[derive(Deserialize)]
 pub struct StreamChunk {
     pub choices: Option<Vec<StreamChunkChoice>>,
+    /// include_usage 开启时，最后一个 chunk 会携带 usage（其余 chunk 为 null）。
+    #[serde(default)]
+    pub usage: Option<ChatUsage>,
 }
 
 #[derive(Deserialize)]
@@ -200,6 +261,46 @@ pub struct StreamDelta {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_gemini_usage_metadata() {
+        let resp: GeminiResponse = serde_json::from_str(
+            r#"{"candidates":[{"content":{"parts":[{"text":"hi"}]}}],
+                "usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":40,"totalTokenCount":180}}"#,
+        )
+        .unwrap();
+        let usage = TokenUsage::from_gemini(resp.usage_metadata.as_ref().unwrap());
+        assert_eq!(usage.prompt_tokens, 100);
+        // total 180 - prompt 100 = 80（含思考 Token）
+        assert_eq!(usage.completion_tokens, 80);
+    }
+
+    #[test]
+    fn gemini_usage_without_total_falls_back_to_candidates() {
+        let resp: GeminiResponse = serde_json::from_str(
+            r#"{"candidates":[],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":7}}"#,
+        )
+        .unwrap();
+        let usage = TokenUsage::from_gemini(resp.usage_metadata.as_ref().unwrap());
+        assert_eq!((usage.prompt_tokens, usage.completion_tokens), (10, 7));
+    }
+
+    #[test]
+    fn parses_chat_usage_from_stream_chunk() {
+        let chunk: StreamChunk = serde_json::from_str(
+            r#"{"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46}}"#,
+        )
+        .unwrap();
+        let usage = TokenUsage::from_chat(chunk.usage.as_ref().unwrap());
+        assert_eq!((usage.prompt_tokens, usage.completion_tokens), (12, 34));
+    }
+
+    #[test]
+    fn missing_usage_defaults_to_zero() {
+        let resp: ChatCompletionResponse =
+            serde_json::from_str(r#"{"choices":[{"message":{"content":"hi"}}]}"#).unwrap();
+        assert!(resp.usage.is_none());
+    }
 
     #[test]
     fn serializes_audio_url_content_part_as_data_uri() {

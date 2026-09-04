@@ -60,7 +60,7 @@ pub async fn transcribe(
     audio_input_mode: AudioInputMode,
     chat_template_kwargs: Option<&serde_json::Value>,
     thinking: Option<&ThinkingConfig>,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let audio_part = match audio_input_mode {
@@ -145,7 +145,12 @@ pub async fn transcribe(
         .and_then(|msg| msg.content.as_ref())
         .ok_or_else(|| "No text in OpenAI-compat response".to_string())?;
 
-    Ok(text.trim().to_string())
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
+    Ok((text.trim().to_string(), usage))
 }
 
 pub async fn optimize(
@@ -157,7 +162,7 @@ pub async fn optimize(
     base_url: &str,
     chat_template_kwargs: Option<&serde_json::Value>,
     thinking: Option<&ThinkingConfig>,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
@@ -222,12 +227,17 @@ pub async fn optimize(
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
 
-    // On empty response, return original text
+    // 空响应时返回原文，但调用确实发生，用量照常上报
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
     if result.is_empty() {
-        return Ok(text.to_string());
+        return Ok((text.to_string(), usage));
     }
 
-    Ok(result)
+    Ok((result, usage))
 }
 
 pub async fn extract_text(
@@ -239,7 +249,7 @@ pub async fn extract_text(
     base_url: &str,
     chat_template_kwargs: Option<&serde_json::Value>,
     thinking: Option<&ThinkingConfig>,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let request = ChatCompletionRequest {
@@ -305,7 +315,12 @@ pub async fn extract_text(
         .and_then(|msg| msg.content.as_ref())
         .ok_or_else(|| "No text in OpenAI-compat extract_text response".to_string())?;
 
-    Ok(text.trim().to_string())
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
+    Ok((text.trim().to_string(), usage))
 }
 
 pub async fn qwen_omni_extract_text(
@@ -315,7 +330,7 @@ pub async fn qwen_omni_extract_text(
     api_key: &str,
     model: &str,
     base_url: &str,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let request = ChatCompletionRequest {
@@ -364,11 +379,11 @@ pub async fn qwen_omni_extract_text(
         return Err(format!("Qwen Omni API error ({}): {}", status, body));
     }
 
-    let text = parse_sse_text(&body)?;
+    let (text, usage) = parse_sse(&body)?;
     if text.is_empty() {
         return Err("No text in Qwen Omni extract_text response".to_string());
     }
-    Ok(text.trim().to_string())
+    Ok((text.trim().to_string(), usage))
 }
 
 pub async fn test_connectivity(
@@ -418,10 +433,12 @@ pub async fn test_connectivity(
     Ok(())
 }
 
-/// Parse a complete SSE response body into a single text string.
+/// Parse a complete SSE response body into a single text string plus token usage.
 /// Iterates over `data: {...}` lines, extracts delta.content from each chunk, and concatenates.
-fn parse_sse_text(body: &str) -> Result<String, String> {
+/// usage 由 include_usage 生成的最后一个 chunk 携带，取最后一次出现的值。
+fn parse_sse(body: &str) -> Result<(String, TokenUsage), String> {
     let mut result = String::new();
+    let mut usage = TokenUsage::default();
     for line in body.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with(':') {
@@ -434,6 +451,9 @@ fn parse_sse_text(body: &str) -> Result<String, String> {
             }
             let chunk: super::types::StreamChunk =
                 serde_json::from_str(data).map_err(|e| format!("Failed to parse SSE chunk: {}", e))?;
+            if let Some(chunk_usage) = chunk.usage.as_ref() {
+                usage = TokenUsage::from_chat(chunk_usage);
+            }
             if let Some(content) = chunk
                 .choices
                 .as_ref()
@@ -445,7 +465,7 @@ fn parse_sse_text(body: &str) -> Result<String, String> {
             }
         }
     }
-    Ok(result)
+    Ok((result, usage))
 }
 
 pub async fn qwen_omni_transcribe(
@@ -455,7 +475,7 @@ pub async fn qwen_omni_transcribe(
     api_key: &str,
     model: &str,
     base_url: &str,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let request = ChatCompletionRequest {
@@ -507,11 +527,11 @@ pub async fn qwen_omni_transcribe(
         return Err(format!("Qwen Omni API error ({}): {}", status, body));
     }
 
-    let text = parse_sse_text(&body)?;
+    let (text, usage) = parse_sse(&body)?;
     if text.is_empty() {
         return Err("No text in Qwen Omni transcribe response".to_string());
     }
-    Ok(text.trim().to_string())
+    Ok((text.trim().to_string(), usage))
 }
 
 pub async fn qwen_omni_optimize(
@@ -521,7 +541,7 @@ pub async fn qwen_omni_optimize(
     api_key: &str,
     model: &str,
     base_url: &str,
-) -> Result<String, String> {
+) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
     let user_content = format!("<voice-input>\n{}\n</voice-input>", text);
@@ -568,11 +588,11 @@ pub async fn qwen_omni_optimize(
         return Err(format!("Qwen Omni API error ({}): {}", status, body));
     }
 
-    let result = parse_sse_text(&body)?;
+    let (result, usage) = parse_sse(&body)?;
     if result.is_empty() {
-        return Ok(text.to_string());
+        return Ok((text.to_string(), usage));
     }
-    Ok(result.trim().to_string())
+    Ok((result.trim().to_string(), usage))
 }
 
 pub async fn qwen_omni_test_connectivity(
@@ -636,5 +656,32 @@ mod kwargs_tests {
     fn non_empty_object_kwargs_is_sent() {
         let kwargs = json!({"enable_thinking": false});
         assert_eq!(effective_kwargs(Some(&kwargs)), Some(kwargs));
+    }
+}
+
+#[cfg(test)]
+mod sse_tests {
+    use super::parse_sse;
+
+    #[test]
+    fn extracts_text_and_usage_from_stream() {
+        let body = concat!(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"好\"}}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":8,\"total_tokens\":33}}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let (text, usage) = parse_sse(body).unwrap();
+        assert_eq!(text, "你好");
+        assert_eq!(usage.prompt_tokens, 25);
+        assert_eq!(usage.completion_tokens, 8);
+    }
+
+    #[test]
+    fn usage_defaults_to_zero_when_missing() {
+        let body = "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\ndata: [DONE]\n\n";
+        let (text, usage) = parse_sse(body).unwrap();
+        assert_eq!(text, "hi");
+        assert_eq!((usage.prompt_tokens, usage.completion_tokens), (0, 0));
     }
 }

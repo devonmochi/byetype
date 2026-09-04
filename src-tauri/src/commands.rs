@@ -239,6 +239,18 @@ pub fn retry_record(
     crate::task::retry_record(&app, record_id)
 }
 
+// ==================== Usage ====================
+
+#[tauri::command]
+pub fn get_usage_records() -> Result<Vec<crate::usage::UsageRecord>, String> {
+    Ok(crate::usage::get_records())
+}
+
+#[tauri::command]
+pub fn clear_usage_records() -> Result<(), String> {
+    crate::usage::clear()
+}
+
 #[tauri::command]
 pub fn cancel_task(
     app: tauri::AppHandle,
