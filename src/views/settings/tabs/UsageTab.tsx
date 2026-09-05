@@ -358,7 +358,7 @@ export function UsageTab() {
         </div>
         <div className="usage-stat-card">
           <div className="usage-stat-label">API调用</div>
-          <div className="usage-stat-value num">{fmtNum(view.calls)}<span style={{ fontSize: 13, fontWeight: 400 }}> 次</span></div>
+          <div className="usage-stat-value num">{fmtNum(view.calls)}<span style={{ fontSize: 11, fontWeight: 400 }}> 次</span></div>
           <div className="usage-stat-sub num">日均 {fmtNum(Math.round(view.calls / view.days))} 次</div>
         </div>
         <div className="usage-stat-card">

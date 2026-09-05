@@ -895,7 +895,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .range-tabs {
@@ -907,8 +907,8 @@
 }
 
 .range-tab {
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 5px 12px;
+  font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
   border: none;
@@ -934,8 +934,8 @@
 }
 
 .scene-chip {
-  font-size: 12px;
-  padding: 5px 12px;
+  font-size: 11px;
+  padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
   border: 1px solid var(--border-color);
@@ -944,7 +944,7 @@
   font-family: inherit;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   transition: border-color 0.15s, color 0.15s, background-color 0.15s;
 }
 
@@ -960,7 +960,7 @@
 }
 
 .scene-chip .cnt {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
   font-weight: 400;
 }
@@ -980,8 +980,8 @@
 .usage-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 @media (max-width: 700px) {
@@ -994,18 +994,18 @@
   background: var(--group-bg);
   border: 1px solid var(--border-color-light);
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 10px 12px;
   min-width: 0;
 }
 
 .usage-stat-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .usage-stat-value {
-  font-size: 22px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.2;
   color: var(--text-primary);
@@ -1016,13 +1016,13 @@
 }
 
 .usage-stat-value.small {
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .usage-stat-sub {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 .usage-trend-up {
@@ -1037,8 +1037,8 @@
   background: var(--group-bg);
   border: 1px solid var(--border-color-light);
   border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
 }
 
 .usage-panel-head {
@@ -1051,7 +1051,7 @@
 }
 
 .usage-panel-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1066,7 +1066,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
 }
 
@@ -1078,7 +1078,7 @@
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 150px;
+  height: 130px;
   padding: 4px 2px 0;
 }
 
@@ -1133,8 +1133,8 @@
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 11px;
+  padding: 6px 8px;
+  font-size: 10px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
   min-width: 130px;
   transform: translate(-50%, -100%);
@@ -1200,7 +1200,7 @@ table.usage-table td:first-child {
 
 table.usage-table td {
   font-size: 12px;
-  padding: 9px 8px;
+  padding: 8px;
   border-bottom: 1px solid var(--border-color-light);
   text-align: right;
   white-space: nowrap;
@@ -1213,7 +1213,7 @@ table.usage-table tr:last-child td {
 
 .usage-model-name {
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 12px;
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1263,15 +1263,15 @@ table.usage-table tr:last-child td {
 }
 
 .usage-storage-note {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
   max-width: 480px;
   line-height: 1.6;
 }
 
 .usage-clear-btn {
-  font-size: 12px;
-  padding: 6px 14px;
+  font-size: 11px;
+  padding: 5px 12px;
   border-radius: 6px;
   cursor: pointer;
   border: 1px solid var(--border-color);
@@ -1300,5 +1300,5 @@ table.usage-table tr:last-child td {
   justify-content: center;
   min-height: 200px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
