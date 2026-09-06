@@ -384,7 +384,7 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true, edi
     <div
       style={
         isFixedHeight
-          ? { display: 'flex', flexDirection: 'column', minHeight: 0 }
+          ? { display: 'flex', flexDirection: 'column', flexShrink: 0 }
           : { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }
       }
     >

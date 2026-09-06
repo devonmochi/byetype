@@ -114,7 +114,7 @@ function VoicePromptsTabInner({ config, onSave }: Props) {
       />
 
       <h2 className="content-title" style={{ marginTop: 24, flexShrink: 0 }}>文本优化提示词</h2>
-      <div>
+      <div style={{ flexShrink: 0 }}>
         {templates.map(template => {
           const isBuiltin = BUILTIN_VOICE_TEMPLATE_IDS.includes(template.id)
           const isExpanded = expandedTemplates.has(template.id)

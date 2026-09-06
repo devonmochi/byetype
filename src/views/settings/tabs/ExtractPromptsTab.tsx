@@ -100,7 +100,7 @@ function ExtractPromptsTabInner({ config, onSave }: Props) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
       <h2 className="content-title" style={{ flexShrink: 0 }}>图像识别提示词</h2>
-      <div>
+      <div style={{ flexShrink: 0 }}>
         {templates.map(template => {
           const isBuiltin = BUILTIN_EXTRACT_TEMPLATE_IDS.includes(template.id)
           const isExpanded = expandedTemplates.has(template.id)
