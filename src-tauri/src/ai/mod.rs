@@ -31,6 +31,21 @@ fn record_usage(scene: &str, resolved: &models::ResolvedModel, usage: TokenUsage
     );
 }
 
+/// 成功调用的输出：文本 + 实际使用的模型信息（供耗时统计按模型归集）。
+pub struct AiOutput {
+    pub text: String,
+    pub model: String,
+    pub provider: String,
+}
+
+fn ai_output(text: String, resolved: &models::ResolvedModel) -> AiOutput {
+    AiOutput {
+        text,
+        model: resolved.model.clone(),
+        provider: resolved.provider_label.clone(),
+    }
+}
+
 /// Transcribe audio using the configured provider.
 pub async fn transcribe(
     client: &reqwest::Client,
@@ -38,7 +53,7 @@ pub async fn transcribe(
     config: &AppConfig,
     prompts_dir: &Path,
     learning_rules: &str,
-) -> Result<String, String> {
+) -> Result<AiOutput, String> {
     let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
     let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir, learning_rules);
 
@@ -105,10 +120,13 @@ pub async fn transcribe(
         }
     };
 
-    if let Ok((_, usage)) = &outcome {
-        record_usage("transcribe", &resolved, *usage);
+    match outcome {
+        Ok((text, usage)) => {
+            record_usage("transcribe", &resolved, usage);
+            Ok(ai_output(text, &resolved))
+        }
+        Err(e) => Err(e),
     }
-    outcome.map(|(text, _)| text)
 }
 
 /// Extract text from an image using the configured provider.
@@ -200,12 +218,16 @@ pub async fn optimize(
     prompts_dir: &Path,
     template_id: &str,
     learning_rules: &str,
-) -> Result<String, String> {
+) -> Result<AiOutput, String> {
     let system_prompt =
         prompt::build_optimize_prompt(config, prompts_dir, template_id, learning_rules);
     if system_prompt.is_empty() {
         // 提示词为空时不会发起 API 调用，不计入用量
-        return Ok(text.to_string());
+        return Ok(AiOutput {
+            text: text.to_string(),
+            model: String::new(),
+            provider: String::new(),
+        });
     }
 
     let resolved = models::resolve_model(config, &config.voice_templates.model_id)?;
@@ -274,10 +296,13 @@ pub async fn optimize(
         }
     };
 
-    if let Ok((_, usage)) = &outcome {
-        record_usage("optimize", &resolved, *usage);
+    match outcome {
+        Ok((text, usage)) => {
+            record_usage("optimize", &resolved, usage);
+            Ok(ai_output(text, &resolved))
+        }
+        Err(e) => Err(e),
     }
-    outcome.map(|(text, _)| text)
 }
 
 /// Analyze a user correction using the configured learning model.

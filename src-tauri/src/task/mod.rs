@@ -144,6 +144,12 @@ struct PipelineOutput {
     transcribe_text: String,
     optimize_text: Option<String>,
     final_text: String,
+    transcribe_model: String,
+    transcribe_provider: String,
+    optimize_model: Option<String>,
+    optimize_provider: Option<String>,
+    transcribe_ms: u64,
+    optimize_ms: u64,
 }
 
 struct PipelineFailure {
@@ -342,6 +348,7 @@ async fn run_pipeline(
     token: CancellationToken,
     template_id: String,
 ) {
+    let pipeline_started = std::time::Instant::now();
     let observer_app = app.clone();
     let observer = Arc::new(move |event| {
         let status = match event {
@@ -395,9 +402,25 @@ async fn run_pipeline(
 
     // Phase 3: Paste result
     match crate::clipboard::paste_text(&output.final_text, config.general.overwrite_clipboard) {
-        Ok(()) => app
-            .state::<crate::learning::VoiceLearningManager>()
-            .record_output(&output.final_text),
+        Ok(()) => {
+            app.state::<crate::learning::VoiceLearningManager>()
+                .record_output(&output.final_text);
+
+            // 粘贴成功才算一次完整处理，记录各阶段耗时
+            let total_ms = pipeline_started.elapsed().as_millis() as u64;
+            let other_ms = total_ms.saturating_sub(output.transcribe_ms + output.optimize_ms);
+            crate::timing::record(crate::timing::TimingRecord {
+                ts: crate::timing::now_millis(),
+                transcribe_ms: output.transcribe_ms,
+                optimize_ms: output.optimize_ms,
+                other_ms,
+                total_ms,
+                transcribe_model: output.transcribe_model,
+                transcribe_provider: output.transcribe_provider,
+                optimize_model: output.optimize_model,
+                optimize_provider: output.optimize_provider,
+            });
+        }
         Err(e) => eprintln!("[TaskManager] Paste failed: {}", e),
     }
 
@@ -440,6 +463,7 @@ async fn execute_pipeline(
 
     observer(PipelineEvent::Transcribing);
     let retry_observer = observer.clone();
+    let transcribe_started = std::time::Instant::now();
     let transcribe = {
         let client = client.clone();
         let audio = audio_base64.clone();
@@ -479,20 +503,28 @@ async fn execute_pipeline(
         message,
         transcribe_text: None,
     })?;
+    let transcribe_ms = transcribe_started.elapsed().as_millis() as u64;
 
     let Some(template_id) = template_id else {
         return Ok(PipelineOutput {
-            final_text: transcribe.clone(),
-            transcribe_text: transcribe,
+            final_text: transcribe.text.clone(),
+            transcribe_text: transcribe.text,
             optimize_text: None,
+            transcribe_model: transcribe.model,
+            transcribe_provider: transcribe.provider,
+            optimize_model: None,
+            optimize_provider: None,
+            transcribe_ms,
+            optimize_ms: 0,
         });
     };
 
     observer(PipelineEvent::Optimizing);
     let retry_observer = observer.clone();
+    let optimize_started = std::time::Instant::now();
     let optimized = {
         let client = client.clone();
-        let text = transcribe.clone();
+        let text = transcribe.text.clone();
         let config = config.clone();
         let prompts_dir = prompts_dir.clone();
         let learning_rules = learning_rules.clone();
@@ -523,19 +555,26 @@ async fn execute_pipeline(
             ) => result,
             _ = token.cancelled() => return Err(PipelineFailure {
                 message: "任务已取消".to_string(),
-                transcribe_text: Some(transcribe.clone()),
+                transcribe_text: Some(transcribe.text.clone()),
             }),
         }
     }
     .map_err(|message| PipelineFailure {
         message,
-        transcribe_text: Some(transcribe.clone()),
+        transcribe_text: Some(transcribe.text.clone()),
     })?;
+    let optimize_ms = optimize_started.elapsed().as_millis() as u64;
 
     Ok(PipelineOutput {
-        transcribe_text: transcribe,
-        optimize_text: Some(optimized.clone()),
-        final_text: optimized,
+        transcribe_text: transcribe.text,
+        optimize_text: Some(optimized.text.clone()),
+        final_text: optimized.text,
+        transcribe_model: transcribe.model,
+        transcribe_provider: transcribe.provider,
+        optimize_model: Some(optimized.model).filter(|m| !m.is_empty()),
+        optimize_provider: Some(optimized.provider).filter(|p| !p.is_empty()),
+        transcribe_ms,
+        optimize_ms,
     })
 }
 

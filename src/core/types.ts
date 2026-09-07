@@ -177,6 +177,23 @@ export interface UsageRecord {
   outputTokens: number
 }
 
+export interface TimingRecord {
+  /** 毫秒时间戳 */
+  ts: number
+  /** 音频转写阶段耗时（含自动重试），毫秒 */
+  transcribeMs: number
+  /** 文本优化阶段耗时（含自动重试），未启用时为0 */
+  optimizeMs: number
+  /** 其他零散耗时（网络建连、粘贴等），毫秒 */
+  otherMs: number
+  /** 从停止录音到粘贴完成的总耗时，毫秒 */
+  totalMs: number
+  transcribeModel: string
+  transcribeProvider: string
+  optimizeModel?: string | null
+  optimizeProvider?: string | null
+}
+
 export interface UpdateInfo {
   version: string
   body: string | null

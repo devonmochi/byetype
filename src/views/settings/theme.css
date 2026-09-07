@@ -889,6 +889,45 @@
 }
 
 /* === Usage Tab === */
+.view-seg {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  padding: 2px;
+  margin-bottom: 16px;
+}
+
+.view-seg button {
+  padding: 5px 18px;
+  font-size: 12px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.view-seg button.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.usage-stage-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.usage-stage-none {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
 .usage-toolbar {
   display: flex;
   justify-content: space-between;

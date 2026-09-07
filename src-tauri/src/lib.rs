@@ -13,6 +13,7 @@ mod backup;
 mod local_api;
 mod learning;
 mod usage;
+mod timing;
 #[cfg(target_os = "windows")]
 mod screenshot_win32;
 
@@ -56,6 +57,7 @@ pub fn run() {
             commands::cancel_task,
             commands::get_usage_records,
             commands::clear_usage_records,
+            commands::get_timing_records,
             commands::list_input_devices,
             commands::test_model_connectivity,
             commands::update_clipboard_text,
@@ -92,6 +94,7 @@ pub fn run() {
             app.manage(config_manager);
             app.manage(learning::VoiceLearningManager::new(&data_dir));
             usage::init(&data_dir, app_handle.clone());
+            timing::init(&data_dir, app_handle.clone());
 
             tray::create(&app_handle)
                 .expect("Failed to create system tray");

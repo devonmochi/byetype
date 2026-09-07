@@ -248,7 +248,14 @@ pub fn get_usage_records() -> Result<Vec<crate::usage::UsageRecord>, String> {
 
 #[tauri::command]
 pub fn clear_usage_records() -> Result<(), String> {
-    crate::usage::clear()
+    crate::usage::clear()?;
+    // 清空按钮同时清掉处理耗时记录
+    crate::timing::clear()
+}
+
+#[tauri::command]
+pub fn get_timing_records() -> Result<Vec<crate::timing::TimingRecord>, String> {
+    Ok(crate::timing::get_records())
 }
 
 #[tauri::command]
