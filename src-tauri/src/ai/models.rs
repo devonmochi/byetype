@@ -73,24 +73,14 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         supports_vision: true,
     },
     BuiltinModel {
-        id: "builtin-deepseek-v4-flash",
+        id: "builtin-deepseek-flash",
         provider: "DeepSeek",
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         protocol: "openai-compat",
         base_url: "https://api.deepseek.com",
         supports_audio: false,
         supports_text: true,
-        supports_vision: false,
-    },
-    BuiltinModel {
-        id: "builtin-deepseek-v4-pro",
-        provider: "DeepSeek",
-        model: "deepseek-v4-pro",
-        protocol: "openai-compat",
-        base_url: "https://api.deepseek.com",
-        supports_audio: false,
-        supports_text: true,
-        supports_vision: false,
+        supports_vision: true,
     },
 ];
 
@@ -163,6 +153,21 @@ pub fn supports_text(config: &AppConfig, model_id: &str) -> Result<bool, String>
 mod tests {
     use super::*;
     use crate::config::types::CustomModelEntry;
+
+    #[test]
+    fn offers_single_deepseek_model_with_vision() {
+        let deepseek: Vec<&BuiltinModel> = BUILTIN_MODELS
+            .iter()
+            .filter(|model| model.provider == "DeepSeek")
+            .collect();
+
+        assert_eq!(deepseek.len(), 1);
+        assert_eq!(deepseek[0].id, "builtin-deepseek-flash");
+        assert_eq!(deepseek[0].model, "deepseek-flash");
+        assert!(deepseek[0].supports_text);
+        assert!(deepseek[0].supports_vision);
+        assert!(!deepseek[0].supports_audio);
+    }
 
     #[test]
     fn reports_custom_audio_only_model_as_not_text_capable() {

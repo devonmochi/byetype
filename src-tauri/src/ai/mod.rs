@@ -150,6 +150,7 @@ pub async fn extract_text(
             &resolved.api_key,
             &resolved.model,
             &resolved.base_url,
+            thinking,
         )
         .await
     } else {

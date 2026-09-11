@@ -174,7 +174,8 @@ fn model_name_to_builtin_id(model_name: &str) -> String {
 }
 
 /// 迁移旧 model_id 引用:
-/// - builtin-deepseek-chat  → builtin-deepseek-v4-flash
+/// - builtin-deepseek-chat / builtin-deepseek-v4-flash / builtin-deepseek-v4-pro
+///   → builtin-deepseek-flash(官方只保留 deepseek-flash 一个 ID,V4 系列已下线)
 /// - builtin-mimo-v2-omni   → builtin-mimo-v2.5
 /// - builtin-gemini-3-flash → builtin-gemini-3.8-flash (Gemini 3.8 Flash 取代 3 Flash)
 /// - builtin-or-gemini-3-flash → builtin-or-gemini-3.8-flash
@@ -184,7 +185,9 @@ fn model_name_to_builtin_id(model_name: &str) -> String {
 /// - builtin-or-gemini-3.7-flash → builtin-or-gemini-3.8-flash
 fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
     let mappings: &[(&str, &str)] = &[
-        ("builtin-deepseek-chat", "builtin-deepseek-v4-flash"),
+        ("builtin-deepseek-chat", "builtin-deepseek-flash"),
+        ("builtin-deepseek-v4-flash", "builtin-deepseek-flash"),
+        ("builtin-deepseek-v4-pro", "builtin-deepseek-flash"),
         ("builtin-mimo-v2-omni", "builtin-mimo-v2.5"),
         ("builtin-gemini-3-flash", "builtin-gemini-3.8-flash"),
         ("builtin-or-gemini-3-flash", "builtin-or-gemini-3.8-flash"),
@@ -229,7 +232,18 @@ mod tests {
     fn migrates_extract_deepseek_chat() {
         let mut raw = json!({ "extract": { "modelId": "builtin-deepseek-chat" } });
         assert!(migrate_legacy_model_ids(&mut raw));
-        assert_eq!(raw["extract"]["modelId"], "builtin-deepseek-v4-flash");
+        assert_eq!(raw["extract"]["modelId"], "builtin-deepseek-flash");
+    }
+
+    #[test]
+    fn migrates_retired_deepseek_v4_models() {
+        let mut raw = json!({
+            "voiceTemplates": { "modelId": "builtin-deepseek-v4-flash" },
+            "voiceLearning": { "modelId": "builtin-deepseek-v4-pro" },
+        });
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-deepseek-flash");
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-flash");
     }
 
     #[test]
@@ -277,7 +291,7 @@ mod tests {
     fn no_change_when_ids_current() {
         let mut raw = json!({
             "transcribe": { "modelId": "builtin-gemini-3.8-flash" },
-            "extract": { "modelId": "builtin-deepseek-v4-flash" },
+            "extract": { "modelId": "builtin-deepseek-flash" },
         });
         assert!(!migrate_legacy_model_ids(&mut raw));
     }
@@ -294,23 +308,34 @@ mod tests {
     #[test]
     fn adds_voice_learning_with_existing_text_model() {
         let mut raw = json!({
-            "transcribe": { "modelId": "builtin-gemini-3-flash" },
-            "voiceTemplates": { "modelId": "builtin-deepseek-v4-flash" }
+            "transcribe": { "modelId": "builtin-gemini-3.8-flash" },
+            "voiceTemplates": { "modelId": "builtin-mimo-v2.5" }
         });
 
         assert!(migrate_if_needed(&mut raw));
-        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-v4-flash");
+        // voiceLearning 取 voiceTemplates 的模型,而不是 transcribe 的
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-mimo-v2.5");
         assert_eq!(raw["voiceLearning"]["thinking"]["enabled"], false);
     }
 
     #[test]
     fn adds_thinking_to_existing_voice_learning() {
         let mut raw = json!({
-            "voiceLearning": { "modelId": "builtin-deepseek-v4-flash" }
+            "voiceLearning": { "modelId": "builtin-gemini-3.8-flash" }
         });
 
         assert!(migrate_if_needed(&mut raw));
-        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-v4-flash");
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-gemini-3.8-flash");
         assert_eq!(raw["voiceLearning"]["thinking"]["enabled"], false);
+    }
+
+    #[test]
+    fn voice_learning_inheriting_retired_deepseek_id_lands_on_flash() {
+        let mut raw = json!({
+            "voiceTemplates": { "modelId": "builtin-deepseek-v4-flash" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-flash");
     }
 }

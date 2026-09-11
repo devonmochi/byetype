@@ -146,7 +146,7 @@ export function TranscribeTab({ config, onSave }: Props) {
         )}
         {isVoiceTemplatesDeepSeek && (
           <>
-            <SettingRow label="启用思考" description="DeepSeek V4 默认开启思考,关闭可显著提速">
+            <SettingRow label="启用思考" description="DeepSeek V4.1 Flash 默认开启思考,关闭可显著提速">
               <Toggle
                 checked={voiceTemplates.thinking.enabled}
                 onChange={checked => updateVoiceTemplatesThinking({ enabled: checked })}
