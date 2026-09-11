@@ -1,4 +1,5 @@
 use reqwest::Client;
+use super::transport;
 
 use super::types::*;
 use crate::config::types::{AudioInputMode, ThinkingConfig};
@@ -48,6 +49,16 @@ fn openrouter_reasoning(thinking: Option<&ThinkingConfig>, model: &str) -> Optio
         effort = "low".to_string();
     }
     Some(OpenRouterReasoning { effort })
+}
+
+/// OpenAI 兼容请求头：Bearer 鉴权，走 OpenRouter 时再带上来源标识。
+fn api_headers(api_key: &str, base_url: &str) -> Vec<(&'static str, String)> {
+    let mut headers = vec![("Authorization", format!("Bearer {}", api_key))];
+    if is_openrouter(base_url) {
+        headers.push(("HTTP-Referer", "https://github.com/devonmochi/byetype".to_string()));
+        headers.push(("X-Title", "ByeType".to_string()));
+    }
+    headers
 }
 
 pub async fn transcribe(
@@ -110,32 +121,8 @@ pub async fn transcribe(
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
-    let mut req = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key));
-    if is_openrouter(base_url) {
-        req = req
-            .header("HTTP-Referer", "https://github.com/devonmochi/byetype")
-            .header("X-Title", "ByeType");
-    }
-    let resp = req
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("OpenAI-compat transcribe request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read OpenAI-compat response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("OpenAI-compat API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse =
-        serde_json::from_str(&body).map_err(|e| format!("Failed to parse OpenAI-compat response: {}", e))?;
+    let headers = api_headers(api_key, base_url);
+    let chat_resp = transport::chat(client, &url, &request, &headers, "OpenAI-compat").await?;
 
     let text = chat_resp
         .choices
@@ -191,32 +178,8 @@ pub async fn optimize(
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
-    let mut req = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key));
-    if is_openrouter(base_url) {
-        req = req
-            .header("HTTP-Referer", "https://github.com/devonmochi/byetype")
-            .header("X-Title", "ByeType");
-    }
-    let resp = req
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("OpenAI-compat optimize request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read OpenAI-compat response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("OpenAI-compat API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse OpenAI-compat response: {}", e))?;
+    let headers = api_headers(api_key, base_url);
+    let chat_resp = transport::chat(client, &url, &request, &headers, "OpenAI-compat").await?;
 
     let result = chat_resp
         .choices
@@ -280,32 +243,8 @@ pub async fn extract_text(
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
-    let mut req = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key));
-    if is_openrouter(base_url) {
-        req = req
-            .header("HTTP-Referer", "https://github.com/devonmochi/byetype")
-            .header("X-Title", "ByeType");
-    }
-    let resp = req
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("OpenAI-compat extract_text request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read OpenAI-compat response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("OpenAI-compat API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse =
-        serde_json::from_str(&body).map_err(|e| format!("Failed to parse OpenAI-compat response: {}", e))?;
+    let headers = api_headers(api_key, base_url);
+    let chat_resp = transport::chat(client, &url, &request, &headers, "OpenAI-compat").await?;
 
     let text = chat_resp
         .choices
@@ -361,24 +300,8 @@ pub async fn qwen_omni_extract_text(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("Qwen Omni extract_text request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("Qwen Omni API error ({}): {}", status, body));
-    }
-
+    let body =
+        transport::post(client, &url, &request, &transport::bearer(api_key), "Qwen Omni").await?;
     let (text, usage) = parse_sse(&body)?;
     if text.is_empty() {
         return Err("No text in Qwen Omni extract_text response".to_string());
@@ -413,22 +336,7 @@ pub async fn test_connectivity(
         chat_template_kwargs: effective_kwargs(chat_template_kwargs),
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("OpenAI-compat connectivity test failed: {}", e))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read OpenAI-compat response: {}", e))?;
-        return Err(format!("OpenAI-compat API error ({}): {}", status, body));
-    }
+    transport::post(client, &url, &request, &transport::bearer(api_key), "OpenAI-compat").await?;
 
     Ok(())
 }
@@ -509,24 +417,8 @@ pub async fn qwen_omni_transcribe(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("Qwen Omni transcribe request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("Qwen Omni API error ({}): {}", status, body));
-    }
-
+    let body =
+        transport::post(client, &url, &request, &transport::bearer(api_key), "Qwen Omni").await?;
     let (text, usage) = parse_sse(&body)?;
     if text.is_empty() {
         return Err("No text in Qwen Omni transcribe response".to_string());
@@ -570,24 +462,8 @@ pub async fn qwen_omni_optimize(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("Qwen Omni optimize request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("Qwen Omni API error ({}): {}", status, body));
-    }
-
+    let body =
+        transport::post(client, &url, &request, &transport::bearer(api_key), "Qwen Omni").await?;
     let (result, usage) = parse_sse(&body)?;
     if result.is_empty() {
         return Ok((text.to_string(), usage));
@@ -621,22 +497,7 @@ pub async fn qwen_omni_test_connectivity(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("Qwen Omni connectivity test failed: {}", e))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read Qwen Omni response: {}", e))?;
-        return Err(format!("Qwen Omni API error ({}): {}", status, body));
-    }
+    transport::post(client, &url, &request, &transport::bearer(api_key), "Qwen Omni").await?;
 
     Ok(())
 }

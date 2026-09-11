@@ -332,7 +332,7 @@ mod tests {
     use super::*;
 
     fn thinking(level: &str) -> ThinkingConfig {
-        ThinkingConfig { enabled: true, budget: 1024, level: level.to_string() }
+        ThinkingConfig { enabled: true, level: level.to_string() }
     }
 
     #[test]
@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn disabled_still_sends_low_on_gemini_3_7() {
         // 3.7 强制思考:关闭开关必须显式发 low,省略参数会落到默认 medium 更慢
-        let off = ThinkingConfig { enabled: false, budget: 1024, level: "LOW".to_string() };
+        let off = ThinkingConfig { enabled: false, level: "LOW".to_string() };
         let cfg = build_thinking_config("gemini-3.7-flash", &off);
         assert_eq!(cfg.unwrap().thinking_config.unwrap().thinking_level, "low");
     }
@@ -365,14 +365,14 @@ mod tests {
     #[test]
     fn disabled_still_sends_low_on_gemini_3_8() {
         // 3.8 强制思考:关闭开关发 low,即直连路径的最小可用档位
-        let off = ThinkingConfig { enabled: false, budget: 1024, level: "LOW".to_string() };
+        let off = ThinkingConfig { enabled: false, level: "LOW".to_string() };
         let cfg = build_thinking_config("gemini-3.8-flash", &off);
         assert_eq!(cfg.unwrap().thinking_config.unwrap().thinking_level, "low");
     }
 
     #[test]
     fn disabled_sends_nothing_on_optional_thinking_gemini() {
-        let off = ThinkingConfig { enabled: false, budget: 1024, level: "LOW".to_string() };
+        let off = ThinkingConfig { enabled: false, level: "LOW".to_string() };
         assert!(build_thinking_config("gemini-3.5-flash-lite", &off).is_none());
     }
 }

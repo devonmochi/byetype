@@ -150,8 +150,6 @@ pub enum ChatContent {
 #[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum ChatContentPart {
-    #[serde(rename = "text")]
-    Text { text: String },
     #[serde(rename = "input_audio")]
     InputAudio { input_audio: AudioData },
     #[serde(rename = "audio_url")]
@@ -194,8 +192,6 @@ pub struct ChatUsage {
     pub prompt_tokens: Option<u64>,
     #[serde(default)]
     pub completion_tokens: Option<u64>,
-    #[serde(default)]
-    pub total_tokens: Option<u64>,
 }
 
 impl TokenUsage {
@@ -230,7 +226,6 @@ pub struct ChatChoice {
 #[derive(Deserialize)]
 pub struct ChatResponseMessage {
     pub content: Option<String>,
-    pub reasoning_content: Option<String>,
 }
 
 // === SSE streaming types (Qwen Omni) ===

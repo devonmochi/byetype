@@ -6,9 +6,7 @@ pub struct BuiltinModel {
     pub model: &'static str,
     pub protocol: &'static str,
     pub base_url: &'static str,
-    pub supports_audio: bool,
     pub supports_text: bool,
-    pub supports_vision: bool,
 }
 
 pub static BUILTIN_MODELS: &[BuiltinModel] = &[
@@ -18,9 +16,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "qwen3.5-omni-plus",
         protocol: "qwen-omni",
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        supports_audio: true,
         supports_text: true,
-        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-qwen-omni-flash",
@@ -28,9 +24,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "qwen3.5-omni-flash",
         protocol: "qwen-omni",
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        supports_audio: true,
         supports_text: true,
-        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-gemini-3.8-flash",
@@ -38,9 +32,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "gemini-3.8-flash",
         protocol: "gemini",
         base_url: "https://generativelanguage.googleapis.com",
-        supports_audio: true,
         supports_text: true,
-        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-mimo-v2.5",
@@ -48,9 +40,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "mimo-v2.5",
         protocol: "mimo",
         base_url: "https://api.xiaomimimo.com/v1",
-        supports_audio: true,
         supports_text: true,
-        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-or-gemini-3.8-flash",
@@ -58,9 +48,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "google/gemini-3.8-flash",
         protocol: "openai-compat",
         base_url: "https://openrouter.ai/api/v1",
-        supports_audio: true,
         supports_text: true,
-        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-or-gemini-3.5-flash-lite",
@@ -68,9 +56,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "google/gemini-3.5-flash-lite",
         protocol: "openai-compat",
         base_url: "https://openrouter.ai/api/v1",
-        supports_audio: true,
         supports_text: true,
-        supports_vision: true,
     },
     BuiltinModel {
         id: "builtin-deepseek-flash",
@@ -78,9 +64,7 @@ pub static BUILTIN_MODELS: &[BuiltinModel] = &[
         model: "deepseek-flash",
         protocol: "openai-compat",
         base_url: "https://api.deepseek.com",
-        supports_audio: false,
         supports_text: true,
-        supports_vision: true,
     },
 ];
 
@@ -155,7 +139,7 @@ mod tests {
     use crate::config::types::CustomModelEntry;
 
     #[test]
-    fn offers_single_deepseek_model_with_vision() {
+    fn offers_single_deepseek_model() {
         let deepseek: Vec<&BuiltinModel> = BUILTIN_MODELS
             .iter()
             .filter(|model| model.provider == "DeepSeek")
@@ -165,8 +149,6 @@ mod tests {
         assert_eq!(deepseek[0].id, "builtin-deepseek-flash");
         assert_eq!(deepseek[0].model, "deepseek-flash");
         assert!(deepseek[0].supports_text);
-        assert!(deepseek[0].supports_vision);
-        assert!(!deepseek[0].supports_audio);
     }
 
     #[test]

@@ -5,15 +5,13 @@ import { invoke } from '@tauri-apps/api/core'
 
 function formatTime(isoString: string): string {
   const date = new Date(isoString)
-  const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-  const h = date.getHours().toString().padStart(2, '0')
-  const m = date.getMinutes().toString().padStart(2, '0')
-  const s = date.getSeconds().toString().padStart(2, '0')
-  if (isToday) return `${h}:${m}:${s}`
-  const month = (date.getMonth() + 1).toString().padStart(2, '0')
-  const day = date.getDate().toString().padStart(2, '0')
-  return `${month}/${day} ${h}:${m}:${s}`
+  const isToday = date.toDateString() === new Date().toDateString()
+  const time = new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(date)
+  if (isToday) return time
+  const day = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(date)
+  return `${day} ${time}`
 }
 
 type StageStatus = 'success' | 'error' | 'pending' | 'processing'

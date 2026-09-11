@@ -28,7 +28,6 @@ pub fn run() {
     let recorder = Arc::new(AudioRecorder::new());
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
@@ -40,13 +39,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
-            commands::get_prompts_dir,
-            commands::get_builtin_prompt_path,
             commands::copy_builtin_prompt,
             commands::is_builtin_prompt_path,
             commands::create_user_prompt_file,
-            commands::open_file,
-            commands::get_recording_state,
             commands::set_launch_at_login,
             commands::get_launch_at_login,
             updater::check_update,
@@ -90,7 +85,8 @@ pub fn run() {
             // Initialize ConfigManager (unified to app_data_dir)
             let data_dir = app.path().app_data_dir()
                 .expect("Failed to resolve app_data_dir");
-            let config_manager = ConfigManager::new(data_dir.clone());
+            let legacy_config_dir = app.path().config_dir().unwrap_or_default();
+            let config_manager = ConfigManager::new(data_dir.clone(), legacy_config_dir);
             app.manage(config_manager);
             app.manage(learning::VoiceLearningManager::new(&data_dir));
             usage::init(&data_dir, app_handle.clone());

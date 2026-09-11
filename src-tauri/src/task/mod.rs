@@ -50,9 +50,6 @@ impl TaskManager {
         self.history.get_audio_base64(record_id)
     }
 
-    pub fn clear_history(&mut self) -> Result<(), String> {
-        self.history.clear()
-    }
 
     fn reserve_task(
         &mut self,

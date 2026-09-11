@@ -174,13 +174,12 @@ pub enum AudioInputMode {
 #[serde(rename_all = "camelCase")]
 pub struct ThinkingConfig {
     pub enabled: bool,
-    pub budget: u32,
     pub level: String,
 }
 
 impl Default for ThinkingConfig {
     fn default() -> Self {
-        Self { enabled: false, budget: 1024, level: "LOW".to_string() }
+        Self { enabled: false, level: "LOW".to_string() }
     }
 }
 
@@ -374,7 +373,6 @@ impl Default for AppConfig {
                 model_id: "builtin-gemini-3.8-flash".to_string(),
                 thinking: ThinkingConfig {
                     enabled: false,
-                    budget: 1024,
                     level: "LOW".to_string(),
                 },
                 prompts: PromptsConfig {
@@ -388,7 +386,6 @@ impl Default for AppConfig {
                 model_id: String::new(),
                 thinking: ThinkingConfig {
                     enabled: false,
-                    budget: 1024,
                     level: "LOW".to_string(),
                 },
                 templates: default_voice_templates(),

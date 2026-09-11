@@ -18,14 +18,6 @@ export async function getLocalApiStatus(): Promise<LocalApiStatus> {
 }
 
 // Prompt commands
-export async function getPromptsDir(): Promise<string> {
-  return invoke<string>('get_prompts_dir')
-}
-
-export async function getBuiltinPromptPath(filename: string): Promise<string> {
-  return invoke<string>('get_builtin_prompt_path', { filename })
-}
-
 export async function copyBuiltinPrompt(filename: string, force: boolean = false): Promise<string> {
   return invoke<string>('copy_builtin_prompt', { filename, force })
 }
@@ -67,10 +59,6 @@ export async function selectFile(): Promise<string | null> {
   return result as string | null
 }
 
-export async function openFile(path: string): Promise<void> {
-  await invoke('open_file', { path })
-}
-
 export async function readPromptFile(path: string): Promise<string> {
   return readTextFile(path)
 }
@@ -79,28 +67,9 @@ export async function writePromptFile(path: string, content: string): Promise<vo
   return writeTextFile(path, content)
 }
 
-// Theme
-export async function getTheme(): Promise<string> {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-export function onThemeChange(callback: (theme: string) => void): () => void {
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-  const handler = (e: MediaQueryListEvent) => {
-    callback(e.matches ? 'dark' : 'light')
-  }
-  mediaQuery.addEventListener('change', handler)
-  return () => mediaQuery.removeEventListener('change', handler)
-}
-
 // Event listeners
 export async function onEvent<T>(event: string, callback: (payload: T) => void): Promise<UnlistenFn> {
   return listen<T>(event, (e) => callback(e.payload))
-}
-
-// Recording state
-export async function getRecordingState(): Promise<boolean> {
-  return invoke<boolean>('get_recording_state')
 }
 
 // Launch at login

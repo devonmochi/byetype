@@ -12,16 +12,13 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
-    pub fn new(config_dir: PathBuf) -> Self {
+    pub fn new(config_dir: PathBuf, legacy_config_dir: PathBuf) -> Self {
         fs::create_dir_all(&config_dir).ok();
         let config_path = config_dir.join("config.json");
 
-        // 迁移：旧版 config.json 在 dirs::config_dir()/byetype/，新版统一到 app_data_dir
+        // 迁移：旧版 config.json 在系统配置目录的 byetype/ 下，新版统一到 app_data_dir
         if !config_path.exists() {
-            let old_dir = dirs::config_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("byetype");
-            let old_path = old_dir.join("config.json");
+            let old_path = legacy_config_dir.join("byetype").join("config.json");
             if old_path.exists() {
                 fs::copy(&old_path, &config_path).ok();
             }

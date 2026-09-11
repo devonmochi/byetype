@@ -1,4 +1,5 @@
 use reqwest::Client;
+use super::transport;
 
 use super::types::*;
 
@@ -43,26 +44,8 @@ pub async fn transcribe(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("api-key", api_key)
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("MiMo transcribe request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read MiMo response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("MiMo API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse =
-        serde_json::from_str(&body).map_err(|e| format!("Failed to parse MiMo response: {}", e))?;
+    let chat_resp =
+        transport::chat(client, &url, &request, &[("api-key", api_key.to_string())], "MiMo").await?;
 
     let text = chat_resp
         .choices
@@ -116,26 +99,8 @@ pub async fn optimize(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("api-key", api_key)
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("MiMo optimize request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read MiMo response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("MiMo API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse MiMo response: {}", e))?;
+    let chat_resp =
+        transport::chat(client, &url, &request, &[("api-key", api_key.to_string())], "MiMo").await?;
 
     let result = chat_resp
         .choices
@@ -197,26 +162,8 @@ pub async fn extract_text(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("api-key", api_key)
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("MiMo extract_text request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read MiMo response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("MiMo API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse =
-        serde_json::from_str(&body).map_err(|e| format!("Failed to parse MiMo response: {}", e))?;
+    let chat_resp =
+        transport::chat(client, &url, &request, &[("api-key", api_key.to_string())], "MiMo").await?;
 
     let text = chat_resp
         .choices
@@ -260,22 +207,7 @@ pub async fn test_connectivity(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("api-key", api_key)
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("MiMo connectivity test failed: {}", e))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read MiMo response: {}", e))?;
-        return Err(format!("MiMo API error ({}): {}", status, body));
-    }
+    transport::post(client, &url, &request, &[("api-key", api_key.to_string())], "MiMo").await?;
 
     Ok(())
 }

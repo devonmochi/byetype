@@ -39,7 +39,6 @@ export interface LocalApiStatus {
 
 export interface ThinkingConfig {
   enabled: boolean
-  budget: number
   level: 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH'
 }
 

@@ -1,4 +1,5 @@
 use reqwest::Client;
+use super::transport;
 
 use super::types::*;
 use crate::config::types::ThinkingConfig;
@@ -66,26 +67,8 @@ pub async fn optimize(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("DeepSeek optimize request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read DeepSeek response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("DeepSeek API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse DeepSeek response: {}", e))?;
+    let chat_resp =
+        transport::chat(client, &url, &request, &transport::bearer(api_key), "DeepSeek").await?;
 
     let result = chat_resp
         .choices
@@ -179,26 +162,8 @@ pub async fn extract_text(
         reasoning_effort,
     );
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("DeepSeek extract_text request failed: {}", e))?;
-
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read DeepSeek response: {}", e))?;
-
-    if !status.is_success() {
-        return Err(format!("DeepSeek API error ({}): {}", status, body));
-    }
-
-    let chat_resp: ChatCompletionResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse DeepSeek response: {}", e))?;
+    let chat_resp =
+        transport::chat(client, &url, &request, &transport::bearer(api_key), "DeepSeek").await?;
 
     let text = chat_resp
         .choices
@@ -245,22 +210,7 @@ pub async fn test_connectivity(
         chat_template_kwargs: None,
     };
 
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("DeepSeek connectivity test failed: {}", e))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read DeepSeek response: {}", e))?;
-        return Err(format!("DeepSeek API error ({}): {}", status, body));
-    }
+    transport::post(client, &url, &request, &transport::bearer(api_key), "DeepSeek").await?;
     Ok(())
 }
 
@@ -272,7 +222,6 @@ mod tests {
     fn preserves_low_reasoning_effort_when_thinking_is_enabled() {
         let thinking = ThinkingConfig {
             enabled: true,
-            budget: 1024,
             level: "LOW".to_string(),
         };
 
@@ -286,7 +235,6 @@ mod tests {
     fn extract_request_sends_inline_png_in_user_message() {
         let thinking = ThinkingConfig {
             enabled: false,
-            budget: 1024,
             level: "LOW".to_string(),
         };
 
@@ -326,7 +274,6 @@ mod tests {
     fn extract_request_uses_configured_reasoning_effort() {
         let thinking = ThinkingConfig {
             enabled: true,
-            budget: 1024,
             level: "LOW".to_string(),
         };
 

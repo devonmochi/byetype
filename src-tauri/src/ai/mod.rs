@@ -1,4 +1,5 @@
 pub mod types;
+pub mod transport;
 pub mod retry;
 pub mod gemini;
 pub mod openai_compat;
@@ -406,7 +407,6 @@ mod tests {
     fn thinking(enabled: bool) -> ThinkingConfig {
         ThinkingConfig {
             enabled,
-            budget: 1024,
             level: "LOW".to_string(),
         }
     }

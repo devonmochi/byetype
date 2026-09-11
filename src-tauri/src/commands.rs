@@ -98,12 +98,6 @@ pub async fn save_config(
     Ok(true)
 }
 
-#[tauri::command]
-pub fn get_prompts_dir(app: tauri::AppHandle) -> Result<String, String> {
-    let prompts_dir = resolve_prompts_dir(&app)?;
-    Ok(prompts_dir.to_string_lossy().to_string())
-}
-
 /// 校验内置提示词文件名，防止路径穿越（".."、路径分隔符、绝对路径）。
 /// 返回校验通过后的文件名（去除首尾空白）。
 fn sanitize_prompt_filename(filename: &str) -> Result<String, String> {
@@ -123,17 +117,6 @@ fn sanitize_prompt_filename(filename: &str) -> Result<String, String> {
         return Err("文件名不能为绝对路径".to_string());
     }
     Ok(trimmed.to_string())
-}
-
-#[tauri::command]
-pub fn get_builtin_prompt_path(
-    app: tauri::AppHandle,
-    filename: String,
-) -> Result<String, String> {
-    let prompts_dir = resolve_prompts_dir(&app)?;
-    let safe_name = sanitize_prompt_filename(&filename)?;
-    let path = prompts_dir.join(&safe_name);
-    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -192,16 +175,6 @@ pub fn is_builtin_prompt_path(
     let target = std::path::Path::new(&path);
     let target_canon = std::fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf());
     Ok(target_canon == prompts_canon || target_canon.starts_with(&prompts_canon))
-}
-
-#[tauri::command]
-pub fn open_file(path: String) -> Result<(), String> {
-    open::that(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn get_recording_state(recorder: State<'_, Arc<AudioRecorder>>) -> Result<bool, String> {
-    Ok(recorder.is_recording())
 }
 
 #[tauri::command]

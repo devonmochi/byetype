@@ -56,12 +56,12 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
             "custom": custom_models,
         });
 
-        let thinking = raw.get("transcribe").and_then(|t| t.get("thinking")).cloned().unwrap_or(serde_json::json!({ "enabled": false, "budget": 1024, "level": "LOW" }));
+        let thinking = raw.get("transcribe").and_then(|t| t.get("thinking")).cloned().unwrap_or(serde_json::json!({ "enabled": false, "level": "LOW" }));
         let prompts = raw.get("transcribe").and_then(|t| t.get("prompts")).cloned().unwrap_or(serde_json::json!({ "agent": "", "rules": "", "vocabulary": "" }));
         raw["transcribe"] = serde_json::json!({ "modelId": transcribe_model_id, "thinking": thinking, "prompts": prompts });
 
         let opt_enabled = raw.get("optimize").and_then(|o| o.get("enabled")).and_then(|v| v.as_bool()).unwrap_or(false);
-        let opt_thinking = raw.get("optimize").and_then(|o| o.get("thinking")).cloned().unwrap_or(serde_json::json!({ "enabled": false, "budget": 1024, "level": "LOW" }));
+        let opt_thinking = raw.get("optimize").and_then(|o| o.get("thinking")).cloned().unwrap_or(serde_json::json!({ "enabled": false, "level": "LOW" }));
         let opt_prompt = raw.get("optimize").and_then(|o| o.get("prompt")).and_then(|v| v.as_str()).unwrap_or_default().to_string();
         raw["optimize"] = serde_json::json!({ "enabled": opt_enabled, "modelId": optimize_model_id, "thinking": opt_thinking, "prompt": opt_prompt });
 
@@ -85,7 +85,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
             .to_string();
         raw["voiceLearning"] = serde_json::json!({
             "modelId": model_id,
-            "thinking": { "enabled": false, "budget": 1024, "level": "LOW" }
+            "thinking": { "enabled": false, "level": "LOW" }
         });
         migrated = true;
     } else if raw
@@ -94,7 +94,7 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
         .is_none()
     {
         raw["voiceLearning"]["thinking"] =
-            serde_json::json!({ "enabled": false, "budget": 1024, "level": "LOW" });
+            serde_json::json!({ "enabled": false, "level": "LOW" });
         migrated = true;
     }
 
@@ -113,7 +113,7 @@ fn migrate_optimize_to_voice_templates(raw: &mut Value) {
 
     let model_id = opt.get("modelId").and_then(|v| v.as_str()).unwrap_or_default().to_string();
     let thinking = opt.get("thinking").cloned().unwrap_or(
-        serde_json::json!({ "enabled": false, "budget": 1024, "level": "LOW" })
+        serde_json::json!({ "enabled": false, "level": "LOW" })
     );
     let custom_prompt = opt.get("prompt").and_then(|v| v.as_str()).unwrap_or_default().to_string();
     let enabled = opt.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
