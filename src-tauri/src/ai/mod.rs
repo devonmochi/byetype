@@ -129,6 +129,17 @@ pub async fn transcribe(
     }
 }
 
+/// 图像识别用哪个模型的思考设置:
+/// 图像识别自己没有思考开关,默认沿用「文本优化模型」那一栏的思考设置,
+/// 让同一个模型在优化和取字两处表现一致。extract.thinking 单独设过时以它为准。
+fn extract_thinking(config: &AppConfig) -> &crate::config::types::ThinkingConfig {
+    config
+        .extract
+        .thinking
+        .as_ref()
+        .unwrap_or(&config.voice_templates.thinking)
+}
+
 /// Extract text from an image using the configured provider.
 pub async fn extract_text(
     client: &reqwest::Client,
@@ -139,7 +150,7 @@ pub async fn extract_text(
 ) -> Result<String, String> {
     let model_id = config.extract.model_id.as_deref().unwrap_or(&config.transcribe.model_id);
     let resolved = models::resolve_model(config, model_id)?;
-    let thinking = config.extract.thinking.as_ref().unwrap_or(&config.transcribe.thinking);
+    let thinking = extract_thinking(config);
     let system_prompt = prompt::build_extract_prompt(config, prompts_dir, template_id);
 
     let outcome: Result<(String, TokenUsage), String> = if is_deepseek(&resolved) {
@@ -151,6 +162,7 @@ pub async fn extract_text(
             &resolved.model,
             &resolved.base_url,
             thinking,
+            config.voice_templates.deepseek_reasoning_effort.as_deref(),
         )
         .await
     } else {
@@ -384,4 +396,36 @@ pub async fn analyze_correction(
         record_usage("learn", &resolved, *usage);
     }
     outcome.map(|(text, _)| text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_thinking;
+    use crate::config::types::{AppConfig, ThinkingConfig};
+
+    fn thinking(enabled: bool) -> ThinkingConfig {
+        ThinkingConfig {
+            enabled,
+            budget: 1024,
+            level: "LOW".to_string(),
+        }
+    }
+
+    #[test]
+    fn extract_follows_text_optimize_thinking_when_unset() {
+        let mut config = AppConfig::default();
+        config.voice_templates.thinking = thinking(true);
+        config.transcribe.thinking = thinking(false);
+
+        assert!(extract_thinking(&config).enabled);
+    }
+
+    #[test]
+    fn extract_thinking_setting_overrides_text_optimize() {
+        let mut config = AppConfig::default();
+        config.extract.thinking = Some(thinking(false));
+        config.voice_templates.thinking = thinking(true);
+
+        assert!(!extract_thinking(&config).enabled);
+    }
 }

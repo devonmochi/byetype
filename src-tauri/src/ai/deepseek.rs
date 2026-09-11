@@ -121,13 +121,15 @@ pub async fn transcribe(
 
 /// 图像识别请求体。图片按官方要求只放在 user 消息的 content 数组里,用 image_url 块内联
 /// data URI(base64 PNG)。不传 detail,让服务端按默认保留原图分辨率。
+/// 思考强度沿用「文本优化模型」那一栏的 reasoning_effort 设置。
 fn build_extract_request(
     model: &str,
     system_prompt: &str,
     image_base64: &str,
     thinking: &ThinkingConfig,
+    reasoning_effort: Option<&str>,
 ) -> ChatCompletionRequest {
-    let (thinking_param, reasoning_effort) = build_thinking_params(thinking, None);
+    let (thinking_param, reasoning_effort) = build_thinking_params(thinking, reasoning_effort);
 
     ChatCompletionRequest {
         model: model.to_string(),
@@ -166,9 +168,16 @@ pub async fn extract_text(
     model: &str,
     base_url: &str,
     thinking: &ThinkingConfig,
+    reasoning_effort: Option<&str>,
 ) -> Result<(String, TokenUsage), String> {
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-    let request = build_extract_request(model, system_prompt, image_base64, thinking);
+    let request = build_extract_request(
+        model,
+        system_prompt,
+        image_base64,
+        thinking,
+        reasoning_effort,
+    );
 
     let resp = client
         .post(&url)
@@ -281,8 +290,13 @@ mod tests {
             level: "LOW".to_string(),
         };
 
-        let request =
-            build_extract_request("deepseek-flash", "识别图片里的文字", "QUJD", &thinking);
+        let request = build_extract_request(
+            "deepseek-flash",
+            "识别图片里的文字",
+            "QUJD",
+            &thinking,
+            None,
+        );
         let value = serde_json::to_value(&request).unwrap();
 
         assert_eq!(value["model"], "deepseek-flash");
@@ -300,11 +314,26 @@ mod tests {
     fn extract_request_disables_thinking_by_default() {
         let thinking = ThinkingConfig::default();
 
-        let request = build_extract_request("deepseek-flash", "", "QUJD", &thinking);
+        let request = build_extract_request("deepseek-flash", "", "QUJD", &thinking, None);
         let value = serde_json::to_value(&request).unwrap();
 
-        // 官方默认开启思考模式,截图取字必须显式关掉,否则每次识别都白跑一段思维链
+        // 官方默认开启思考模式,思考关闭时必须显式关掉,否则每次识别都白跑一段思维链
         assert_eq!(value["thinking"]["type"], "disabled");
         assert!(value.get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn extract_request_uses_configured_reasoning_effort() {
+        let thinking = ThinkingConfig {
+            enabled: true,
+            budget: 1024,
+            level: "LOW".to_string(),
+        };
+
+        let request = build_extract_request("deepseek-flash", "", "QUJD", &thinking, Some("low"));
+        let value = serde_json::to_value(&request).unwrap();
+
+        assert_eq!(value["thinking"]["type"], "enabled");
+        assert_eq!(value["reasoning_effort"], "low");
     }
 }
