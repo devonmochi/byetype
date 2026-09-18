@@ -28,7 +28,7 @@ ByeType 是一个 Markdown 驱动的 AI 语音输入工具。按 F4 说话，文
 
 ## 🤖 支持的模型
 
-预置 5 个模型：Qwen 3.5 Omni Plus / Flash 和 MiMo v2.5 走国内直连，Gemini 3.8 Flash 需要代理，DeepSeek V4.1 Flash 只做文本优化和截图取字。所有模型在「设置 → 模型管理」里填自己的 API Key。无法直接访问 Google 时，可以换成 OpenRouter 中转的 `google/gemini-3.8-flash` 或 `google/gemini-3.5-flash-lite`。
+预置模型中，Qwen 3.8 Omni Flash和MiMo v2.5走国内直连，Gemini 3.8 Flash需要代理，DeepSeek V4.1 Flash只做文本优化和截图取字。所有模型在「设置 → 模型管理」里填自己的 API Key。无法直接访问 Google 时，可以换成 OpenRouter 中转的 `google/gemini-3.8-flash` 或 `google/gemini-3.5-flash-lite`。
 
 ## 🔬 真实效果对比
 
@@ -231,7 +231,7 @@ some-audio-command | curl -fsS -X POST \
 
 两种方案：
 
-1. 在「设置 → 语音转写」中选择 Qwen 3.5 Omni 等国内直连模型，无需代理
+1. 在「设置 → 语音转写」中选择Qwen 3.8 Omni Flash等国内直连模型，无需代理
 2. 在「设置 → 通用设置 → 网络与性能 → HTTP 代理地址」中配置代理后使用 Gemini
 </details>
 

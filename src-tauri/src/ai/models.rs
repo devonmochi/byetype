@@ -11,17 +11,9 @@ pub struct BuiltinModel {
 
 pub static BUILTIN_MODELS: &[BuiltinModel] = &[
     BuiltinModel {
-        id: "builtin-qwen-omni-plus",
+        id: "builtin-qwen3.8-omni-flash",
         provider: "阿里云百炼",
-        model: "qwen3.5-omni-plus",
-        protocol: "qwen-omni",
-        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        supports_text: true,
-    },
-    BuiltinModel {
-        id: "builtin-qwen-omni-flash",
-        provider: "阿里云百炼",
-        model: "qwen3.5-omni-flash",
+        model: "qwen3.8-omni-flash",
         protocol: "qwen-omni",
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
         supports_text: true,
@@ -137,6 +129,18 @@ pub fn supports_text(config: &AppConfig, model_id: &str) -> Result<bool, String>
 mod tests {
     use super::*;
     use crate::config::types::CustomModelEntry;
+
+    #[test]
+    fn offers_only_qwen_3_8_omni_flash() {
+        let qwen: Vec<&BuiltinModel> = BUILTIN_MODELS
+            .iter()
+            .filter(|model| model.provider == "阿里云百炼")
+            .collect();
+
+        assert_eq!(qwen.len(), 1);
+        assert_eq!(qwen[0].id, "builtin-qwen3.8-omni-flash");
+        assert_eq!(qwen[0].model, "qwen3.8-omni-flash");
+    }
 
     #[test]
     fn offers_single_deepseek_model() {

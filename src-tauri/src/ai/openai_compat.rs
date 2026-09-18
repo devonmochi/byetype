@@ -114,6 +114,7 @@ pub async fn transcribe(
         stream: None,
         max_tokens: None,
         stream_options: None,
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
@@ -171,6 +172,7 @@ pub async fn optimize(
         stream: None,
         max_tokens: None,
         stream_options: None,
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
@@ -236,6 +238,7 @@ pub async fn extract_text(
         stream: Some(false),
         max_tokens: None,
         stream_options: None,
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: if is_openrouter(base_url) { openrouter_reasoning(thinking, model) } else { None },
@@ -293,6 +296,7 @@ pub async fn qwen_omni_extract_text(
         stream: Some(true),
         max_tokens: None,
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
@@ -329,6 +333,7 @@ pub async fn test_connectivity(
         stream: None,
         max_tokens: None,
         stream_options: None,
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
@@ -376,17 +381,13 @@ fn parse_sse(body: &str) -> Result<(String, TokenUsage), String> {
     Ok((result, usage))
 }
 
-pub async fn qwen_omni_transcribe(
-    client: &Client,
+fn qwen_omni_transcribe_request(
     audio_base64: &str,
     system_prompt: &str,
-    api_key: &str,
     model: &str,
-    base_url: &str,
-) -> Result<(String, TokenUsage), String> {
-    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-
-    let request = ChatCompletionRequest {
+    thinking: &ThinkingConfig,
+) -> ChatCompletionRequest {
+    ChatCompletionRequest {
         model: model.to_string(),
         messages: vec![
             ChatMessage {
@@ -407,22 +408,50 @@ pub async fn qwen_omni_transcribe(
         ],
         modalities: Some(vec!["text".to_string()]),
         output_modalities: None,
-        stream: Some(true),
+        stream: Some(false),
         max_tokens: None,
-        stream_options: Some(super::types::StreamOptions { include_usage: true }),
+        stream_options: None,
+        enable_thinking: Some(thinking.enabled),
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
-        provider: openrouter_provider(base_url, model),
+        provider: None,
         chat_template_kwargs: None,
-    };
-
-    let body =
-        transport::post(client, &url, &request, &transport::bearer(api_key), "Qwen Omni").await?;
-    let (text, usage) = parse_sse(&body)?;
-    if text.is_empty() {
-        return Err("No text in Qwen Omni transcribe response".to_string());
     }
+}
+
+pub async fn qwen_omni_transcribe(
+    client: &Client,
+    audio_base64: &str,
+    system_prompt: &str,
+    api_key: &str,
+    model: &str,
+    base_url: &str,
+    thinking: &ThinkingConfig,
+) -> Result<(String, TokenUsage), String> {
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+    let request = qwen_omni_transcribe_request(audio_base64, system_prompt, model, thinking);
+    let chat_resp = transport::chat(
+        client,
+        &url,
+        &request,
+        &transport::bearer(api_key),
+        "Qwen Omni",
+    )
+    .await?;
+    let text = chat_resp
+        .choices
+        .as_ref()
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.message.as_ref())
+        .and_then(|message| message.content.as_ref())
+        .filter(|content| !content.trim().is_empty())
+        .ok_or_else(|| "No text in Qwen Omni transcribe response".to_string())?;
+    let usage = chat_resp
+        .usage
+        .as_ref()
+        .map(TokenUsage::from_chat)
+        .unwrap_or_default();
     Ok((text.trim().to_string(), usage))
 }
 
@@ -455,6 +484,7 @@ pub async fn qwen_omni_optimize(
         stream: Some(true),
         max_tokens: None,
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
@@ -490,6 +520,7 @@ pub async fn qwen_omni_test_connectivity(
         stream: Some(true),
         max_tokens: Some(32),
         stream_options: Some(super::types::StreamOptions { include_usage: true }),
+        enable_thinking: None,
         thinking: None,
         reasoning_effort: None,
         reasoning: None,
@@ -500,6 +531,32 @@ pub async fn qwen_omni_test_connectivity(
     transport::post(client, &url, &request, &transport::bearer(api_key), "Qwen Omni").await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod qwen_tests {
+    use super::qwen_omni_transcribe_request;
+    use crate::config::types::ThinkingConfig;
+
+    #[test]
+    fn audio_transcription_is_non_streaming_and_disables_thinking() {
+        let thinking = ThinkingConfig { enabled: false, level: "LOW".to_string() };
+        let request = qwen_omni_transcribe_request("audio", "prompt", "qwen3.8-omni-flash", &thinking);
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(value["stream"], false);
+        assert_eq!(value["enable_thinking"], false);
+        assert!(value.get("stream_options").is_none());
+    }
+
+    #[test]
+    fn audio_transcription_can_enable_thinking() {
+        let thinking = ThinkingConfig { enabled: true, level: "HIGH".to_string() };
+        let request = qwen_omni_transcribe_request("audio", "prompt", "qwen3.8-omni-flash", &thinking);
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(value["enable_thinking"], true);
+    }
 }
 
 #[cfg(test)]

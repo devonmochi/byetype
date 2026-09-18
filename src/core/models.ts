@@ -15,20 +15,9 @@ export interface ModelEntry {
 
 export const BUILTIN_MODELS: Omit<ModelEntry, 'apiKey'>[] = [
   {
-    id: 'builtin-qwen-omni-plus',
+    id: 'builtin-qwen3.8-omni-flash',
     provider: '阿里云百炼',
-    model: 'qwen3.5-omni-plus',
-    protocol: 'qwen-omni',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    builtin: true,
-    supportsAudio: true,
-    supportsText: true,
-    supportsVision: true,
-  },
-  {
-    id: 'builtin-qwen-omni-flash',
-    provider: '阿里云百炼',
-    model: 'qwen3.5-omni-flash',
+    model: 'qwen3.8-omni-flash',
     protocol: 'qwen-omni',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     builtin: true,

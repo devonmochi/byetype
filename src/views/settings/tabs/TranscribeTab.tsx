@@ -19,6 +19,7 @@ export function TranscribeTab({ config, onSave }: Props) {
   const isOpenRouter = (m: ReturnType<typeof findModel>) =>
     m?.protocol === 'openai-compat' && (m?.baseUrl?.includes('openrouter.ai') ?? false)
   const isTranscribeGemini = transcribeModel?.protocol === 'gemini' || isOpenRouter(transcribeModel)
+  const isTranscribeQwen = transcribeModel?.protocol === 'qwen-omni'
   const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini' || isOpenRouter(voiceTemplatesModel)
   // Gemini 3.7 系列不支持 MINIMAL 思考档位，隐藏该选项并按 LOW 显示
   const transcribeSupportsMinimal = supportsMinimalThinking(transcribeModel?.model)
@@ -71,7 +72,7 @@ export function TranscribeTab({ config, onSave }: Props) {
             )}
           </select>
         </SettingRow>
-        {isTranscribeGemini && (
+        {(isTranscribeGemini || isTranscribeQwen) && (
           <>
             <SettingRow label="启用思考" description="让模型在转写前先进行推理">
               <Toggle
@@ -79,7 +80,7 @@ export function TranscribeTab({ config, onSave }: Props) {
                 onChange={checked => updateTranscribeThinking({ enabled: checked })}
               />
             </SettingRow>
-            {transcribe.thinking.enabled && (
+            {isTranscribeGemini && transcribe.thinking.enabled && (
               <SettingRow label="Thinking Level" description="思考深度级别">
                 <select
                   className="select"

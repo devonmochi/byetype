@@ -176,6 +176,7 @@ fn model_name_to_builtin_id(model_name: &str) -> String {
 /// 迁移旧 model_id 引用:
 /// - builtin-deepseek-chat / builtin-deepseek-v4-flash / builtin-deepseek-v4-pro
 ///   → builtin-deepseek-flash(官方只保留 deepseek-flash 一个 ID,V4 系列已下线)
+/// - builtin-qwen-omni-plus / builtin-qwen-omni-flash → builtin-qwen3.8-omni-flash
 /// - builtin-mimo-v2-omni   → builtin-mimo-v2.5
 /// - builtin-gemini-3-flash → builtin-gemini-3.8-flash (Gemini 3.8 Flash 取代 3 Flash)
 /// - builtin-or-gemini-3-flash → builtin-or-gemini-3.8-flash
@@ -188,6 +189,8 @@ fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
         ("builtin-deepseek-chat", "builtin-deepseek-flash"),
         ("builtin-deepseek-v4-flash", "builtin-deepseek-flash"),
         ("builtin-deepseek-v4-pro", "builtin-deepseek-flash"),
+        ("builtin-qwen-omni-plus", "builtin-qwen3.8-omni-flash"),
+        ("builtin-qwen-omni-flash", "builtin-qwen3.8-omni-flash"),
         ("builtin-mimo-v2-omni", "builtin-mimo-v2.5"),
         ("builtin-gemini-3-flash", "builtin-gemini-3.8-flash"),
         ("builtin-or-gemini-3-flash", "builtin-or-gemini-3.8-flash"),
@@ -220,6 +223,18 @@ fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn migrates_qwen_3_5_omni_models_to_qwen_3_8_flash() {
+        let mut raw = json!({
+            "transcribe": { "modelId": "builtin-qwen-omni-plus" },
+            "extract": { "modelId": "builtin-qwen-omni-flash" },
+        });
+
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-qwen3.8-omni-flash");
+        assert_eq!(raw["extract"]["modelId"], "builtin-qwen3.8-omni-flash");
+    }
 
     #[test]
     fn migrates_transcribe_mimo_omni() {

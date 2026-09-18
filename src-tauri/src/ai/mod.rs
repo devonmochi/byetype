@@ -90,6 +90,7 @@ pub async fn transcribe(
                     &resolved.api_key,
                     &resolved.model,
                     &resolved.base_url,
+                    &config.transcribe.thinking,
                 )
                 .await
             }

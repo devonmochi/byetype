@@ -60,6 +60,7 @@ pub async fn optimize(
         stream: None,
         max_tokens: None,
         stream_options: None,
+        enable_thinking: None,
         thinking: thinking_param,
         reasoning_effort,
         reasoning: None,
@@ -135,6 +136,7 @@ fn build_extract_request(
         stream: None,
         max_tokens: None,
         stream_options: None,
+        enable_thinking: None,
         thinking: thinking_param,
         reasoning_effort,
         reasoning: None,
@@ -201,6 +203,7 @@ pub async fn test_connectivity(
         stream: None,
         max_tokens: Some(8),
         stream_options: None,
+        enable_thinking: None,
         thinking: Some(ThinkingParam {
             thinking_type: "disabled".to_string(),
         }),
