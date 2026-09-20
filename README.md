@@ -7,7 +7,7 @@ ByeType是一个由Markdown驱动的AI语音输入工具。你可以自由定义
 
 ByeType免费开源，使用你自己的API Key。支持macOS、Windows，以及通过iOS快捷指令在iPhone和iPad上使用。
 
-![录音 → 转写 → 优化 → 自动粘贴](docs/images/demo.gif)
+<img src="docs/images/demo.gif" width="444" alt="录音 → 转写 → 优化 → 自动粘贴">
 
 ## 📱 iPhone / iPad
 
