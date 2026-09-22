@@ -67,6 +67,16 @@ fn default_extract_shortcut() -> String {
     "F6".to_string()
 }
 
+/// 语音输入 1 的默认快捷键：Windows 下为物理右 Alt（`AltRight`），
+/// 其他平台保持原有 `F4`。
+fn default_shortcut() -> String {
+    if cfg!(target_os = "windows") {
+        "AltRight".to_string()
+    } else {
+        "F4".to_string()
+    }
+}
+
 fn default_shortcut2() -> String {
     String::new()
 }
@@ -86,6 +96,7 @@ fn default_extract_template() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralConfig {
+    #[serde(default = "default_shortcut")]
     pub shortcut: String,
     pub launch_at_login: bool,
     pub theme: String,
@@ -339,7 +350,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             general: GeneralConfig {
-                shortcut: "F4".to_string(),
+                shortcut: default_shortcut(),
                 launch_at_login: false,
                 theme: "system".to_string(),
                 max_recording_seconds: 180,

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import type { AppConfig, AudioDevice, UpdateInfo, BackupEntry, LocalApiStatus } from '../core/types'
+import type { AppConfig, AudioDevice, UpdateInfo, BackupEntry, LocalApiStatus, ShortcutPatch, ShortcutStatus, ShortcutUpdateResult } from '../core/types'
 
 // Config commands
 export async function getConfig(): Promise<AppConfig> {
@@ -15,6 +15,36 @@ export async function saveConfig(config: AppConfig): Promise<boolean> {
 
 export async function getLocalApiStatus(): Promise<LocalApiStatus> {
   return invoke<LocalApiStatus>('get_local_api_status')
+}
+
+// Shortcut domain commands
+
+export async function getShortcutStatus(): Promise<ShortcutStatus> {
+  return invoke<ShortcutStatus>('get_shortcut_status')
+}
+
+export async function updateShortcuts(patch: ShortcutPatch): Promise<ShortcutUpdateResult> {
+  return invoke<ShortcutUpdateResult>('update_shortcuts', { patch })
+}
+
+export async function resetShortcuts(): Promise<ShortcutUpdateResult> {
+  return invoke<ShortcutUpdateResult>('reset_shortcuts')
+}
+
+export async function beginShortcutCapture(field: string): Promise<number> {
+  return invoke<number>('begin_shortcut_capture', { field })
+}
+
+export async function commitShortcutCapture(field: string, token: number): Promise<void> {
+  return invoke<void>('commit_shortcut_capture', { field, token })
+}
+
+export async function endShortcutCapture(field: string, token: number): Promise<void> {
+  return invoke<void>('end_shortcut_capture', { field, token })
+}
+
+export async function cancelShortcutCapture(field: string, token: number): Promise<void> {
+  return invoke<void>('cancel_shortcut_capture', { field, token })
 }
 
 // Prompt commands

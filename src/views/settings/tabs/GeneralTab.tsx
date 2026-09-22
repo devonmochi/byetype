@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { AppConfig, AudioDevice, LocalApiStatus, ThemeMode } from '../../../core/types'
+import { AppConfig, AudioDevice, LocalApiStatus, ShortcutPatch, ShortcutStatus, ThemeMode } from '../../../core/types'
 import {
   getLaunchAtLogin,
   getLocalApiStatus,
+  getShortcutStatus,
   onEvent,
   setLaunchAtLogin,
   listInputDevices,
@@ -11,6 +12,7 @@ import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
 import { EditableLabel } from '../components/EditableLabel'
+import { ShortcutInput } from '../components/ShortcutInput'
 
 const DEFAULT_LABELS = {
   shortcut: '语音输入 1',
@@ -22,25 +24,29 @@ const DEFAULT_LABELS = {
 const IS_MACOS = navigator.platform.toUpperCase().includes('MAC')
 
 function formatShortcutDisplay(combo: string): string {
-  if (!IS_MACOS) return combo
+  if (!combo) return '未设置'
+  if (combo === 'AltRight') return '右 Alt'
+  if (combo === 'AltLeft') return '左 Alt'
+  if (!IS_MACOS) return combo.replace(/\bSuper\b/g, 'Win')
   return combo
     .replace(/Command/g, '\u2318')
+    .replace(/Super/g, '\u2318')
     .replace(/Shift/g, '\u21E7')
     .replace(/Alt/g, '\u2325')
+    .replace(/Ctrl/g, '\u2303')
 }
 
 interface Props {
   config: AppConfig
   onSave: (config: AppConfig) => void
+  onShortcutChange: (patch: ShortcutPatch) => Promise<void>
+  onResetShortcuts: () => Promise<void>
 }
 
-export function GeneralTab({ config, onSave }: Props) {
-  const [recording, setRecording] = useState(false)
-  const [recording2, setRecording2] = useState(false)
-  const [recordingExtract, setRecordingExtract] = useState(false)
-  const [recordingExtract2, setRecordingExtract2] = useState(false)
+export function GeneralTab({ config, onSave, onShortcutChange, onResetShortcuts }: Props) {
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [conflictMsg, setConflictMsg] = useState('')
+  const [shortcutStatus, setShortcutStatus] = useState<ShortcutStatus | null>(null)
   const [localApiStatus, setLocalApiStatus] = useState<LocalApiStatus>({
     running: false,
     port: null,
@@ -112,81 +118,53 @@ export function GeneralTab({ config, onSave }: Props) {
     extractShortcut2: config.general.extractShortcut2Label?.trim() || DEFAULT_LABELS.extractShortcut2,
   }
 
-  function createKeyHandler(
-    setRec: (v: boolean) => void,
-    onCapture: (combo: string) => void,
-    others: { key: string; label: string }[],
-  ) {
-    return (e: React.KeyboardEvent) => {
-      e.preventDefault()
-      if (e.key === 'Escape') {
-        setRec(false)
-        return
-      }
-      if (e.key === 'Tab') return
-      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
-
-      const key = e.key === ' ' ? 'Space' : e.key
-      const parts: string[] = []
-      if (e.ctrlKey) parts.push('Ctrl')
-      if (e.altKey) parts.push('Alt')
-      if (e.shiftKey) parts.push('Shift')
-      if (e.metaKey) parts.push(IS_MACOS ? 'Command' : 'Win')
-      parts.push(key)
-      const combo = parts.join('+')
-
-      const conflict = others.find(o => o.key === combo)
-      if (conflict) {
-        setConflictMsg(`\u4E0E${conflict.label}\u51B2\u7A81`)
-        setTimeout(() => setConflictMsg(''), 3000)
-        setRec(false)
-        return
-      }
-
-      onCapture(combo)
-      setRec(false)
+  useEffect(() => {
+    let disposed = false
+    let timer: ReturnType<typeof setInterval> | null = null
+    const load = () => {
+      getShortcutStatus()
+        .then(status => { if (!disposed) setShortcutStatus(status) })
+        .catch(error => console.error('Failed to get shortcut status:', error))
     }
+    const startTimer = () => {
+      if (timer === null) timer = setInterval(load, 2000)
+    }
+    const stopTimer = () => {
+      if (timer !== null) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+    // Only poll while the settings page is visible; hidden windows stop polling.
+    const syncVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        load()
+        startTimer()
+      } else {
+        stopTimer()
+      }
+    }
+    syncVisibility()
+    window.addEventListener('focus', load)
+    document.addEventListener('visibilitychange', syncVisibility)
+    return () => {
+      disposed = true
+      stopTimer()
+      window.removeEventListener('focus', load)
+      document.removeEventListener('visibilitychange', syncVisibility)
+    }
+  }, [])
+
+  const shortcutEditable = shortcutStatus?.editable !== false
+
+  const showShortcutError = (message: string) => {
+    setConflictMsg(message)
+    setTimeout(() => setConflictMsg(''), 4000)
   }
 
-  const handleKeyDown = createKeyHandler(
-    setRecording,
-    (combo) => update({ shortcut: combo }),
-    [
-      { key: config.general.shortcut2, label: labelOf.shortcut2 },
-      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
-      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
-    ],
-  )
-
-  const handleKeyDown2 = createKeyHandler(
-    setRecording2,
-    (combo) => update({ shortcut2: combo }),
-    [
-      { key: config.general.shortcut, label: labelOf.shortcut },
-      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
-      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
-    ],
-  )
-
-  const handleExtractKeyDown = createKeyHandler(
-    setRecordingExtract,
-    (combo) => update({ extractShortcut: combo }),
-    [
-      { key: config.general.shortcut, label: labelOf.shortcut },
-      { key: config.general.shortcut2, label: labelOf.shortcut2 },
-      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
-    ],
-  )
-
-  const handleExtractKeyDown2 = createKeyHandler(
-    setRecordingExtract2,
-    (combo) => update({ extractShortcut2: combo }),
-    [
-      { key: config.general.shortcut, label: labelOf.shortcut },
-      { key: config.general.shortcut2, label: labelOf.shortcut2 },
-      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
-    ],
-  )
+  const handleShortcutCommit = async (field: string, value: string) => {
+    await onShortcutChange({ [field]: value } as ShortcutPatch)
+  }
 
   const themes: { value: ThemeMode; label: string; style: React.CSSProperties }[] = [
     { value: 'light', label: '浅色', style: { background: '#ffffff', border: '1px solid #d2d2d7' } },
@@ -236,14 +214,12 @@ export function GeneralTab({ config, onSave }: Props) {
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
-            <input
-              className={`kbd${recording ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.shortcut)}
-              onKeyDown={recording ? handleKeyDown : undefined}
-              onFocus={() => setRecording(true)}
-              onBlur={() => setRecording(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            <ShortcutInput
+              field="shortcut"
+              display={formatShortcutDisplay(config.general.shortcut)}
+              disabled={!shortcutEditable}
+              onCommit={handleShortcutCommit}
+              onError={showShortcutError}
             />
           </div>
         </SettingRow>
@@ -267,14 +243,12 @@ export function GeneralTab({ config, onSave }: Props) {
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
-            <input
-              className={`kbd${recording2 ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.shortcut2)}
-              onKeyDown={recording2 ? handleKeyDown2 : undefined}
-              onFocus={() => setRecording2(true)}
-              onBlur={() => setRecording2(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            <ShortcutInput
+              field="shortcut2"
+              display={formatShortcutDisplay(config.general.shortcut2)}
+              disabled={!shortcutEditable}
+              onCommit={handleShortcutCommit}
+              onError={showShortcutError}
             />
           </div>
         </SettingRow>
@@ -292,6 +266,28 @@ export function GeneralTab({ config, onSave }: Props) {
             checked={config.general.overwriteClipboard !== false}
             onChange={checked => update({ overwriteClipboard: checked })}
           />
+        </SettingRow>
+        <SettingRow
+          label="恢复默认快捷键"
+          description="将四个快捷键重置为默认值（语音输入 1 = 右 Alt，截图取词 = F6，其余为空）"
+        >
+          <button
+            className="file-picker-btn"
+            onClick={async () => {
+              if (!window.confirm('确定把四个快捷键恢复为默认值吗？')) return
+              try {
+                await onResetShortcuts()
+              } catch (error: unknown) {
+                showShortcutError(
+                  typeof error === 'string'
+                    ? error
+                    : (error as { message?: string } | null)?.message || '恢复默认快捷键失败',
+                )
+              }
+            }}
+          >
+            恢复默认
+          </button>
         </SettingRow>
       </SettingGroup>
 
@@ -315,14 +311,12 @@ export function GeneralTab({ config, onSave }: Props) {
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
-            <input
-              className={`kbd${recordingExtract ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.extractShortcut)}
-              onKeyDown={recordingExtract ? handleExtractKeyDown : undefined}
-              onFocus={() => setRecordingExtract(true)}
-              onBlur={() => setRecordingExtract(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            <ShortcutInput
+              field="extractShortcut"
+              display={formatShortcutDisplay(config.general.extractShortcut)}
+              disabled={!shortcutEditable}
+              onCommit={handleShortcutCommit}
+              onError={showShortcutError}
             />
           </div>
         </SettingRow>
@@ -345,14 +339,12 @@ export function GeneralTab({ config, onSave }: Props) {
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
-            <input
-              className={`kbd${recordingExtract2 ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.extractShortcut2)}
-              onKeyDown={recordingExtract2 ? handleExtractKeyDown2 : undefined}
-              onFocus={() => setRecordingExtract2(true)}
-              onBlur={() => setRecordingExtract2(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+            <ShortcutInput
+              field="extractShortcut2"
+              display={formatShortcutDisplay(config.general.extractShortcut2)}
+              disabled={!shortcutEditable}
+              onCommit={handleShortcutCommit}
+              onError={showShortcutError}
             />
           </div>
         </SettingRow>
@@ -361,6 +353,26 @@ export function GeneralTab({ config, onSave }: Props) {
       {conflictMsg && (
         <div style={{ color: '#ff3b30', fontSize: 12, padding: '4px 16px' }}>
           {conflictMsg}
+        </div>
+      )}
+
+      {shortcutStatus?.schemaMode === 'future' && (
+        <div style={{ color: 'var(--text-secondary)', fontSize: 12, padding: '4px 16px' }}>
+          该配置由更高版本创建，修改快捷键时会保留高版本 schema 与未知字段。
+        </div>
+      )}
+
+      {config.general.shortcut === 'AltRight' && shortcutStatus && !shortcutStatus.altRightBackend && (
+        <div style={{ color: '#ff3b30', fontSize: 12, padding: '4px 16px' }}>
+          右 Alt 监听后端未启动，右 Alt 不会触发语音。原因：
+          {shortcutStatus.diagnostics.filter(d => !d.startsWith('右 Alt 后端')).join('；') || '未知'}
+          （已收到右 Alt 事件 {shortcutStatus.nativeEventsSeen} 次，派发 {shortcutStatus.nativeEventsDispatched} 次；按住说话={shortcutStatus.pttMode ? '开' : '关'}；捕获中={shortcutStatus.capturing ? '是' : '否'}）
+        </div>
+      )}
+
+      {config.general.shortcut === 'AltRight' && shortcutStatus?.altRightBackend && (
+        <div style={{ color: 'var(--text-secondary)', fontSize: 12, padding: '4px 16px' }}>
+          右 Alt 后端：{shortcutStatus.altRightBackend}；已收到事件 {shortcutStatus.nativeEventsSeen} 次，派发 {shortcutStatus.nativeEventsDispatched} 次；按住说话={shortcutStatus.pttMode ? '开' : '关'}；捕获中={shortcutStatus.capturing ? '是' : '否'}
         </div>
       )}
 
