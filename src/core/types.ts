@@ -26,6 +26,41 @@ export interface GeneralConfig {
   overwriteClipboard?: boolean
 }
 
+/** 稀疏快捷键更新：缺失字段表示不修改，显式 "" 表示清空。 */
+export interface ShortcutPatch {
+  shortcut?: string
+  shortcut2?: string
+  extractShortcut?: string
+  extractShortcut2?: string
+}
+
+export interface ShortcutFieldResult {
+  field: string
+  value: string
+  registered: boolean
+  error: string | null
+}
+
+export interface ShortcutUpdateResult {
+  shortcut: string
+  shortcut2: string
+  extractShortcut: string
+  extractShortcut2: string
+  altRightBackend: string | null
+  perField: ShortcutFieldResult[]
+}
+
+export interface ShortcutStatus {
+  schemaMode: 'supported' | 'future'
+  editable: boolean
+  altRightBackend: string | null
+  nativeEventsSeen: number
+  nativeEventsDispatched: number
+  pttMode: boolean
+  capturing: boolean
+  diagnostics: string[]
+}
+
 export interface LocalApiConfig {
   enabled: boolean
   port: number

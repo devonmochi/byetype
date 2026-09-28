@@ -10,9 +10,9 @@ import { VoicePromptsTab } from './tabs/VoicePromptsTab'
 import { ExtractPromptsTab } from './tabs/ExtractPromptsTab'
 import { BackupTab } from './tabs/BackupTab'
 import { VoiceLearningTab } from './tabs/VoiceLearningTab'
-import type { AppConfig, UpdateState, UpdateInfo } from '../../core/types'
+import type { AppConfig, UpdateState, UpdateInfo, ShortcutPatch } from '../../core/types'
 import { getVersion } from '@tauri-apps/api/app'
-import { getConfig, saveConfig, onEvent, checkUpdate } from '../../lib/tauri-api'
+import { getConfig, saveConfig, onEvent, checkUpdate, updateShortcuts, resetShortcuts } from '../../lib/tauri-api'
 import './theme.css'
 
 type TabItem =
@@ -169,6 +169,49 @@ export function App() {
     }, 300)
   }, [])
 
+  const showShortcutResult = useCallback((result: { shortcut: string; shortcut2: string; extractShortcut: string; extractShortcut2: string }) => {
+    setConfig(prev => prev ? {
+      ...prev,
+      general: {
+        ...prev.general,
+        shortcut: result.shortcut,
+        shortcut2: result.shortcut2,
+        extractShortcut: result.extractShortcut,
+        extractShortcut2: result.extractShortcut2,
+      },
+    } : prev)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }, [])
+
+  // Shortcut changes use the backend's dedicated field-level update path and
+  // are never written through the full AppConfig snapshot.
+  const handleShortcutChange = useCallback(async (patch: ShortcutPatch) => {
+    try {
+      const result = await updateShortcuts(patch)
+      showShortcutResult(result)
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || '保存快捷键失败'
+      setErrorMsg(msg)
+      setTimeout(() => setErrorMsg(''), 4000)
+      getConfig().then(setConfig).catch(() => {})
+      throw e
+    }
+  }, [showShortcutResult])
+
+  const handleResetShortcuts = useCallback(async () => {
+    try {
+      const result = await resetShortcuts()
+      showShortcutResult(result)
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || '恢复默认快捷键失败'
+      setErrorMsg(msg)
+      setTimeout(() => setErrorMsg(''), 4000)
+      getConfig().then(setConfig).catch(() => {})
+      throw e
+    }
+  }, [showShortcutResult])
+
   const showDot = updateState.phase === 'available' && !updateState.dismissed
 
   if (!config) return <div style={{ padding: 20, color: 'var(--text-primary)' }}>Loading...</div>
@@ -209,7 +252,7 @@ export function App() {
         )}
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'usage' && <UsageTab />}
-        {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} />}
+        {activeTab === 'general' && <GeneralTab config={config} onSave={handleSave} onShortcutChange={handleShortcutChange} onResetShortcuts={handleResetShortcuts} />}
         {activeTab === 'transcribe' && <TranscribeTab config={config} onSave={handleSave} />}
         {activeTab === 'models' && <ModelsTab config={config} onSave={handleSave} />}
         {activeTab === 'voice-learning' && <VoiceLearningTab config={config} onSave={handleSave} />}

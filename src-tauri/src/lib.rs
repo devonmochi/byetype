@@ -39,6 +39,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
+            commands::get_shortcut_status,
+            commands::update_shortcuts,
+            commands::reset_shortcuts,
+            commands::begin_shortcut_capture,
+            commands::commit_shortcut_capture,
+            commands::end_shortcut_capture,
+            commands::cancel_shortcut_capture,
             commands::copy_builtin_prompt,
             commands::is_builtin_prompt_path,
             commands::create_user_prompt_file,
@@ -88,6 +95,7 @@ pub fn run() {
             let legacy_config_dir = app.path().config_dir().unwrap_or_default();
             let config_manager = ConfigManager::new(data_dir.clone(), legacy_config_dir);
             app.manage(config_manager);
+            app.manage(shortcut::ShortcutManager::new());
             app.manage(learning::VoiceLearningManager::new(&data_dir));
             usage::init(&data_dir, app_handle.clone());
             timing::init(&data_dir, app_handle.clone());
@@ -120,8 +128,10 @@ pub fn run() {
             bubble::init(&app_handle)
                 .expect("Failed to pre-create bubble window");
 
-            shortcut::register(&app_handle, recorder.clone())
-                .expect("Failed to register shortcut");
+            // 单个快捷键异常不得导致整个应用启动失败（§18.1）。
+            if let Err(error) = shortcut::register(&app_handle, recorder.clone()) {
+                eprintln!("[shortcut] 启动注册失败: {error}");
+            }
 
             // Settings window: hidden on startup
             if let Some(win) = app.get_webview_window("settings") {

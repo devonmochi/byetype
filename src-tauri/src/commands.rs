@@ -56,46 +56,138 @@ pub async fn save_config(
     config.validate()?;
     let old_config = config_manager.get();
     let recorder = recorder.inner().clone();
-    let old_shortcut = old_config.general.shortcut.clone();
-    let old_shortcut2 = old_config.general.shortcut2.clone();
-    let old_extract_shortcut = old_config.general.extract_shortcut.clone();
-    let old_extract_shortcut2 = old_config.general.extract_shortcut2.clone();
-    let old_shortcut_template = old_config.general.shortcut_template.clone();
-    let old_shortcut2_template = old_config.general.shortcut2_template.clone();
-    let old_extract_shortcut_template = old_config.general.extract_shortcut_template.clone();
-    let old_extract_shortcut2_template = old_config.general.extract_shortcut2_template.clone();
+
+    // 快捷键域走专属字段级更新路径；完整配置序列化不得覆盖快捷键字段。
+    let shortcut_patch = crate::shortcut::ShortcutPatch {
+        shortcut: (config.general.shortcut != old_config.general.shortcut)
+            .then(|| config.general.shortcut.clone()),
+        shortcut2: (config.general.shortcut2 != old_config.general.shortcut2)
+            .then(|| config.general.shortcut2.clone()),
+        extract_shortcut: (config.general.extract_shortcut != old_config.general.extract_shortcut)
+            .then(|| config.general.extract_shortcut.clone()),
+        extract_shortcut2: (
+            config.general.extract_shortcut2 != old_config.general.extract_shortcut2
+        )
+        .then(|| config.general.extract_shortcut2.clone()),
+    };
+    let templates_changed = config.general.shortcut_template
+        != old_config.general.shortcut_template
+        || config.general.shortcut2_template != old_config.general.shortcut2_template
+        || config.general.extract_shortcut_template
+            != old_config.general.extract_shortcut_template
+        || config.general.extract_shortcut2_template
+            != old_config.general.extract_shortcut2_template;
+
+    // 用后端已确认的快捷键值构造基础配置，避免前端旧完整快照覆盖快捷键。
+    let mut base = config.clone();
+    base.general.shortcut = old_config.general.shortcut.clone();
+    base.general.shortcut2 = old_config.general.shortcut2.clone();
+    base.general.extract_shortcut = old_config.general.extract_shortcut.clone();
+    base.general.extract_shortcut2 = old_config.general.extract_shortcut2.clone();
+
     local_api_manager
         .configure(app.clone(), &config.local_api)
         .await?;
-    if let Err(error) = config_manager.update(config.clone()) {
+    if let Err(error) = config_manager.update(base) {
         let _ = local_api_manager
             .configure(app.clone(), &old_config.local_api)
             .await;
         return Err(error);
     }
 
-    let shortcuts_changed = config.general.shortcut != old_shortcut
-        || config.general.shortcut2 != old_shortcut2
-        || config.general.extract_shortcut != old_extract_shortcut
-        || config.general.extract_shortcut2 != old_extract_shortcut2
-        || config.general.shortcut_template != old_shortcut_template
-        || config.general.shortcut2_template != old_shortcut2_template
-        || config.general.extract_shortcut_template != old_extract_shortcut_template
-        || config.general.extract_shortcut2_template != old_extract_shortcut2_template;
-    if shortcuts_changed {
-        if let Err(e) = crate::shortcut::register(&app, recorder.clone()) {
-            // 注册失败：旧快捷键已被 unregister_all 清空，且新配置（含可能非法/冲突的快捷键）已写盘。
-            // 回滚配置到 old_config 并重新注册旧快捷键，避免用户丢失全部全局快捷键且无法恢复。
-            config_manager.update(old_config.clone()).ok();
-            let _ = local_api_manager
-                .configure(app.clone(), &old_config.local_api)
-                .await;
-            let _ = crate::shortcut::register(&app, recorder.clone());
-            return Err(e);
-        }
+    if !shortcut_patch.is_empty() {
+        // 显式快捷键变更：整次成功或整次回滚。
+        crate::shortcut::update_shortcuts(&app, recorder, shortcut_patch)?;
+    } else if templates_changed {
+        // 输出风格变化需要按新模板重新注册。
+        crate::shortcut::register(&app, recorder)?;
     }
 
     Ok(true)
+}
+
+// ==================== Shortcut domain commands ====================
+
+#[tauri::command]
+pub fn get_shortcut_status(app: tauri::AppHandle) -> crate::shortcut::ShortcutStatus {
+    crate::shortcut::shortcut_status(&app)
+}
+
+#[tauri::command]
+pub fn update_shortcuts(
+    app: tauri::AppHandle,
+    recorder: State<'_, Arc<AudioRecorder>>,
+    patch: crate::shortcut::ShortcutPatch,
+) -> Result<crate::shortcut::ShortcutUpdateResult, String> {
+    crate::shortcut::update_shortcuts(&app, recorder.inner().clone(), patch)
+}
+
+/// Reset the four shortcuts to platform defaults. Useful when a migrated config
+/// left the shortcut component in a conflicted/skipped state.
+#[tauri::command]
+pub fn reset_shortcuts(
+    app: tauri::AppHandle,
+    recorder: State<'_, Arc<AudioRecorder>>,
+) -> Result<crate::shortcut::ShortcutUpdateResult, String> {
+    let patch = crate::shortcut::ShortcutPatch {
+        shortcut: Some(crate::shortcut::default_primary_shortcut()),
+        shortcut2: Some(String::new()),
+        extract_shortcut: Some("F6".to_string()),
+        extract_shortcut2: Some(String::new()),
+    };
+    crate::shortcut::update_shortcuts(&app, recorder.inner().clone(), patch)
+}
+
+fn parse_shortcut_field(field: &str) -> Result<crate::shortcut::ShortcutField, String> {
+    crate::shortcut::ShortcutField::parse_key(field)
+        .ok_or_else(|| format!("未知快捷键字段: {field}"))
+}
+
+#[tauri::command]
+pub fn begin_shortcut_capture(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    field: String,
+) -> Result<u64, String> {
+    let field = parse_shortcut_field(&field)?;
+    let manager = app.state::<crate::shortcut::ShortcutManager>();
+    Ok(manager.begin_capture(window.label().to_string(), field))
+}
+
+#[tauri::command]
+pub fn commit_shortcut_capture(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    field: String,
+    token: u64,
+) -> Result<(), String> {
+    let field = parse_shortcut_field(&field)?;
+    app.state::<crate::shortcut::ShortcutManager>()
+        .commit_capture(token, window.label(), field)
+}
+
+#[tauri::command]
+pub fn end_shortcut_capture(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    field: String,
+    token: u64,
+) -> Result<(), String> {
+    let field = parse_shortcut_field(&field)?;
+    app.state::<crate::shortcut::ShortcutManager>()
+        .end_capture(token, window.label(), field)
+}
+
+#[tauri::command]
+pub fn cancel_shortcut_capture(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    field: String,
+    token: u64,
+) -> Result<(), String> {
+    let field = parse_shortcut_field(&field)?;
+    app.state::<crate::shortcut::ShortcutManager>()
+        .cancel_capture(token, window.label(), field)
 }
 
 /// 校验内置提示词文件名，防止路径穿越（".."、路径分隔符、绝对路径）。
