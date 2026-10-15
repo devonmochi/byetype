@@ -40,27 +40,12 @@ export function TemplatePromptsPanel({ kind, config, onSave }: Props) {
     setNameDraft(current?.name ?? '')
   }, [current?.id, current?.name])
 
-  if (!current) {
-    return <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>暂无模板</div>
-  }
-
-  const isBuiltin = BUILTIN_IDS[kind].includes(current.id)
-
   const updateTemplates = (next: TemplateEntry[]) => {
     onSave(
       kind === 'voice'
         ? { ...config, voiceTemplates: { ...config.voiceTemplates, templates: next } }
         : { ...config, extract: { ...config.extract, templates: next } }
     )
-  }
-
-  const commitName = () => {
-    const name = nameDraft.trim()
-    if (!name || name === current.name) {
-      setNameDraft(current.name)
-      return
-    }
-    updateTemplates(templates.map(t => (t.id === current.id ? { ...t, name } : t)))
   }
 
   const addTemplate = async () => {
@@ -75,8 +60,44 @@ export function TemplatePromptsPanel({ kind, config, onSave }: Props) {
     }
   }
 
+  // 列表为空时仍然保留「添加模板」，否则旧空配置再也加不回模板。
+  if (!current) {
+    return (
+      <div className="template-tools">
+        <div className="template-tools-actions">
+          <button className="file-picker-btn" onClick={addTemplate}>添加模板</button>
+        </div>
+      </div>
+    )
+  }
+
+  const isBuiltin = BUILTIN_IDS[kind].includes(current.id)
+
+  const commitName = () => {
+    const name = nameDraft.trim()
+    if (!name || name === current.name) {
+      setNameDraft(current.name)
+      return
+    }
+    updateTemplates(templates.map(t => (t.id === current.id ? { ...t, name } : t)))
+  }
+
+  // 删除自定义模板时，把指向它的快捷键绑定改到保留的模板上，
+  // 避免界面显示一个模板、后端却按已删除的模板执行。
   const deleteTemplate = () => {
-    updateTemplates(templates.filter(t => t.id !== current.id))
+    const remaining = templates.filter(t => t.id !== current.id)
+    const fallback = remaining[0]?.id ?? ''
+    const general = { ...config.general }
+    if (kind === 'voice') {
+      if (general.shortcutTemplate === current.id) general.shortcutTemplate = fallback
+      if (general.shortcut2Template === current.id) general.shortcut2Template = fallback
+      onSave({ ...config, general, voiceTemplates: { ...config.voiceTemplates, templates: remaining } })
+    } else {
+      if (general.extractShortcutTemplate === current.id) general.extractShortcutTemplate = fallback
+      if (general.extractShortcut2Template === current.id) general.extractShortcut2Template = fallback
+      onSave({ ...config, general, extract: { ...config.extract, templates: remaining } })
+    }
+    setSelectedId(remaining[0]?.id ?? '')
   }
 
   return (

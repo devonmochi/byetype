@@ -156,6 +156,13 @@ export function GeneralTab({ config, onSave }: Props) {
   const strengtheningEnabled = config.general.textStrengtheningEnabled !== false
   const voiceTemplates = config.voiceTemplates.templates ?? []
 
+  // 文本强化关闭时第二个语音快捷键不注册，也不该再挡住其他快捷键，
+  // 与 Rust 侧 register 的冲突检测保持一致。
+  const secondVoiceConflict = (): { key: string; label: string }[] =>
+    strengtheningEnabled && config.general.shortcut2
+      ? [{ key: config.general.shortcut2, label: VOICE_LABEL_2 }]
+      : []
+
   function createKeyHandler(
     setRec: (v: boolean) => void,
     onCapture: (combo: string) => void,
@@ -196,7 +203,7 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecording,
     (combo) => update({ shortcut: combo }),
     [
-      { key: config.general.shortcut2, label: VOICE_LABEL_2 },
+      ...secondVoiceConflict(),
       { key: config.general.extractShortcut, label: IMAGE_LABEL_1 },
       { key: config.general.extractShortcut2, label: IMAGE_LABEL_2 },
     ],
@@ -217,7 +224,7 @@ export function GeneralTab({ config, onSave }: Props) {
     (combo) => update({ extractShortcut: combo }),
     [
       { key: config.general.shortcut, label: VOICE_LABEL_1 },
-      { key: config.general.shortcut2, label: VOICE_LABEL_2 },
+      ...secondVoiceConflict(),
       { key: config.general.extractShortcut2, label: IMAGE_LABEL_2 },
     ],
   )
@@ -227,7 +234,7 @@ export function GeneralTab({ config, onSave }: Props) {
     (combo) => update({ extractShortcut2: combo }),
     [
       { key: config.general.shortcut, label: VOICE_LABEL_1 },
-      { key: config.general.shortcut2, label: VOICE_LABEL_2 },
+      ...secondVoiceConflict(),
       { key: config.general.extractShortcut, label: IMAGE_LABEL_1 },
     ],
   )

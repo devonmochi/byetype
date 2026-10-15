@@ -202,7 +202,8 @@ pub struct TranscribeConfig {
     pub thinking: ThinkingConfig,
     pub prompts: PromptsConfig,
     /// 规则增强（将文本规则注入语音规则）：把所选文本强化规则拼进识别阶段的提示词，
-    /// 由强语音模型一次处理完成。开启且规则非空时跳过第二阶段。
+    /// 由强语音模型一次处理完成。只影响第一阶段是否注入规则，
+    /// 第二阶段是否运行由 general.textStrengtheningEnabled 单独决定。
     #[serde(default)]
     pub inject_text_rules: bool,
 }
