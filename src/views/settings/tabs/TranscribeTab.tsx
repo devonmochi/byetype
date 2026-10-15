@@ -100,14 +100,20 @@ export function TranscribeTab({ config, onSave }: Props) {
         )}
         <SettingRow
           label={
-            <span>
+            <span style={strengtheningEnabled ? { color: 'var(--text-secondary)' } : undefined}>
               规则增强
               <span className="rule-direction">将文本规则注入语音规则</span>
             </span>
           }
+          description={
+            strengtheningEnabled
+              ? '文本强化会把同一条规则跑第二遍，需先关闭文本强化才能注入'
+              : '识别阶段直接按所选风格的规则输出，一轮完成'
+          }
         >
           <Toggle
-            checked={transcribe.injectTextRules ?? false}
+            checked={(transcribe.injectTextRules ?? false) && !strengtheningEnabled}
+            disabled={strengtheningEnabled}
             onChange={checked => updateTranscribe({ injectTextRules: checked })}
           />
         </SettingRow>
