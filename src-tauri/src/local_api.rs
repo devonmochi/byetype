@@ -264,6 +264,9 @@ fn text_response(status: StatusCode, body: impl Into<String>) -> Response {
 }
 
 fn resolve_template(config: &AppConfig, requested: Option<&str>) -> Result<Option<String>, String> {
+    // 文本强化全局关闭时，普通请求（显式模板或默认绑定）都只跑识别，
+    // 与快捷键、重试路径用同一套开关语义；raw 仍然只识别。
+    let strengthening_enabled = config.general.text_strengthening_enabled;
     match requested {
         Some("raw") => Ok(None),
         Some(template_id)
@@ -273,10 +276,10 @@ fn resolve_template(config: &AppConfig, requested: Option<&str>) -> Result<Optio
                 .iter()
                 .any(|template| template.id == template_id) =>
         {
-            Ok(Some(template_id.to_string()))
+            Ok(strengthening_enabled.then(|| template_id.to_string()))
         }
         Some(template_id) => Err(format!("未知语音模板：{}", template_id)),
-        None => Ok((!config.general.shortcut_template.is_empty())
+        None => Ok((strengthening_enabled && !config.general.shortcut_template.is_empty())
             .then(|| config.general.shortcut_template.clone())),
     }
 }
@@ -316,6 +319,24 @@ mod tests {
     fn unknown_template_is_rejected() {
         let config = AppConfig::default();
 
+        assert_eq!(
+            resolve_template(&config, Some("missing")),
+            Err("未知语音模板：missing".to_string())
+        );
+    }
+
+    #[test]
+    fn strengthening_off_downgrades_normal_requests_to_recognition_only() {
+        let mut config = AppConfig::default();
+        config.general.text_strengthening_enabled = false;
+
+        // 显式指定模板也只识别
+        assert_eq!(resolve_template(&config, Some("voice-translate")), Ok(None));
+        // 未指定模板同样只识别
+        assert_eq!(resolve_template(&config, None), Ok(None));
+        // raw 语义不变
+        assert_eq!(resolve_template(&config, Some("raw")), Ok(None));
+        // 未知模板仍然报错
         assert_eq!(
             resolve_template(&config, Some("missing")),
             Err("未知语音模板：missing".to_string())

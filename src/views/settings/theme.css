@@ -860,32 +860,73 @@
   height: 16px;
 }
 
-.setting-row-label-editable {
-  cursor: text;
-  border-radius: 4px;
-  padding: 1px 4px;
-  margin: -1px -4px;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* === 文本强化 === */
+/* 强化入口用蓝色区分 */
+.sidebar-item-accent {
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+  color: var(--accent);
 }
-.setting-row-label-editable:hover {
-  background: var(--bg-secondary);
+
+.mode-label {
+  font-weight: 500;
 }
-.setting-row-label-input {
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: 4px;
-  padding: 1px 4px;
-  margin: -2px -5px;
-  max-width: 160px;
-  font: inherit;
-  color: inherit;
-  outline: none;
+
+.strengthening-formula {
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
-.setting-row-label-input:focus {
-  border-color: var(--accent);
+
+/* 规则增强开关右侧紧跟的方向说明 */
+.rule-direction {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* 开启时两个语音入口缩进到文本强化开关下方 */
+.strengthened-voice-inputs {
+  margin-left: 32px;
+  margin-bottom: 4px;
+}
+
+.strengthened-voice-inputs .setting-row {
+  padding-left: 16px;
+}
+
+.optimization-heading {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+}
+
+.rules-intro {
+  margin: -10px 0 16px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.template-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 20px 0 10px;
+  flex-shrink: 0;
+}
+
+.template-tools .template-select {
+  min-width: 160px;
+}
+
+.template-tools-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* === Usage Tab === */

@@ -48,15 +48,22 @@ fn ai_output(text: String, resolved: &models::ResolvedModel) -> AiOutput {
 }
 
 /// Transcribe audio using the configured provider.
+/// `injected_text_rules` 是「将文本规则注入语音规则」要拼进识别阶段的文本强化规则正文。
 pub async fn transcribe(
     client: &reqwest::Client,
     audio_base64: &str,
     config: &AppConfig,
     prompts_dir: &Path,
     learning_rules: &str,
+    injected_text_rules: Option<&str>,
 ) -> Result<AiOutput, String> {
     let resolved = models::resolve_model(config, &config.transcribe.model_id)?;
-    let system_prompt = prompt::build_transcribe_prompt(config, prompts_dir, learning_rules);
+    let system_prompt = prompt::build_transcribe_prompt(
+        config,
+        prompts_dir,
+        learning_rules,
+        injected_text_rules,
+    );
 
     let outcome: Result<(String, TokenUsage), String> = if is_deepseek(&resolved) {
         deepseek::transcribe(

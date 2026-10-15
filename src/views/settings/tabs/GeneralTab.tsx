@@ -10,14 +10,14 @@ import {
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
-import { EditableLabel } from '../components/EditableLabel'
 
-const DEFAULT_LABELS = {
-  shortcut: '语音输入 1',
-  shortcut2: '语音输入 2',
-  extractShortcut: '截图取词',
-  extractShortcut2: '截图翻译',
-} as const
+/** 语音入口固定名称，不再允许自定义 */
+const VOICE_PLAIN_LABEL = '语音输入'
+const VOICE_LABEL_1 = '语音输入 1'
+const VOICE_LABEL_2 = '语音输入 2'
+/** 图像入口固定名称 */
+const IMAGE_LABEL_1 = '图片识别1'
+const IMAGE_LABEL_2 = '图片识别2'
 
 const IS_MACOS = navigator.platform.toUpperCase().includes('MAC')
 
@@ -27,6 +27,54 @@ function formatShortcutDisplay(combo: string): string {
     .replace(/Command/g, '\u2318')
     .replace(/Shift/g, '\u21E7')
     .replace(/Alt/g, '\u2325')
+}
+
+interface ShortcutInputProps {
+  label: string
+  value: string
+  recording: boolean
+  onRecordingChange: (recording: boolean) => void
+  onKeyDown: (e: React.KeyboardEvent) => void
+}
+
+function ShortcutInput({ label, value, recording, onRecordingChange, onKeyDown }: ShortcutInputProps) {
+  return (
+    <input
+      className={`kbd${recording ? ' recording' : ''}`}
+      value={formatShortcutDisplay(value)}
+      onKeyDown={recording ? onKeyDown : undefined}
+      onFocus={() => onRecordingChange(true)}
+      onBlur={() => onRecordingChange(false)}
+      readOnly
+      placeholder="未设置"
+      aria-label={`修改${label}快捷键`}
+      style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+    />
+  )
+}
+
+interface TemplateSelectProps {
+  value: string
+  templates: { id: string; name: string }[]
+  onChange: (templateId: string) => void
+}
+
+function TemplateSelect({ value, templates, onChange }: TemplateSelectProps) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
+      <select
+        className="select"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{ minWidth: 100 }}
+      >
+        {templates.map(t => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
+    </div>
+  )
 }
 
 interface Props {
@@ -105,12 +153,8 @@ export function GeneralTab({ config, onSave }: Props) {
 
   const curlCommand = `curl -fsS -X POST --data-binary @recording.m4a -H 'Content-Type: audio/mp4' 'http://127.0.0.1:${config.localApi.port}/transcribe'`
 
-  const labelOf = {
-    shortcut: config.general.shortcutLabel?.trim() || DEFAULT_LABELS.shortcut,
-    shortcut2: config.general.shortcut2Label?.trim() || DEFAULT_LABELS.shortcut2,
-    extractShortcut: config.general.extractShortcutLabel?.trim() || DEFAULT_LABELS.extractShortcut,
-    extractShortcut2: config.general.extractShortcut2Label?.trim() || DEFAULT_LABELS.extractShortcut2,
-  }
+  const strengtheningEnabled = config.general.textStrengtheningEnabled !== false
+  const voiceTemplates = config.voiceTemplates.templates ?? []
 
   function createKeyHandler(
     setRec: (v: boolean) => void,
@@ -152,9 +196,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecording,
     (combo) => update({ shortcut: combo }),
     [
-      { key: config.general.shortcut2, label: labelOf.shortcut2 },
-      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
-      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
+      { key: config.general.shortcut2, label: VOICE_LABEL_2 },
+      { key: config.general.extractShortcut, label: IMAGE_LABEL_1 },
+      { key: config.general.extractShortcut2, label: IMAGE_LABEL_2 },
     ],
   )
 
@@ -162,9 +206,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecording2,
     (combo) => update({ shortcut2: combo }),
     [
-      { key: config.general.shortcut, label: labelOf.shortcut },
-      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
-      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
+      { key: config.general.shortcut, label: VOICE_LABEL_1 },
+      { key: config.general.extractShortcut, label: IMAGE_LABEL_1 },
+      { key: config.general.extractShortcut2, label: IMAGE_LABEL_2 },
     ],
   )
 
@@ -172,9 +216,9 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecordingExtract,
     (combo) => update({ extractShortcut: combo }),
     [
-      { key: config.general.shortcut, label: labelOf.shortcut },
-      { key: config.general.shortcut2, label: labelOf.shortcut2 },
-      { key: config.general.extractShortcut2, label: labelOf.extractShortcut2 },
+      { key: config.general.shortcut, label: VOICE_LABEL_1 },
+      { key: config.general.shortcut2, label: VOICE_LABEL_2 },
+      { key: config.general.extractShortcut2, label: IMAGE_LABEL_2 },
     ],
   )
 
@@ -182,11 +226,26 @@ export function GeneralTab({ config, onSave }: Props) {
     setRecordingExtract2,
     (combo) => update({ extractShortcut2: combo }),
     [
-      { key: config.general.shortcut, label: labelOf.shortcut },
-      { key: config.general.shortcut2, label: labelOf.shortcut2 },
-      { key: config.general.extractShortcut, label: labelOf.extractShortcut },
+      { key: config.general.shortcut, label: VOICE_LABEL_1 },
+      { key: config.general.shortcut2, label: VOICE_LABEL_2 },
+      { key: config.general.extractShortcut, label: IMAGE_LABEL_1 },
     ],
   )
+
+  // 开关只切换 enabled，不改任何模板选择与快捷键；
+  // 旧配置里「输出风格选无」存的是空模板，打开时补一个可用默认项。
+  const setStrengthening = (enabled: boolean) => {
+    if (!enabled) {
+      update({ textStrengtheningEnabled: false })
+      return
+    }
+    update({
+      textStrengtheningEnabled: true,
+      shortcutTemplate: config.general.shortcutTemplate || voiceTemplates[0]?.id || '',
+      shortcut2Template:
+        config.general.shortcut2Template || voiceTemplates[1]?.id || voiceTemplates[0]?.id || '',
+    })
+  }
 
   const themes: { value: ThemeMode; label: string; style: React.CSSProperties }[] = [
     { value: 'light', label: '浅色', style: { background: '#ffffff', border: '1px solid #d2d2d7' } },
@@ -216,68 +275,63 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="语音输入">
-        <SettingRow label={
-          <EditableLabel
-            value={labelOf.shortcut}
-            defaultValue={DEFAULT_LABELS.shortcut}
-            onChange={next => update({ shortcutLabel: next })}
-          />
-        }>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
-            <select
-              className="select"
-              value={config.general.shortcutTemplate}
-              onChange={e => update({ shortcutTemplate: e.target.value })}
-              style={{ minWidth: 100 }}
-            >
-              <option value="">无</option>
-              {config.voiceTemplates.templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <input
-              className={`kbd${recording ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.shortcut)}
-              onKeyDown={recording ? handleKeyDown : undefined}
-              onFocus={() => setRecording(true)}
-              onBlur={() => setRecording(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+        {!strengtheningEnabled && (
+          <SettingRow label={VOICE_PLAIN_LABEL}>
+            <ShortcutInput
+              label={VOICE_PLAIN_LABEL}
+              value={config.general.shortcut}
+              recording={recording}
+              onRecordingChange={setRecording}
+              onKeyDown={handleKeyDown}
             />
-          </div>
+          </SettingRow>
+        )}
+        <SettingRow
+          label={
+            <span className="mode-label">
+              文本强化
+              <span className="strengthening-formula">（语音识别文本＋强化规则＝最终文本）</span>
+            </span>
+          }
+        >
+          <Toggle checked={strengtheningEnabled} onChange={setStrengthening} />
         </SettingRow>
-        <SettingRow label={
-          <EditableLabel
-            value={labelOf.shortcut2}
-            defaultValue={DEFAULT_LABELS.shortcut2}
-            onChange={next => update({ shortcut2Label: next })}
-          />
-        }>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
-            <select
-              className="select"
-              value={config.general.shortcut2Template}
-              onChange={e => update({ shortcut2Template: e.target.value })}
-              style={{ minWidth: 100 }}
-            >
-              <option value="">无</option>
-              {config.voiceTemplates.templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <input
-              className={`kbd${recording2 ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.shortcut2)}
-              onKeyDown={recording2 ? handleKeyDown2 : undefined}
-              onFocus={() => setRecording2(true)}
-              onBlur={() => setRecording2(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
-            />
+        {strengtheningEnabled && (
+          <div className="strengthened-voice-inputs">
+            <SettingRow label={VOICE_LABEL_1}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <TemplateSelect
+                  value={config.general.shortcutTemplate}
+                  templates={voiceTemplates}
+                  onChange={templateId => update({ shortcutTemplate: templateId })}
+                />
+                <ShortcutInput
+                  label={VOICE_LABEL_1}
+                  value={config.general.shortcut}
+                  recording={recording}
+                  onRecordingChange={setRecording}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+            </SettingRow>
+            <SettingRow label={VOICE_LABEL_2}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <TemplateSelect
+                  value={config.general.shortcut2Template}
+                  templates={voiceTemplates}
+                  onChange={templateId => update({ shortcut2Template: templateId })}
+                />
+                <ShortcutInput
+                  label={VOICE_LABEL_2}
+                  value={config.general.shortcut2}
+                  recording={recording2}
+                  onRecordingChange={setRecording2}
+                  onKeyDown={handleKeyDown2}
+                />
+              </div>
+            </SettingRow>
           </div>
-        </SettingRow>
+        )}
         <SettingRow label="按住说话模式" description="开启后按住快捷键期间录音，松开立即识别">
           <Toggle
             checked={!!config.general.pttMode}
@@ -296,63 +350,35 @@ export function GeneralTab({ config, onSave }: Props) {
       </SettingGroup>
 
       <SettingGroup title="图像识别">
-        <SettingRow label={
-          <EditableLabel
-            value={labelOf.extractShortcut}
-            defaultValue={DEFAULT_LABELS.extractShortcut}
-            onChange={next => update({ extractShortcutLabel: next })}
-          />
-        }>
+        <SettingRow label={IMAGE_LABEL_1}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
-            <select
-              className="select"
+            <TemplateSelect
               value={config.general.extractShortcutTemplate}
-              onChange={e => update({ extractShortcutTemplate: e.target.value })}
-              style={{ minWidth: 100 }}
-            >
-              {config.extract.templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <input
-              className={`kbd${recordingExtract ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.extractShortcut)}
-              onKeyDown={recordingExtract ? handleExtractKeyDown : undefined}
-              onFocus={() => setRecordingExtract(true)}
-              onBlur={() => setRecordingExtract(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+              templates={config.extract.templates}
+              onChange={templateId => update({ extractShortcutTemplate: templateId })}
+            />
+            <ShortcutInput
+              label={IMAGE_LABEL_1}
+              value={config.general.extractShortcut}
+              recording={recordingExtract}
+              onRecordingChange={setRecordingExtract}
+              onKeyDown={handleExtractKeyDown}
             />
           </div>
         </SettingRow>
-        <SettingRow label={
-          <EditableLabel
-            value={labelOf.extractShortcut2}
-            defaultValue={DEFAULT_LABELS.extractShortcut2}
-            onChange={next => update({ extractShortcut2Label: next })}
-          />
-        }>
+        <SettingRow label={IMAGE_LABEL_2}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
-            <select
-              className="select"
+            <TemplateSelect
               value={config.general.extractShortcut2Template}
-              onChange={e => update({ extractShortcut2Template: e.target.value })}
-              style={{ minWidth: 100 }}
-            >
-              {config.extract.templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <input
-              className={`kbd${recordingExtract2 ? ' recording' : ''}`}
-              value={formatShortcutDisplay(config.general.extractShortcut2)}
-              onKeyDown={recordingExtract2 ? handleExtractKeyDown2 : undefined}
-              onFocus={() => setRecordingExtract2(true)}
-              onBlur={() => setRecordingExtract2(false)}
-              readOnly
-              style={{ width: 120, textAlign: 'center', cursor: 'pointer' }}
+              templates={config.extract.templates}
+              onChange={templateId => update({ extractShortcut2Template: templateId })}
+            />
+            <ShortcutInput
+              label={IMAGE_LABEL_2}
+              value={config.general.extractShortcut2}
+              recording={recordingExtract2}
+              onRecordingChange={setRecordingExtract2}
+              onKeyDown={handleExtractKeyDown2}
             />
           </div>
         </SettingRow>

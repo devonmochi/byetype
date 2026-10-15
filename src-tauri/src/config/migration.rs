@@ -102,7 +102,39 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
         migrated = true;
     }
 
+    if migrate_text_strengthening_switch(raw) {
+        migrated = true;
+    }
+
     migrated
+}
+
+/// 迁移全局「文本强化」开关：
+/// 旧版用「输出风格选无」表示关闭，没有独立开关。已有 shortcutTemplate 为空的配置
+/// 视为关闭；模板本身保留在 voiceTemplates 里，不当作丢失。
+fn migrate_text_strengthening_switch(raw: &mut Value) -> bool {
+    let Some(general) = raw.get_mut("general") else { return false };
+    if general.get("textStrengtheningEnabled").is_some() {
+        return false;
+    }
+    // 字段缺失时旧行为等同于默认模板 voice-optimize，因此缺省为开启。
+    let enabled = general
+        .get("shortcutTemplate")
+        .and_then(|value| value.as_str())
+        .map(|value| !value.is_empty())
+        .unwrap_or(true);
+    general["textStrengtheningEnabled"] = Value::Bool(enabled);
+    // 开关是全局的，第二个入口不再有「无」这个状态；
+    // 旧配置里第二个入口选过无（空模板）时补回默认风格，避免界面显示与运行时不一致。
+    if enabled
+        && general
+            .get("shortcut2Template")
+            .and_then(|value| value.as_str())
+            .is_some_and(|value| value.is_empty())
+    {
+        general["shortcut2Template"] = Value::String("voice-translate".to_string());
+    }
+    true
 }
 
 fn migrate_optimize_to_voice_templates(raw: &mut Value) {
@@ -352,5 +384,59 @@ mod tests {
 
         assert!(migrate_if_needed(&mut raw));
         assert_eq!(raw["voiceLearning"]["modelId"], "builtin-deepseek-flash");
+    }
+
+    #[test]
+    fn existing_config_with_template_keeps_text_strengthening_on() {
+        let mut raw = json!({
+            "general": { "shortcut": "F4", "shortcutTemplate": "voice-optimize" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], true);
+    }
+
+    #[test]
+    fn existing_config_without_template_treats_strengthening_as_off() {
+        let mut raw = json!({
+            "general": { "shortcut": "F4", "shortcutTemplate": "" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], false);
+        // 模板本身不能被清掉
+        assert_eq!(raw["general"]["shortcutTemplate"], "");
+    }
+
+    #[test]
+    fn migration_is_idempotent_for_existing_switch() {
+        let mut raw = json!({
+            "general": { "shortcutTemplate": "", "textStrengtheningEnabled": true }
+        });
+
+        assert!(!migrate_text_strengthening_switch(&mut raw));
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], true);
+    }
+
+    #[test]
+    fn strengthening_on_backfills_empty_second_template() {
+        let mut raw = json!({
+            "general": { "shortcutTemplate": "voice-optimize", "shortcut2Template": "" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], true);
+        assert_eq!(raw["general"]["shortcut2Template"], "voice-translate");
+    }
+
+    #[test]
+    fn strengthening_off_keeps_second_template_untouched() {
+        let mut raw = json!({
+            "general": { "shortcutTemplate": "", "shortcut2Template": "" }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], false);
+        assert_eq!(raw["general"]["shortcut2Template"], "");
     }
 }

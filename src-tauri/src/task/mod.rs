@@ -154,6 +154,34 @@ struct PipelineFailure {
     transcribe_text: Option<String>,
 }
 
+/// 识别阶段注入的规则来源模板：
+/// 全局强化开启时用当前触发快捷键选的模板；关闭时用保存的主快捷键模板。
+/// raw 请求（template_id 为 None）只识别，不注入。
+fn text_rule_injection_template<'a>(
+    strengthening_enabled: bool,
+    triggered_template: Option<&'a str>,
+    saved_main_template: &'a str,
+) -> Option<&'a str> {
+    let triggered = triggered_template?;
+    let source = if strengthening_enabled { triggered } else { saved_main_template };
+    (!source.is_empty()).then_some(source)
+}
+
+/// 第二阶段（文本强化模型）要用的模板；返回 None 表示跳过第二阶段。
+/// 全局开关关闭时一律跳过；识别阶段已注入规则时也不重复跑第二遍。
+fn second_stage_template(
+    strengthening_enabled: bool,
+    triggered_template: Option<&str>,
+    injected_text_rules: bool,
+) -> Option<String> {
+    if !strengthening_enabled || injected_text_rules {
+        return None;
+    }
+    triggered_template
+        .filter(|template_id| !template_id.is_empty())
+        .map(str::to_string)
+}
+
 pub async fn run_silent_pipeline(
     app: &AppHandle,
     audio_base64: String,
@@ -458,6 +486,20 @@ async fn execute_pipeline(
         },
     )?;
 
+    // 规则增强（将文本规则注入语音规则）与全局强化开关共同决定两阶段怎么跑。
+    let injection_template = text_rule_injection_template(
+        config.general.text_strengthening_enabled,
+        template_id.as_deref(),
+        &config.general.shortcut_template,
+    );
+    let injected_text_rules =
+        crate::ai::prompt::resolve_text_rule_injection(&config, &prompts_dir, injection_template);
+    let second_stage = second_stage_template(
+        config.general.text_strengthening_enabled,
+        template_id.as_deref(),
+        injected_text_rules.is_some(),
+    );
+
     observer(PipelineEvent::Transcribing);
     let retry_observer = observer.clone();
     let transcribe_started = std::time::Instant::now();
@@ -467,6 +509,7 @@ async fn execute_pipeline(
         let config = config.clone();
         let prompts_dir = prompts_dir.clone();
         let learning_rules = learning_rules.clone();
+        let injected_text_rules = injected_text_rules.clone();
         tokio::select! {
             result = ai::retry::with_retry(
                 || {
@@ -475,6 +518,7 @@ async fn execute_pipeline(
                     let config = config.clone();
                     let prompts_dir = prompts_dir.clone();
                     let learning_rules = learning_rules.clone();
+                    let injected_text_rules = injected_text_rules.clone();
                     async move {
                         ai::transcribe(
                             &client,
@@ -482,6 +526,7 @@ async fn execute_pipeline(
                             &config,
                             &prompts_dir,
                             &learning_rules,
+                            injected_text_rules.as_deref(),
                         )
                         .await
                     }
@@ -502,7 +547,7 @@ async fn execute_pipeline(
     })?;
     let transcribe_ms = transcribe_started.elapsed().as_millis() as u64;
 
-    let Some(template_id) = template_id else {
+    let Some(template_id) = second_stage else {
         return Ok(PipelineOutput {
             final_text: transcribe.text.clone(),
             transcribe_text: transcribe.text,
@@ -1026,5 +1071,44 @@ pub fn submit_screenshot_crop(
 ) {
     if let Some(sender) = sender_state.lock().unwrap().take() {
         let _ = sender.send(crop);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{second_stage_template, text_rule_injection_template};
+
+    #[test]
+    fn injection_source_follows_trigger_or_saved_main_template() {
+        // 强化开启：用当前触发快捷键选的模板
+        assert_eq!(
+            text_rule_injection_template(true, Some("voice-translate"), "voice-optimize"),
+            Some("voice-translate")
+        );
+        // 强化关闭：仍可注入，规则来源退回保存的主快捷键模板
+        assert_eq!(
+            text_rule_injection_template(false, Some("voice-translate"), "voice-optimize"),
+            Some("voice-optimize")
+        );
+        // 主快捷键模板为空时没有规则来源
+        assert_eq!(text_rule_injection_template(false, Some("voice-translate"), ""), None);
+        // raw 请求（无模板）只识别，不注入
+        assert_eq!(text_rule_injection_template(true, None, "voice-optimize"), None);
+    }
+
+    #[test]
+    fn second_stage_skipped_when_strengthening_off_or_rules_injected() {
+        // 正常路径：强化开启且未注入，跑第二阶段
+        assert_eq!(
+            second_stage_template(true, Some("voice-optimize"), false),
+            Some("voice-optimize".to_string())
+        );
+        // 全局关闭：不调用第二个模型
+        assert_eq!(second_stage_template(false, Some("voice-optimize"), false), None);
+        // 识别阶段已注入规则：不再重复跑第二遍
+        assert_eq!(second_stage_template(true, Some("voice-optimize"), true), None);
+        // raw 请求
+        assert_eq!(second_stage_template(true, None, false), None);
+        assert_eq!(second_stage_template(true, Some(""), false), None);
     }
 }

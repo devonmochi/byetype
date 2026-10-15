@@ -119,6 +119,10 @@ pub struct GeneralConfig {
     pub ptt_mode: bool,
     #[serde(default = "default_true")]
     pub overwrite_clipboard: bool,
+    /// 全局「文本强化」开关。关闭时所有普通语音转写只跑识别，
+    /// 不调用文本强化模型（第二个模型），第二个语音快捷键也不注册。
+    #[serde(default = "default_true")]
+    pub text_strengthening_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,6 +201,10 @@ pub struct TranscribeConfig {
     pub model_id: String,
     pub thinking: ThinkingConfig,
     pub prompts: PromptsConfig,
+    /// 规则增强（将文本规则注入语音规则）：把所选文本强化规则拼进识别阶段的提示词，
+    /// 由强语音模型一次处理完成。开启且规则非空时跳过第二阶段。
+    #[serde(default)]
+    pub inject_text_rules: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -357,6 +365,7 @@ impl Default for AppConfig {
                 extract_shortcut2_label: None,
                 ptt_mode: false,
                 overwrite_clipboard: true,
+                text_strengthening_enabled: true,
             },
             local_api: LocalApiConfig::default(),
             models: ModelsConfig {
@@ -380,6 +389,7 @@ impl Default for AppConfig {
                     rules: String::new(),
                     vocabulary: String::new(),
                 },
+                inject_text_rules: false,
             },
             voice_learning: VoiceLearningConfig::default(),
             voice_templates: VoiceTemplatesConfig {

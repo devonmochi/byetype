@@ -26,14 +26,16 @@ pub fn register(
     // key that will be registered — otherwise an empty extract_shortcut would
     // bypass the uniqueness check and silently collide with another "F6" shortcut.
     let ek1 = if cfg.general.extract_shortcut.is_empty() { "F6".to_string() } else { cfg.general.extract_shortcut.clone() };
-    let keys = [
-        cfg.general.shortcut.clone(),
-        cfg.general.shortcut2.clone(),
-        ek1.clone(),
-        cfg.general.extract_shortcut2.clone(),
-    ];
+    // 文本强化关闭时第二个语音快捷键不注册，也不参与冲突检测，
+    // 避免它继续被触发或在未注册的情况下挡住保存。
+    let second_voice_enabled =
+        cfg.general.text_strengthening_enabled && !cfg.general.shortcut2.is_empty();
+    let mut keys = vec![cfg.general.shortcut.clone(), ek1.clone(), cfg.general.extract_shortcut2.clone()];
+    if second_voice_enabled {
+        keys.push(cfg.general.shortcut2.clone());
+    }
 
-    // Conflict detection: all 4 shortcuts must be unique
+    // Conflict detection: registered shortcuts must be unique
     for i in 0..keys.len() {
         for j in (i + 1)..keys.len() {
             if !keys[i].is_empty() && keys[i] == keys[j] {
@@ -49,8 +51,8 @@ pub fn register(
     if !cfg.general.shortcut.is_empty() {
         register_voice_shortcut(app, &cfg.general.shortcut, cfg.general.shortcut_template.clone(), recorder.clone())?;
     }
-    // Voice shortcut 2
-    if !cfg.general.shortcut2.is_empty() {
+    // Voice shortcut 2 (仅文本强化开启时注册)
+    if second_voice_enabled {
         register_voice_shortcut(app, &cfg.general.shortcut2, cfg.general.shortcut2_template.clone(), recorder.clone())?;
     }
     // Image shortcut 1 (ek1 with fallback already computed above for conflict detection)

@@ -81,7 +81,10 @@ pub async fn save_config(
         || config.general.shortcut_template != old_shortcut_template
         || config.general.shortcut2_template != old_shortcut2_template
         || config.general.extract_shortcut_template != old_extract_shortcut_template
-        || config.general.extract_shortcut2_template != old_extract_shortcut2_template;
+        || config.general.extract_shortcut2_template != old_extract_shortcut2_template
+        // 关掉文本强化要注销第二个语音快捷键，开回来要重新注册
+        || config.general.text_strengthening_enabled
+            != old_config.general.text_strengthening_enabled;
     if shortcuts_changed {
         if let Err(e) = crate::shortcut::register(&app, recorder.clone()) {
             // 注册失败：旧快捷键已被 unregister_all 清空，且新配置（含可能非法/冲突的快捷键）已写盘。
