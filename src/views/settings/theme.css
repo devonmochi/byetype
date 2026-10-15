@@ -913,20 +913,157 @@
 .template-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
   margin: 20px 0 10px;
   flex-shrink: 0;
+  position: relative;
 }
 
-.template-tools .template-select {
-  min-width: 160px;
+/* 模板名即入口：默认无边框，悬停才浮出浅底和图标 */
+.template-name-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 168px;
+  padding: 6px 10px 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 
-.template-tools-actions {
+.template-name-btn:hover,
+.template-name-btn[aria-expanded="true"] {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.template-name-btn .caret {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.template-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-name-input {
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  width: 178px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.template-icon-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.template-icon-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.template-icon-danger:hover {
+  color: #d70015;
+}
+
+.template-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 200px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+  padding: 5px;
+  z-index: 20;
+}
+
+.template-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-menu-item:hover {
+  background: var(--bg-secondary);
+}
+
+.template-menu-item.selected {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.template-menu-item .check {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.template-menu-sep {
+  height: 1px;
+  background: var(--border-color-light);
+  margin: 5px 4px;
+}
+
+.template-menu-add {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.template-add-empty {
+  padding: 6px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.template-add-empty:hover {
+  border-color: var(--accent);
 }
 
 /* === Usage Tab === */
