@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByeType 设置界面重构展示稿</title>
+<style>
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #fafafa;
+  --border-color: #e5e5e5;
+  --border-light: #f0f0f0;
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #999999;
+  --text-disabled: #c7c7cc;
+  --accent: #007aff;
+  --accent-bg: rgba(0,122,255,0.1);
+  --input-bg: #ffffff;
+  --input-border: #d2d2d7;
+  --toggle-on: #34c759;
+  --group-bg: #f9f9f9;
+  --success: #2ecc71;
+  --danger: #ff453a;
+}
+[data-theme="dark"] {
+  --bg-primary: #1c1c1e;
+  --bg-secondary: #2c2c2e;
+  --bg-tertiary: #3a3a3c;
+  --border-color: #3a3a3c;
+  --border-light: #333336;
+  --text-primary: #f5f5f7;
+  --text-secondary: #98989f;
+  --text-tertiary: #636366;
+  --text-disabled: #48484a;
+  --accent: #0a84ff;
+  --accent-bg: rgba(10,132,255,0.15);
+  --input-bg: #2c2c2e;
+  --input-border: #3a3a3c;
+  --toggle-on: #30d158;
+  --group-bg: #2c2c2e;
+  --success: #30d158;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: #e8e8ed;
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.frame {
+  width: 100%;
+  max-width: 1080px;
+  height: 720px;
+  display: flex;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+[data-theme="dark"] body, body:has(.frame[data-dark]) { }
+
+/* sidebar */
+.sidebar {
+  width: 176px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  padding: 14px 0;
+  flex-shrink: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-item {
+  padding: 7px 14px;
+  margin: 1px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  border: none;
+  background: none;
+  width: calc(100% - 16px);
+  text-align: left;
+  font-family: inherit;
+  transition: background-color .15s, color .15s;
+}
+.sidebar-item:hover { background: var(--bg-tertiary); }
+.sidebar-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.sidebar-item .dot {
+  float: right; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--danger); margin-top: 6px;
+}
+.sidebar-section-label {
+  font-size: 10px; color: var(--text-disabled);
+  text-transform: uppercase; letter-spacing: 1.5px;
+  padding: 12px 16px 4px;
+}
+.sidebar-foot { margin-top: auto; padding: 8px 16px; font-size: 10px; color: var(--text-tertiary); }
+
+/* content */
+.content {
+  flex: 1; padding: 22px 26px; overflow-y: auto; position: relative;
+}
+.content-title { font-size: 18px; font-weight: 600; margin: 0 0 18px; color: var(--text-primary); }
+.content-sub { font-size: 12px; color: var(--text-secondary); margin: -12px 0 16px; }
+
+.save-status {
+  position: sticky; top: 0; z-index: 5; display: flex; justify-content: flex-end;
+  padding: 2px 0 8px; font-size: 12px; color: var(--text-tertiary);
+  background: var(--bg-primary); min-height: 24px;
+}
+.save-status.ok { color: var(--success); }
+.save-status.err { color: var(--danger); }
+
+.group { background: var(--group-bg); border-radius: 10px; margin-bottom: 18px; }
+.group-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 16px; cursor: pointer; user-select: none;
+}
+.group-head .arrow { font-size: 10px; color: var(--text-tertiary); transition: transform .15s; }
+.group.collapsed .arrow { transform: rotate(-90deg); }
+.group-title { font-size: 12px; font-weight: 500; color: var(--text-secondary); letter-spacing: .5px; }
+.group-head .hint { margin-left: auto; font-size: 11px; color: var(--text-tertiary); font-weight: 400; }
+.group-body { padding: 2px 0; }
+.group.collapsed .group-body { display: none; }
+
+.row {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  padding: 11px 16px; min-height: 44px;
+}
+.row:not(:last-child) { border-bottom: 1px solid var(--border-light); }
+.row-main { min-width: 0; }
+.row-label { font-size: 13px; color: var(--text-primary); }
+.row-label .name-edit {
+  cursor: text; border-radius: 4px; padding: 1px 4px; margin: -1px -4px;
+  border: 1px dashed transparent;
+}
+.row-label .name-edit:hover { background: var(--bg-secondary); border-color: var(--border-color); }
+.row-label .name-edit::after { content: "✎"; font-size: 10px; color: var(--text-tertiary); margin-left: 4px; }
+.row-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.toggle {
+  position: relative; width: 36px; height: 20px; border-radius: 10px;
+  background: var(--input-border); cursor: pointer; border: none; padding: 0;
+  transition: background-color .2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--toggle-on); }
+.toggle .knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; transition: transform .2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+.toggle.on .knob { transform: translateX(16px); }
+
+.input, .select {
+  padding: 6px 10px; border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--input-bg); color: var(--text-primary); font-size: 13px;
+  font-family: inherit; outline: none;
+}
+.input:focus, .select:focus { border-color: var(--accent); }
+
+.kbd {
+  display: inline-block; padding: 4px 12px;
+  background: var(--bg-tertiary); border: 1px solid var(--input-border);
+  border-radius: 6px; font-size: 12px; color: var(--text-primary);
+  cursor: pointer; min-width: 72px; text-align: center;
+  font-family: -apple-system, monospace;
+}
+.kbd.recording { background: #fff3cd; border-color: #d9b44a; color: #8a6d1a; }
+[data-theme="dark"] .kbd.recording { background: #3a3520; border-color: #6b5d1f; color: #e5d78a; }
+
+.btn {
+  padding: 5px 12px; border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--input-bg); color: var(--text-primary); font-size: 12px;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: border-color .15s, color .15s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: .85; color: #fff; }
+.btn.ghost { border-style: dashed; color: var(--text-secondary); width: 100%; padding: 9px; }
+.btn.ghost:hover { color: var(--accent); }
+.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.appearance-options { display: flex; gap: 16px; padding: 4px 0; }
+.appearance-option { text-align: center; cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; }
+.appearance-preview {
+  width: 60px; height: 42px; border-radius: 8px; border: 2px solid transparent;
+  margin-bottom: 6px; transition: border-color .15s;
+}
+.appearance-option.active .appearance-preview { border-color: var(--accent); }
+.appearance-label { font-size: 11px; color: var(--text-secondary); }
+.appearance-option.active .appearance-label { color: var(--accent); font-weight: 500; }
+
+/* tabs */
+.seg { display: inline-flex; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 9px; padding: 2px; margin-bottom: 16px; }
+.seg button {
+  padding: 5px 18px; font-size: 12px; border: none; border-radius: 7px;
+  cursor: pointer; background: none; color: var(--text-secondary); font-family: inherit;
+}
+.seg button.active { background: var(--bg-primary); color: var(--text-primary); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.subtabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 14px; }
+.subtab {
+  padding: 7px 14px; font-size: 13px; color: var(--text-secondary); cursor: pointer;
+  border: none; background: none; border-bottom: 2px solid transparent; font-family: inherit;
+}
+.subtab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+/* template cards */
+.tpl {
+  background: var(--group-bg); border: 1px solid var(--border-color);
+  border-radius: 10px; margin-bottom: 10px;
+}
+.tpl-head { display: flex; align-items: center; padding: 9px 14px; gap: 8px; cursor: pointer; }
+.tpl-name { font-size: 13px; flex: 1; }
+.tpl-tag { font-size: 10px; color: var(--text-secondary); background: var(--bg-tertiary); padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.tpl-used { font-size: 10px; color: var(--accent); background: var(--accent-bg); padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.tpl-body { border-top: 1px solid var(--border-color); padding: 12px 14px; display: none; }
+.tpl.open .tpl-body { display: block; }
+.tpl-editor {
+  border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.6;
+  padding: 10px 12px; color: var(--text-primary); white-space: pre-wrap; max-height: 180px; overflow-y: auto;
+}
+.tpl-editor.muted { color: var(--text-secondary); }
+.tpl-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-tertiary); }
+
+/* model provider cards */
+.provider { background: var(--group-bg); border-radius: 10px; margin-bottom: 10px; }
+.provider-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 11px 16px; cursor: pointer; user-select: none;
+}
+.provider-name { font-size: 13px; font-weight: 600; }
+.provider-sub { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+.provider-body { border-top: 1px solid var(--border-light); display: none; }
+.provider.open .provider-body { display: block; }
+.pmodel { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; }
+.pmodel:not(:last-child) { border-bottom: 1px solid var(--border-light); }
+.pmodel-name { font-size: 12px; }
+.caps { display: flex; gap: 4px; }
+.cap { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
+.cap-audio { background: rgba(99,102,241,.12); color: rgb(99,102,241); }
+.cap-vision { background: rgba(234,179,8,.12); color: rgb(180,138,6); }
+.cap-text { background: rgba(34,197,94,.12); color: rgb(22,163,74); }
+.test-result { font-size: 11px; font-weight: 500; }
+.test-result.ok { color: var(--success); }
+.test-result.err { color: var(--danger); }
+.api-key-wrapper { position: relative; display: flex; align-items: center; flex: 1; max-width: 340px; margin-left: 66px; }
+.api-key-wrapper .input { flex: 1; padding-right: 32px; }
+.eye {
+  position: absolute; right: 6px; background: none; border: none; cursor: pointer;
+  color: var(--text-tertiary); font-size: 13px; padding: 2px;
+}
+
+/* history */
+.hist-row {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--group-bg); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+}
+.hist-top { display: flex; align-items: center; gap: 10px; }
+.hist-time { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.hist-pipe { display: flex; align-items: center; gap: 6px; flex: 1; font-size: 11px; color: var(--text-secondary); }
+.hist-arrow { color: var(--text-disabled); font-size: 10px; }
+.stage { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.st-dot { font-size: 8px; }
+.st-dot.success { color: var(--success); } .st-dot.error { color: var(--danger); }
+.st-dot.processing { color: #ff9500; } .st-dot.pending { color: var(--text-disabled); }
+.hist-cell {
+  flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0;
+  padding: 4px 8px; background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-radius: 4px; font-size: 11px;
+}
+.hist-label { color: var(--text-secondary); font-size: 10px; flex-shrink: 0; }
+.hist-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.hist-copy { cursor: pointer; font-size: 12px; opacity: .4; }
+.hist-copy:hover { opacity: 1; }
+
+/* usage */
+.range-tabs { display: flex; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+.range-tab {
+  padding: 5px 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  border: none; background: var(--bg-primary); font-family: inherit;
+}
+.range-tab + .range-tab { border-left: 1px solid var(--border-color); }
+.range-tab.active { background: var(--accent); color: #fff; font-weight: 500; }
+.scene-chip {
+  font-size: 11px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--bg-primary);
+  color: var(--text-secondary); font-family: inherit;
+  display: flex; align-items: center; gap: 5px;
+}
+.scene-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); font-weight: 500; }
+.chip-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.usage-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.stat-card { background: var(--group-bg); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.stat-label { font-size: 10px; color: var(--text-secondary); margin-bottom: 4px; }
+.stat-value { font-size: 16px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-sub { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
+.panel { background: var(--group-bg); border: 1px solid var(--border-light); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; flex-wrap: wrap; }
+.panel-title { font-size: 12px; font-weight: 600; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text-secondary); }
+.chart { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 3px; border-radius: 2px 2px 0 0; }
+.bar-col:hover { background: var(--accent-bg); }
+.bar-seg { width: 100%; }
+table.tbl { width: 100%; border-collapse: collapse; }
+table.tbl th {
+  font-size: 11px; color: var(--text-secondary); font-weight: 500; text-align: right;
+  padding: 6px 8px; border-bottom: 1px solid var(--border-color); white-space: nowrap;
+}
+table.tbl th:first-child, table.tbl td:first-child { text-align: left; padding-left: 2px; }
+table.tbl td { font-size: 12px; padding: 8px; border-bottom: 1px solid var(--border-light); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.tbl tr:last-child td { border-bottom: none; }
+.model-cell-name { font-weight: 600; font-size: 12px; }
+.model-cell-prov { font-size: 11px; color: var(--text-secondary); }
+.share-bar { height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; margin-top: 4px; min-width: 80px; }
+.share-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+
+/* editor preview (词汇/规则) */
+.doc-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 0; }
+.doc-editor {
+  border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 6px 6px;
+  background: var(--input-bg); font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px; line-height: 1.7; padding: 12px 14px; color: var(--text-primary);
+  white-space: pre-wrap; min-height: 180px; max-height: 240px; overflow-y: auto;
+}
+.doc-editor h { color: var(--accent); font-weight: 600; }
+.doc-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); margin-top: 6px; }
+
+/* about */
+.about-header { display: flex; flex-direction: column; align-items: center; padding: 20px 0 16px; gap: 8px; }
+.about-icon {
+  width: 56px; height: 56px; border-radius: 12px;
+  background: linear-gradient(135deg, #FF8C42, #FF5E1A);
+  display: flex; align-items: center; justify-content: center;
+}
+.about-name { font-size: 16px; font-weight: 600; }
+.about-version { font-size: 12px; color: var(--text-secondary); }
+.update-card { background: var(--group-bg); border: 1px solid rgba(10,132,255,.3); border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
+.update-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.update-version { font-size: 14px; font-weight: 600; }
+.update-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(48,209,88,.15); color: var(--success); font-weight: 500; }
+.update-changelog { list-style: none; margin: 0 0 12px; }
+.update-changelog li { font-size: 13px; color: var(--text-secondary); padding: 3px 0 3px 14px; position: relative; line-height: 1.5; }
+.update-changelog li::before { content: '•'; position: absolute; left: 0; color: var(--text-tertiary); }
+
+/* banner */
+.banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 14px;
+}
+.banner.warn { background: rgba(255,159,10,.12); color: #b25000; }
+[data-theme="dark"] .banner.warn { color: #ffcc80; }
+.banner.info { background: var(--accent-bg); color: var(--accent); }
+
+/* toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.78); color: #fff; font-size: 12px;
+  padding: 8px 16px; border-radius: 8px; opacity: 0; pointer-events: none;
+  transition: opacity .25s; z-index: 99;
+}
+.toast.show { opacity: 1; }
+
+.note {
+  font-size: 11px; color: var(--text-tertiary); padding: 8px 16px 12px; line-height: 1.6;
+}
+.page { display: none; }
+.page.active { display: block; }
+.link-btn { background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; font-family: inherit; padding: 0; }
+.link-btn:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="frame" id="app">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="content" id="content">
+    <div class="save-status" id="saveStatus">所有更改自动保存</div>
+
+    <!-- ============ 常用设置 ============ -->
+    <section class="page" data-page="general">
+      <h2 class="content-title">常用设置</h2>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">外观</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">界面主题</div><div class="row-desc">跟随系统时自动切换深浅色</div></div>
+            <div class="appearance-options">
+              <button class="appearance-option" data-theme-opt="light" onclick="setTheme('light', this)"><div class="appearance-preview" style="background:#ffffff;border:1px solid #d2d2d7"></div><div class="appearance-label">浅色</div></button>
+              <button class="appearance-option" data-theme-opt="dark" onclick="setTheme('dark', this)"><div class="appearance-preview" style="background:#1c1c1e"></div><div class="appearance-label">深色</div></button>
+              <button class="appearance-option active" data-theme-opt="system" onclick="setTheme('system', this)"><div class="appearance-preview" style="background:linear-gradient(to right,#ffffff 50%,#1c1c1e 50%)"></div><div class="appearance-label">自动</div></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">录音</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">麦克风</div><div class="row-desc">语音输入使用的输入设备</div></div>
+            <div class="row-actions">
+              <select class="select"><option>系统默认</option><option>MacBook Pro麦克风</option><option>AirPods Pro</option></select>
+              <button class="btn" onclick="toast('已刷新设备列表')">刷新</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">最大录音时长</div><div class="row-desc">超时自动停止并识别，范围10至600秒</div></div>
+            <div class="row-actions"><input class="input" style="width:80px;text-align:center" value="180"><span style="font-size:11px;color:var(--text-secondary)">秒</span></div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">按住说话</div><div class="row-desc">按住快捷键期间录音，松开立即识别</div></div>
+            <button class="toggle" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">覆盖剪贴板</div><div class="row-desc">关闭后识别完成会自动还原原剪贴板内容</div></div>
+            <button class="toggle on" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">启动</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">登录时启动 ByeType</div></div>
+            <button class="toggle on" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+        </div>
+      </div>
+      <div class="note">模型、快捷键、提示词等按功能放在「语音输入」和「截图识别」中。网络代理、超时等参数在「高级设置」。</div>
+    </section>
+
+    <!-- ============ 语音输入 ============ -->
+    <section class="page" data-page="voice">
+      <h2 class="content-title">语音输入</h2>
+      <div class="content-sub">从按快捷键到输出文字的全部设置</div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">快捷键与输出</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label"><span class="name-edit" onclick="toast('进入名称编辑（展示稿为模拟）')">语音输入 1</span></div></div>
+            <div class="row-actions">
+              <select class="select" style="min-width:110px"><option>自动换行</option><option>翻译</option><option>自定义</option><option value="">无（仅转写）</option></select>
+              <span class="kbd" onclick="recordKey(this)">F4</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label"><span class="name-edit" onclick="toast('进入名称编辑（展示稿为模拟）')">语音输入 2</span></div><div class="row-desc">未设置时不启用第二个语音入口</div></div>
+            <div class="row-actions">
+              <select class="select" style="min-width:110px"><option>翻译</option><option>自动换行</option><option value="">无（仅转写）</option></select>
+              <span class="kbd muted" onclick="recordKey(this)">未设置</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">模型与处理</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">转写模型</div><div class="row-desc">把语音变成文字，仅列出支持音频的模型</div></div>
+            <select class="select" style="width:250px">
+              <optgroup label="预置模型"><option>Google Gemini - gemini-3.8-flash</option><option>阿里云百炼 - qwen3.8-omni-flash</option></optgroup>
+            </select>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">启用思考（转写）</div><div class="row-desc">让模型在转写前先进行推理</div></div>
+            <button class="toggle" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">文本优化模型</div><div class="row-desc">按输出风格处理转写结果，仅列出文本模型</div></div>
+            <select class="select" style="width:250px">
+              <optgroup label="预置模型"><option>DeepSeek - deepseek-flash</option><option>Google Gemini - gemini-3.8-flash</option></optgroup>
+            </select>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">启用思考（优化）</div><div class="row-desc">DeepSeek Flash 默认开启思考，关闭可提速</div></div>
+            <button class="toggle on" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">思考强度</div><div class="row-desc">low更快，max更深（仅 DeepSeek 模型显示）</div></div>
+            <select class="select" style="width:110px"><option>low</option><option selected>high</option><option>max</option></select>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">规则增强</div><div class="row-desc">优化时再次注入全部转写规则，适合转写能力较弱的模型</div></div>
+            <button class="toggle" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">DeepSeek 密钥未填写</div><div class="row-desc">文本优化模型需要密钥才能调用</div></div>
+            <button class="link-btn" onclick="go('models')">去「模型与服务」填写</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">词汇与转写规则</span><span class="hint">修改后自动保存，转写时生效</span></div>
+        <div class="group-body" style="padding:0 16px 14px">
+          <div class="doc-tabs">
+            <button class="subtab active" onclick="docTab(this,'doc-vocab')">专有词汇</button>
+            <button class="subtab" onclick="docTab(this,'doc-rules')">转录规则</button>
+          </div>
+          <div class="doc-editor" id="doc-vocab" contenteditable="true"># 专有词汇表 - 语音校正的依据
+遇到语音识别结果与以下词汇发音相近时，必须校正为此处的写法。
+
+## 人名
+李少杰
+
+## 行业术语
+美团、闪电仓、GTV
+
+## 技术词汇
+ByeType、DeepSeek、Tauri</div>
+          <div class="doc-editor" id="doc-rules" style="display:none" contenteditable="true"># 转录规则 - 语音到文字的变换法则
+
+## 输出格式
+- 默认输出阿拉伯数字："第一步" → "第1步"
+- 时间、金钱、计量单位使用阿拉伯数字："九块五毛" → "9.5元"
+- 汉字与数字、英文之间不保留空格
+
+## 符号口令
+- "订单横杠明细" → "订单-明细"
+- "消费金额大于等于100" → "消费金额≥100"
+
+## 口语清理
+- 语气词直接省略："嗯，我知道了啊" → "我知道了"
+- 去除口水词：然后、就是、其实、基本上</div>
+          <div class="doc-meta"><span>修改后自动保存</span><span>✓ 已保存</span></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">输出风格</span><span class="hint">决定优化模型如何加工转写结果</span></div>
+        <div class="group-body" style="padding:10px 16px 14px">
+          <div class="tpl open">
+            <div class="tpl-head" onclick="this.parentElement.classList.toggle('open')">
+              <span class="tpl-name">自动换行</span>
+              <span class="tpl-used">语音输入 1 使用中</span>
+              <span class="tpl-tag">内置</span>
+            </div>
+            <div class="tpl-body">
+              <div class="tpl-editor">你是一个纯文本分段工具。把连续文本整理成便于阅读的自然段落。每段包含1至2句话……</div>
+              <div class="tpl-meta"><span>对应文件 text-optimize.md</span><span><button class="btn" onclick="toast('已恢复内置提示词')">恢复默认</button></span></div>
+            </div>
+          </div>
+          <div class="tpl">
+            <div class="tpl-head" onclick="this.parentElement.classList.toggle('open')">
+              <span class="tpl-name">翻译</span>
+              <span class="tpl-used">语音输入 2 使用中</span>
+              <span class="tpl-tag">内置</span>
+            </div>
+            <div class="tpl-body">
+              <div class="tpl-editor">You are a professional translator. Translate the following text into English. Keep the original meaning, tone, and formatting…</div>
+              <div class="tpl-meta"><span>对应文件 voice-translate.md</span><span><button class="btn" onclick="toast('已恢复内置提示词')">恢复默认</button></span></div>
+            </div>
+          </div>
+          <div class="tpl">
+            <div class="tpl-head" onclick="this.parentElement.classList.toggle('open')">
+              <span class="tpl-name">自定义</span>
+              <span class="tpl-tag">内置</span>
+            </div>
+            <div class="tpl-body">
+              <div class="tpl-editor muted">（空白提示词，可直接编写你自己的处理规则）</div>
+              <div class="tpl-meta"><span>对应文件 voice-custom</span><span><button class="btn" onclick="toast('已恢复内置提示词')">恢复默认</button></span></div>
+            </div>
+          </div>
+          <button class="btn ghost" onclick="addTpl(this)">＋ 添加输出风格</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">学习纠错</span><span class="hint">修改转写结果时自动归纳词汇与规则</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">学习模型</div><div class="row-desc">对比原始转写与修改后的文本，归纳纠错规则</div></div>
+            <select class="select" style="width:250px"><option>DeepSeek - deepseek-flash</option></select>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">启用思考（学习）</div></div>
+            <button class="toggle on" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">学习结果</div><div class="row-desc">已积累 6 条词汇、12 条规则，追加到专有词汇与转录规则中</div></div>
+            <button class="btn" onclick="toast('展开学习结果文档（展示稿为模拟）')">查看</button>
+          </div>
+        </div>
+        <div class="note">学习提示词属于进阶内容，放在「高级设置 → 学习提示词」。</div>
+      </div>
+    </section>
+
+    <!-- ============ 截图识别 ============ -->
+    <section class="page" data-page="extract">
+      <h2 class="content-title">截图识别</h2>
+      <div class="content-sub">快捷键截图后提取或翻译画面文字</div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">快捷键与输出</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label"><span class="name-edit" onclick="toast('进入名称编辑（展示稿为模拟）')">截图取词</span></div></div>
+            <div class="row-actions">
+              <select class="select" style="min-width:110px"><option>文字识别</option><option>翻译</option><option>自定义</option></select>
+              <span class="kbd" onclick="recordKey(this)">F6</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label"><span class="name-edit" onclick="toast('进入名称编辑（展示稿为模拟）')">截图翻译</span></div><div class="row-desc">未设置时不启用第二个截图入口</div></div>
+            <div class="row-actions">
+              <select class="select" style="min-width:110px"><option>翻译</option><option>文字识别</option></select>
+              <span class="kbd muted" onclick="recordKey(this)">未设置</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">识别模型</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">图像识别模型</div><div class="row-desc">仅列出支持视觉的模型</div></div>
+            <select class="select" style="width:250px">
+              <optgroup label="预置模型"><option>Google Gemini - gemini-3.8-flash</option><option>阿里云百炼 - qwen3.8-omni-flash</option></optgroup>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">输出风格</span></div>
+        <div class="group-body" style="padding:10px 16px 14px">
+          <div class="tpl open">
+            <div class="tpl-head" onclick="this.parentElement.classList.toggle('open')">
+              <span class="tpl-name">文字识别</span><span class="tpl-used">截图取词使用中</span><span class="tpl-tag">内置</span>
+            </div>
+            <div class="tpl-body">
+              <div class="tpl-editor">你是精通 OCR 和信息架构的文本提取助手。提取截图中的所有文字，理解布局层次，修复换行并按结构重组输出……</div>
+              <div class="tpl-meta"><span>对应文件 text-extract.md</span><span><button class="btn" onclick="toast('已恢复内置提示词')">恢复默认</button></span></div>
+            </div>
+          </div>
+          <div class="tpl">
+            <div class="tpl-head" onclick="this.parentElement.classList.toggle('open')">
+              <span class="tpl-name">翻译</span><span class="tpl-tag">内置</span>
+            </div>
+            <div class="tpl-body">
+              <div class="tpl-editor">Extract all visible text from this image, then translate the text into Chinese…</div>
+              <div class="tpl-meta"><span>对应文件 image-translate.md</span><span><button class="btn" onclick="toast('已恢复内置提示词')">恢复默认</button></span></div>
+            </div>
+          </div>
+          <button class="btn ghost" onclick="addTpl(this)">＋ 添加输出风格</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 模型与服务 ============ -->
+    <section class="page" data-page="models">
+      <h2 class="content-title">模型与服务</h2>
+      <div class="content-sub">填写各服务的密钥；所有模型在这里测试连通性</div>
+
+      <div class="group" style="padding:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px">
+          <span class="group-title">预置服务</span>
+          <button class="btn" onclick="testAll(this)">测试全部</button>
+        </div>
+
+        <div class="provider open">
+          <div class="provider-head" onclick="this.parentElement.classList.toggle('open')">
+            <div><div class="provider-name">Google Gemini</div><div class="provider-sub">密钥已填写</div></div>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="provider-body">
+            <div class="row">
+              <div class="row-main"><div class="row-label">API Key</div></div>
+              <div class="row-actions">
+                <div class="api-key-wrapper" style="margin-left:0">
+                  <input class="input" type="password" value="AIzaSyD-xxxxxxxxxxxxxxxx">
+                  <button class="eye" onclick="togglePwd(this)">👁</button>
+                </div>
+              </div>
+            </div>
+            <div class="pmodel"><span class="pmodel-name">gemini-3.8-flash</span><span class="caps"><span class="cap cap-audio">音频</span><span class="cap cap-vision">图像</span><span class="cap cap-text">文本</span></span><span class="row-actions"><span class="test-result" data-test></span><button class="btn" onclick="testOne(this)">测试</button></span></div>
+          </div>
+        </div>
+
+        <div class="provider">
+          <div class="provider-head" onclick="this.parentElement.classList.toggle('open')">
+            <div><div class="provider-name">阿里云百炼</div><div class="provider-sub">密钥已填写</div></div>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="provider-body">
+            <div class="row">
+              <div class="row-main"><div class="row-label">API Key</div></div>
+              <div class="row-actions">
+                <div class="api-key-wrapper" style="margin-left:0">
+                  <input class="input" type="password" value="sk-xxxxxxxxxxxx">
+                  <button class="eye" onclick="togglePwd(this)">👁</button>
+                </div>
+              </div>
+            </div>
+            <div class="pmodel"><span class="pmodel-name">qwen3.8-omni-flash</span><span class="caps"><span class="cap cap-audio">音频</span><span class="cap cap-vision">图像</span><span class="cap cap-text">文本</span></span><span class="row-actions"><span class="test-result" data-test></span><button class="btn" onclick="testOne(this)">测试</button></span></div>
+          </div>
+        </div>
+
+        <div class="provider">
+          <div class="provider-head" onclick="this.parentElement.classList.toggle('open')">
+            <div><div class="provider-name">DeepSeek</div><div class="provider-sub" style="color:var(--danger)">密钥未填写</div></div>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="provider-body">
+            <div class="row">
+              <div class="row-main"><div class="row-label">API Key</div><div class="row-desc">文本优化与学习纠错使用此服务</div></div>
+              <div class="row-actions">
+                <div class="api-key-wrapper" style="margin-left:0">
+                  <input class="input" placeholder="sk-...">
+                </div>
+              </div>
+            </div>
+            <div class="pmodel"><span class="pmodel-name">deepseek-flash</span><span class="caps"><span class="cap cap-vision">图像</span><span class="cap cap-text">文本</span></span><span class="row-actions"><span class="test-result" data-test></span><button class="btn" onclick="testOne(this)">测试</button></span></div>
+          </div>
+        </div>
+
+        <div class="provider">
+          <div class="provider-head" onclick="this.parentElement.classList.toggle('open')">
+            <div><div class="provider-name">OpenRouter</div><div class="provider-sub">2 个模型 · 密钥未填写</div></div>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="provider-body">
+            <div class="row">
+              <div class="row-main"><div class="row-label">API Key</div></div>
+              <div class="row-actions">
+                <div class="api-key-wrapper" style="margin-left:0">
+                  <input class="input" placeholder="sk-or-v1-...">
+                </div>
+              </div>
+            </div>
+            <div class="pmodel"><span class="pmodel-name">google/gemini-3.8-flash</span><span class="caps"><span class="cap cap-audio">音频</span><span class="cap cap-vision">图像</span><span class="cap cap-text">文本</span></span><span class="row-actions"><span class="test-result" data-test></span><button class="btn" onclick="testOne(this)">测试</button></span></div>
+            <div class="pmodel"><span class="pmodel-name">google/gemini-3.5-flash-lite</span><span class="caps"><span class="cap cap-audio">音频</span><span class="cap cap-vision">图像</span><span class="cap cap-text">文本</span></span><span class="row-actions"><span class="test-result" data-test></span><button class="btn" onclick="testOne(this)">测试</button></span></div>
+          </div>
+        </div>
+
+        <div class="provider">
+          <div class="provider-head" onclick="this.parentElement.classList.toggle('open')">
+            <div><div class="provider-name">XiaoMi</div><div class="provider-sub">1 个模型 · 密钥未填写</div></div>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="provider-body">
+            <div class="row">
+              <div class="row-main"><div class="row-label">API Key</div></div>
+              <div class="row-actions"><div class="api-key-wrapper" style="margin-left:0"><input class="input" placeholder="sk-..."></div></div>
+            </div>
+            <div class="pmodel"><span class="pmodel-name">mimo-v2.5</span><span class="caps"><span class="cap cap-audio">音频</span><span class="cap cap-vision">图像</span><span class="cap cap-text">文本</span></span><span class="row-actions"><span class="test-result" data-test></span><button class="btn" onclick="testOne(this)">测试</button></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">自定义模型</span><span class="hint">接入任意 OpenAI 兼容或 Gemini 服务</span></div>
+        <div class="group-body" style="padding:10px 16px 14px">
+          <button class="btn ghost" onclick="toast('展开新建模型表单（展示稿为模拟）')">＋ 添加自定义模型</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 历史与用量 ============ -->
+    <section class="page" data-page="data">
+      <h2 class="content-title">历史与用量</h2>
+      <div class="subtabs">
+        <button class="subtab active" onclick="dataTab(this,'d-history')">历史记录</button>
+        <button class="subtab" onclick="dataTab(this,'d-token')">Token 用量</button>
+        <button class="subtab" onclick="dataTab(this,'d-timing')">处理耗时</button>
+      </div>
+
+      <div id="d-history">
+        <div class="hist-row">
+          <div class="hist-top">
+            <span class="hist-time">10:24:08</span>
+            <div class="hist-pipe">
+              <span class="stage"><span class="st-dot success">●</span>音频</span><span class="hist-arrow">→</span>
+              <span class="stage"><span class="st-dot success">●</span>转写</span><span class="hist-arrow">→</span>
+              <span class="stage"><span class="st-dot success">●</span>优化</span>
+            </div>
+            <button class="btn" onclick="toast('已发起重试（展示稿为模拟）')">重试</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="hist-cell"><span class="hist-label">转写</span><span class="hist-text">我觉得这个方案没问题，明天开始执行</span><span class="hist-copy" onclick="toast('已复制')">📋</span></div>
+            <div class="hist-cell"><span class="hist-label">优化</span><span class="hist-text">我觉得这个方案没问题，明天开始执行。</span><span class="hist-copy" onclick="toast('已复制')">📋</span></div>
+          </div>
+        </div>
+        <div class="hist-row">
+          <div class="hist-top">
+            <span class="hist-time">10:18:55</span>
+            <div class="hist-pipe">
+              <span class="stage"><span class="st-dot success">●</span>截图</span><span class="hist-arrow">→</span>
+              <span class="stage"><span class="st-dot error">●</span>识别</span>
+            </div>
+            <button class="btn" onclick="toast('已发起重试（展示稿为模拟）')">重试</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="hist-cell"><span class="hist-label">识别</span><span class="hist-text" style="color:var(--danger)">API 调用超时（10秒）</span></div>
+          </div>
+        </div>
+        <div class="hist-row">
+          <div class="hist-top">
+            <span class="hist-time">09:57:31</span>
+            <div class="hist-pipe">
+              <span class="stage"><span class="st-dot success">●</span>音频</span><span class="hist-arrow">→</span>
+              <span class="stage"><span class="st-dot success">●</span>转写</span><span class="hist-arrow">→</span>
+              <span class="stage"><span class="st-dot success">●</span>优化</span>
+            </div>
+            <button class="btn" disabled>重试</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="hist-cell"><span class="hist-label">转写</span><span class="hist-text">帮我查一下上周的消耗数据</span><span class="hist-copy" onclick="toast('已复制')">📋</span></div>
+            <div class="hist-cell"><span class="hist-label">优化</span><span class="hist-text">帮我查一下上周的消耗数据。</span><span class="hist-copy" onclick="toast('已复制')">📋</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="d-token" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+          <div class="range-tabs">
+            <button class="range-tab active">今天</button><button class="range-tab">近7天</button><button class="range-tab">近30天</button><button class="range-tab">全部</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="scene-chip active"><span class="chip-dot" style="background:#007aff"></span>全部 28</button>
+            <button class="scene-chip"><span class="chip-dot" style="background:#007aff"></span>转写 18</button>
+            <button class="scene-chip"><span class="chip-dot" style="background:#ff9500"></span>识别 4</button>
+            <button class="scene-chip"><span class="chip-dot" style="background:#34c759"></span>优化 4</button>
+            <button class="scene-chip"><span class="chip-dot" style="background:#af52de"></span>学习 2</button>
+          </div>
+        </div>
+        <div class="usage-cards">
+          <div class="stat-card"><div class="stat-label">总Token</div><div class="stat-value">48.2万</div><div class="stat-sub">输入 41.5万 · 输出 6.7万</div></div>
+          <div class="stat-card"><div class="stat-label">API调用</div><div class="stat-value">28 次</div><div class="stat-sub">日均 28 次</div></div>
+          <div class="stat-card"><div class="stat-label">最常用模型</div><div class="stat-value" style="font-size:13px">gemini-3.8-flash</div><div class="stat-sub">占64% · 30.8万</div></div>
+          <div class="stat-card"><div class="stat-label">消耗趋势</div><div class="stat-value" style="color:var(--danger)">+12%</div><div class="stat-sub">较昨天增加</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Token用量（按小时）</span>
+            <div class="legend">
+              <span class="legend-item"><span class="chip-dot" style="background:#007aff"></span>转写</span>
+              <span class="legend-item"><span class="chip-dot" style="background:#ff9500"></span>识别</span>
+              <span class="legend-item"><span class="chip-dot" style="background:#34c759"></span>优化</span>
+              <span class="legend-item"><span class="chip-dot" style="background:#af52de"></span>学习</span>
+            </div>
+          </div>
+          <div class="chart" id="token-chart"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">按模型汇总</span></div>
+          <table class="tbl">
+            <thead><tr><th>模型</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>总Token</th><th>占比</th></tr></thead>
+            <tbody>
+              <tr><td><div class="model-cell-name">gemini-3.8-flash</div><div class="model-cell-prov">Google Gemini</div></td><td>18</td><td>30.1万</td><td>2.4万</td><td><b>32.5万</b></td><td style="min-width:110px"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>64%</span><div class="share-bar" style="width:64px"><div class="share-fill" style="width:64%"></div></div></div></td></tr>
+              <tr><td><div class="model-cell-name">deepseek-flash</div><div class="model-cell-prov">DeepSeek</div></td><td>6</td><td>8.9万</td><td>4.1万</td><td><b>13.0万</b></td><td style="min-width:110px"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>26%</span><div class="share-bar" style="width:64px"><div class="share-fill" style="width:26%"></div></div></div></td></tr>
+              <tr><td><div class="model-cell-name">qwen3.8-omni-flash</div><div class="model-cell-prov">阿里云百炼</div></td><td>4</td><td>2.2万</td><td>0.5万</td><td><b>2.7万</b></td><td style="min-width:110px"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>5%</span><div class="share-bar" style="width:64px"><div class="share-fill" style="width:5%"></div></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:flex-end"><button class="btn danger" onclick="toast('二次确认后清空统计（展示稿为模拟）')">清空统计数据</button></div>
+      </div>
+
+      <div id="d-timing" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="range-tabs">
+            <button class="range-tab active">今天</button><button class="range-tab">近7天</button><button class="range-tab">近30天</button><button class="range-tab">全部</button>
+          </div>
+        </div>
+        <div class="usage-cards">
+          <div class="stat-card"><div class="stat-label">平均处理耗时 · 今天</div><div class="stat-value">3.8秒</div><div class="stat-sub">较昨天变快 8%</div></div>
+          <div class="stat-card"><div class="stat-label">音频转写平均</div><div class="stat-value">2.9秒</div><div class="stat-sub">占总耗时76%</div></div>
+          <div class="stat-card"><div class="stat-label">文本优化平均</div><div class="stat-value">0.8秒</div><div class="stat-sub">占总耗时21%</div></div>
+          <div class="stat-card"><div class="stat-label">录音次数</div><div class="stat-value">22 次</div><div class="stat-sub">日均 22 次</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">处理耗时（按小时）</span>
+            <div class="legend">
+              <span class="legend-item"><span class="chip-dot" style="background:#007aff"></span>音频转写</span>
+              <span class="legend-item"><span class="chip-dot" style="background:#34c759"></span>文本优化</span>
+            </div>
+          </div>
+          <div class="chart" id="timing-chart"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">按模型汇总</span></div>
+          <table class="tbl">
+            <thead><tr><th>模型</th><th>音频转写平均</th><th>文本优化平均</th><th>调用次数</th><th>占比</th></tr></thead>
+            <tbody>
+              <tr><td><div class="model-cell-name">gemini-3.8-flash</div><div class="model-cell-prov">Google Gemini</div></td><td>2.9秒<div class="stat-sub">18次</div></td><td>未参与</td><td><b>18</b></td><td style="min-width:110px"><div class="share-bar" style="width:100px"><div class="share-fill" style="width:82%"></div></div></td></tr>
+              <tr><td><div class="model-cell-name">deepseek-flash</div><div class="model-cell-prov">DeepSeek</div></td><td>未参与</td><td>0.8秒<div class="stat-sub">4次</div></td><td><b>4</b></td><td style="min-width:110px"><div class="share-bar" style="width:100px"><div class="share-fill" style="width:18%"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 备份与恢复 ============ -->
+    <section class="page" data-page="backup">
+      <h2 class="content-title">备份与恢复</h2>
+      <div class="content-sub">备份包含全部设置与提示词文件</div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">本地备份</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">导出备份</div><div class="row-desc">选择保存位置，导出 zip 备份文件</div></div>
+            <button class="btn" onclick="toast('已导出（展示稿为模拟）')">备份到本地</button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">从备份恢复</div><div class="row-desc">选择 zip 文件，恢复后需重启应用</div></div>
+            <button class="btn" onclick="toast('选择文件并确认后恢复（展示稿为模拟）')">从本地恢复</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">云端备份（S3）</span><span class="hint">适合在多台电脑间同步</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">Endpoint</div><div class="row-desc">留空则使用 AWS S3 标准地址</div></div>
+            <input class="input" style="width:230px" placeholder="https://s3.amazonaws.com">
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">Region / Bucket</div></div>
+            <div class="row-actions">
+              <input class="input" style="width:110px" placeholder="us-east-1">
+              <input class="input" style="width:140px" placeholder="my-backup-bucket">
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">Access Key / Secret Key</div></div>
+            <div class="row-actions">
+              <input class="input" style="width:130px" placeholder="AKIAXXXXX">
+              <input class="input" type="password" style="width:130px" placeholder="******">
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">连接与备份</div></div>
+            <div class="row-actions">
+              <button class="btn" onclick="mockTest(this)">测试连接</button>
+              <button class="btn" onclick="toast('已备份到 S3（展示稿为模拟）')">备份到云端</button>
+              <button class="btn" onclick="toast('已加载备份列表（展示稿为模拟）')">云端备份列表</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 高级设置 ============ -->
+    <section class="page" data-page="advanced">
+      <h2 class="content-title">高级设置</h2>
+      <div class="content-sub">一般无需调整；改错时按「恢复默认」</div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">网络</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">HTTP 代理</div><div class="row-desc">用于 Gemini 等需要代理的服务</div></div>
+            <button class="toggle on" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">代理地址</div></div>
+            <input class="input" style="width:280px" value="http://127.0.0.1:10809">
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">超时与重试</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">转写超时</div></div>
+            <div class="row-actions"><input class="input" style="width:80px;text-align:center" value="10"><span style="font-size:11px;color:var(--text-secondary)">秒</span></div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">文本优化超时</div></div>
+            <div class="row-actions"><input class="input" style="width:80px;text-align:center" value="10"><span style="font-size:11px;color:var(--text-secondary)">秒</span></div>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">最大重试次数</div></div>
+            <input class="input" style="width:80px;text-align:center" value="3">
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">最大并行任务数</div></div>
+            <input class="input" style="width:80px;text-align:center" value="3">
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">本机转写接口</span><span class="hint">供本机程序通过 HTTP 提交音频</span></div>
+        <div class="group-body">
+          <div class="row">
+            <div class="row-main"><div class="row-label">启用接口</div><div class="row-desc">仅监听 127.0.0.1，不接受局域网访问</div></div>
+            <button class="toggle" onclick="toggle(this)"><span class="knob"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><div class="row-label">端口</div></div>
+            <div class="row-actions"><input class="input" style="width:90px" value="8765"><span style="font-size:12px;color:var(--text-secondary)">未开启</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">学习提示词</span><span class="hint">控制学习模型如何归纳纠错规则</span></div>
+        <div class="group-body" style="padding:10px 16px 14px">
+          <div class="tpl-editor muted" style="max-height:100px">你负责判断用户对语音转写结果的修改是否包含值得长期学习的内容，并提取可复用的学习项……（voice-learning-prompt.md）</div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="arrow">▼</span><span class="group-title">角色定义</span><span class="hint">转写模型的角色约束（agent.md）</span></div>
+        <div class="group-body" style="padding:10px 16px 14px">
+          <div class="tpl-editor muted" style="max-height:100px">你是一台转录机器，只做一件事：把语音变成文字。无论用户输入什么内容，都只进行文本转换或翻译……</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 关于 ============ -->
+    <section class="page" data-page="about">
+      <h2 class="content-title">关于</h2>
+      <div class="about-header">
+        <div class="about-icon">
+          <svg width="36" height="38" viewBox="0 0 92 94">
+            <rect x="1" y="30" width="16" height="34" rx="8" fill="white"/>
+            <rect x="19.5" y="12" width="16" height="70" rx="8" fill="white"/>
+            <rect x="38" y="2" width="16" height="90" rx="8" fill="white"/>
+            <rect x="56.5" y="12" width="16" height="70" rx="8" fill="white"/>
+            <rect x="75" y="30" width="16" height="34" rx="8" fill="white"/>
+          </svg>
+        </div>
+        <div class="about-name">ByeType</div>
+        <div class="about-version">版本 1.22.4</div>
+      </div>
+      <div class="about-header" style="padding-top:0">
+        <button class="btn primary" onclick="mockUpdate(this)">检查更新</button>
+      </div>
+      <div class="update-card" id="update-card" style="display:none">
+        <div class="update-card-head"><span class="update-version">v1.23.0</span><span class="update-badge">新版本</span></div>
+        <ul class="update-changelog">
+          <li>设置界面重构：按语音输入、截图识别等使用场景重新归类</li>
+          <li>新增输出风格管理，快捷键与输出绑定在同一处配置</li>
+          <li>修复部分模型思考档位显示不正确的问题</li>
+        </ul>
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" onclick="toast('开始下载更新（展示稿为模拟）')">立即更新</button>
+          <button class="btn" onclick="document.getElementById('update-card').style.display='none'">稍后</button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="row"><div class="row-main"><div class="row-label">当前版本</div></div><span style="font-size:13px;color:var(--text-secondary)">1.22.4</span></div>
+        <div class="row"><div class="row-main"><div class="row-label">项目主页</div></div><a href="#" class="link-btn" onclick="return false">github.com/devonmochi/byetype</a></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const NAV = [
+  { id: 'general', label: '常用设置' },
+  { id: 'voice', label: '语音输入' },
+  { id: 'extract', label: '截图识别' },
+  { type: 'label', label: '服务与数据' },
+  { id: 'models', label: '模型与服务' },
+  { id: 'data', label: '历史与用量' },
+  { id: 'backup', label: '备份与恢复' },
+  { type: 'label', label: '进阶' },
+  { id: 'advanced', label: '高级设置' },
+  { id: 'about', label: '关于', dot: true },
+]
+const sidebar = document.getElementById('sidebar')
+NAV.forEach(item => {
+  if (item.type === 'label') {
+    const el = document.createElement('div')
+    el.className = 'sidebar-section-label'; el.textContent = item.label
+    sidebar.appendChild(el); return
+  }
+  const el = document.createElement('button')
+  el.className = 'sidebar-item'; el.textContent = item.label; el.dataset.page = item.id
+  if (item.dot) el.innerHTML += '<span class="dot" title="有新版本"></span>'
+  el.onclick = () => go(item.id)
+  sidebar.appendChild(el)
+})
+const foot = document.createElement('div')
+foot.className = 'sidebar-foot'; foot.textContent = 'ByeType 1.22.4'
+sidebar.appendChild(foot)
+
+function go(id) {
+  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.toggle('active', b.dataset.page === id))
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === id))
+  document.getElementById('content').scrollTop = 0
+}
+go('general')
+
+function toggle(btn) {
+  btn.classList.toggle('on')
+  markSaved()
+}
+function setTheme(mode, btn) {
+  document.querySelectorAll('.appearance-option').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  const dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+  markSaved()
+}
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark'
+
+function recordKey(kbd) {
+  kbd.classList.add('recording'); kbd.textContent = '按下新按键'
+  const handler = e => {
+    e.preventDefault()
+    window.removeEventListener('keydown', handler, true)
+    kbd.classList.remove('recording')
+    if (e.key === 'Escape') { kbd.textContent = kbd.dataset.old || '未设置'; return }
+    const parts = []
+    if (e.metaKey) parts.push('⌘'); if (e.ctrlKey) parts.push('Ctrl')
+    if (e.altKey) parts.push('⌥'); if (e.shiftKey) parts.push('⇧')
+    parts.push(e.key === ' ' ? 'Space' : e.key.toUpperCase())
+    const combo = parts.join('+')
+    if (['F4', 'F6'].includes(combo) && kbd.dataset.old !== combo) {
+      toast('与「语音输入 1」冲突，已保留原快捷键'); kbd.textContent = kbd.dataset.old || '未设置'; return
+    }
+    kbd.textContent = combo; kbd.classList.remove('muted'); markSaved()
+  }
+  kbd.dataset.old = kbd.textContent.trim()
+  window.addEventListener('keydown', handler, true)
+}
+
+function togglePwd(eye) {
+  const input = eye.parentElement.querySelector('input')
+  input.type = input.type === 'password' ? 'text' : 'password'
+}
+function testOne(btn) {
+  const out = btn.parentElement.querySelector('[data-test]')
+  out.textContent = '...'; out.className = 'test-result'
+  setTimeout(() => {
+    const ok = !btn.closest('.provider').querySelector('.provider-sub')?.textContent.includes('未填写')
+    out.textContent = ok ? Math.floor(300 + Math.random() * 900) + 'ms' : '密钥未填写'
+    out.className = 'test-result ' + (ok ? 'ok' : 'err')
+  }, 600)
+}
+function testAll(btn) {
+  btn.disabled = true; btn.textContent = '测试中...'
+  setTimeout(() => { btn.disabled = false; btn.textContent = '测试全部'; toast('测试完成：4 个可用，2 个缺密钥') }, 1200)
+}
+function mockTest(btn) {
+  btn.disabled = true; btn.textContent = '测试中...'
+  setTimeout(() => { btn.disabled = false; btn.textContent = '测试连接'; toast('连接成功') }, 800)
+}
+function mockUpdate(btn) {
+  btn.disabled = true; btn.textContent = '检查中...'
+  setTimeout(() => {
+    btn.disabled = false; btn.style.display = 'none'
+    document.getElementById('update-card').style.display = 'block'
+  }, 800)
+}
+
+function docTab(btn, id) {
+  btn.parentElement.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  ;['doc-vocab', 'doc-rules'].forEach(x => document.getElementById(x).style.display = x === id ? 'block' : 'none')
+}
+function dataTab(btn, id) {
+  btn.parentElement.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  ;['d-history', 'd-token', 'd-timing'].forEach(x => document.getElementById(x).style.display = x === id ? 'block' : 'none')
+}
+function addTpl(btn) {
+  const tpl = document.createElement('div')
+  tpl.className = 'tpl open'
+  tpl.innerHTML = '<div class="tpl-head" onclick="this.parentElement.classList.toggle(\'open\')"><span class="tpl-name">新输出风格</span><span class="tpl-tag">用户</span></div><div class="tpl-body"><div class="tpl-editor muted" contenteditable="true">（在此编写处理规则）</div><div class="tpl-meta"><span>用户模板</span><span><button class="btn danger" onclick="this.closest(\'.tpl\').remove()">删除</button></span></div></div>'
+  btn.before(tpl)
+  markSaved()
+}
+
+// charts
+function drawChart(id, data, colors) {
+  const el = document.getElementById(id)
+  const max = Math.max(...data.map(d => d.reduce((a, b) => a + b, 0)), 1)
+  data.forEach(d => {
+    const col = document.createElement('div'); col.className = 'bar-col'
+    if (d.reduce((a, b) => a + b, 0) === 0) { col.style.opacity = .35; col.innerHTML = '<div style="height:3px;width:4px;margin:0 auto;background:var(--text-disabled);border-radius:2px;opacity:.5"></div>' }
+    else d.forEach((v, i) => { if (!v) return; const seg = document.createElement('div'); seg.className = 'bar-seg'; seg.style.height = (v / max * 100) + '%'; seg.style.background = colors[i]; col.appendChild(seg) })
+    el.appendChild(col)
+  })
+}
+drawChart('token-chart', [
+  [0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],
+  [12,0,2,0],[18,2,3,1],[9,0,1,0],[14,1,2,0],[6,0,0,0],[3,1,0,1],[8,0,1,0],[11,0,0,0],[5,0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]
+], ['#007aff', '#ff9500', '#34c759', '#af52de'])
+drawChart('timing-chart', [
+  [0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],
+  [9,3],[12,4],[7,2],[10,3],[4,1],[2,1],[6,2],[8,2],[3,1],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]
+], ['#007aff', '#34c759'])
+
+// save status
+let saveTimer
+function markSaved() {
+  const el = document.getElementById('saveStatus')
+  el.textContent = '保存中…'; el.className = 'save-status'
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => { el.textContent = '✓ 已保存'; el.className = 'save-status ok' }, 500)
+}
+let toastTimer
+function toast(msg) {
+  const el = document.getElementById('toast')
+  el.textContent = msg; el.classList.add('show')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800)
+}
+
+// group collapse
+document.querySelectorAll('.group-head').forEach(head => {
+  head.addEventListener('click', e => {
+    if (e.target.closest('button') && !e.target.closest('.group-head').querySelector('.hint')) return
+    head.parentElement.classList.toggle('collapsed')
+  })
+})
+</script>
+</body>
+</html>

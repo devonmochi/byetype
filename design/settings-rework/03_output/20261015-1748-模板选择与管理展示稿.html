@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模板选择与管理展示稿</title>
+<style>
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #fafafa;
+  --border-color: #e5e5e5;
+  --border-color-light: #f0f0f0;
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #999999;
+  --accent: #007aff;
+  --accent-bg: rgba(0,122,255,0.1);
+  --input-bg: #ffffff;
+  --input-border: #d2d2d7;
+  --menu-bg: #ffffff;
+  --menu-shadow: 0 8px 26px rgba(0,0,0,.16);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: #e8e8ed; color: var(--text-primary);
+  padding: 28px 24px 60px;
+}
+.wrap { max-width: 1000px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 600; margin-bottom: 10px; }
+.lead { font-size: 13px; color: #4a4a4f; line-height: 1.75; margin-bottom: 8px; }
+.lead code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #fff; padding: 1px 5px; border-radius: 4px; }
+h2 { font-size: 15px; font-weight: 600; margin: 34px 0 6px; }
+.sub { font-size: 12px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 14px; }
+.screen {
+  background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-radius: 12px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.08);
+  display: flex; min-height: 340px;
+}
+.sidebar { width: 160px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); padding: 14px 0; flex-shrink: 0; }
+.sidebar-item { padding: 8px 16px; margin: 0 8px; border-radius: 6px; font-size: 13px; }
+.sidebar-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.sidebar-group { font-size: 10px; color: #c7c7cc; letter-spacing: 1.5px; padding: 4px 16px; margin: 12px 8px 4px; }
+.content { flex: 1; padding: 20px 22px; min-width: 0; position: relative; }
+.content-title { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+
+.tool-row { display: flex; align-items: center; gap: 8px; margin: 18px 0 12px; }
+.tool-row .spacer { flex: 1; }
+
+.select-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-width: 168px; padding: 6px 10px 6px 12px;
+  border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--input-bg); font-size: 13px; color: var(--text-primary);
+}
+.select-btn .caret { margin-left: auto; color: var(--text-secondary); font-size: 10px; }
+.select-btn.focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+
+.menu {
+  position: absolute; width: 200px; background: var(--menu-bg);
+  border: 1px solid var(--border-color); border-radius: 8px;
+  box-shadow: var(--menu-shadow); padding: 5px; z-index: 5;
+}
+.menu-item { padding: 7px 10px; border-radius: 5px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.menu-item.sel { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.menu-item .check { margin-left: auto; font-size: 11px; }
+.menu-sep { height: 1px; background: var(--border-color-light); margin: 5px 4px; }
+.menu-add { color: var(--accent); font-weight: 500; }
+
+.btn {
+  padding: 6px 12px; border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--input-bg); font-size: 13px; color: var(--text-primary); font-family: inherit;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.muted { color: var(--text-secondary); }
+
+.rename-input {
+  padding: 6px 12px; border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--input-bg); font-size: 13px; color: var(--text-primary);
+  width: 168px; font-family: inherit;
+}
+
+.editor {
+  border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);
+  min-height: 150px; padding: 14px 16px;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  color: var(--text-secondary); line-height: 1.8;
+}
+.editor-head { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.editor-path {
+  flex: 1; font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+  color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hint { font-size: 11px; color: var(--text-secondary); margin-top: 8px; }
+.badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: var(--accent-bg); color: var(--accent); margin-left: 8px; vertical-align: 1px; }
+.badge-new { background: rgba(52,199,89,.15); color: #1f9d4d; }
+.note { background: #fff8e6; border: 1px solid #f0dca8; border-radius: 8px; padding: 12px 16px; font-size: 12px; line-height: 1.75; color: #6b5620; margin-top: 16px; }
+.compare { display: flex; gap: 14px; flex-wrap: wrap; }
+.compare > div { flex: 1; min-width: 300px; }
+.cap { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>模板选择与管理展示稿</h1>
+  <p class="lead">现在这一行有四个控件：左边下拉选模板，中间输入框改名，右边「添加模板」和「删除」。下拉和输入框长得像，看着重复；「添加模板」也跑到最外面。</p>
+  <p class="lead">改成：<strong>下拉选模板，「添加模板」放进下拉里当最后一项，改名收进「重命名」按钮</strong>。这一套控件在文本强化规则和图像识别提示词两页共用，改一次两页都变。</p>
+
+  <h2>一、默认状态</h2>
+  <p class="sub">一行只留三样：选模板、重命名、删除。删除只在自定义模板上出现，内置模板不显示。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <span class="select-btn">自动换行<span class="caret">▼</span></span>
+        <span class="btn">重命名</span>
+        <span class="spacer"></span>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>二、点开下拉</h2>
+  <p class="sub">「添加模板」是下拉里的最后一项，跟模板名之间用一条分隔线隔开，颜色用主色区分。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <span class="select-btn focus">自动换行<span class="caret">▲</span></span>
+        <span class="btn">重命名</span>
+        <span class="spacer"></span>
+      </div>
+      <div class="menu" style="top:88px;left:182px">
+        <div class="menu-item sel">自动换行<span class="check">✓</span></div>
+        <div class="menu-item">自动翻译</div>
+        <div class="menu-item">自动分段</div>
+        <div class="menu-sep"></div>
+        <div class="menu-item menu-add">＋ 添加模板</div>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>三、点「重命名」</h2>
+  <p class="sub">原来的输入框收在这里，点了才出现。<strong>改名后按回车或点「确定」生效</strong>，点「取消」恢复原名。名称最长20个字。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <input class="rename-input" value="自动换行">
+        <span class="btn primary">确定</span>
+        <span class="btn muted">取消</span>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>四、添加模板之后</h2>
+  <p class="sub">新模板自动选中并显示在「重命名」状态，改完名字即可用。自定义模板选中时才出现「删除」。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <span class="select-btn">新模板<span class="caret">▼</span></span>
+        <span class="btn">重命名</span>
+        <span class="spacer"></span>
+        <span class="btn">删除</span>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/user-voice-….md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>五、改前改后对照</h2>
+  <div class="compare">
+    <div>
+      <div class="cap">改前：四个控件并排，「添加模板」在最外面</div>
+      <div class="tool-row">
+        <span class="select-btn" style="opacity:.5">自动换行<span class="caret">▼</span></span>
+        <input class="rename-input" style="border-color:var(--input-border)" value="自动换行">
+        <span class="btn" style="opacity:.5">添加模板</span>
+      </div>
+    </div>
+    <div>
+      <div class="cap">改后：选模板、重命名、删除</div>
+      <div class="tool-row">
+        <span class="select-btn">自动换行<span class="caret">▼</span></span>
+        <span class="btn">重命名</span>
+        <span class="spacer"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">改这几处，其余不动：模板选择、提示词编辑、选择文件、重置为内置的行为都不变；删除模板时把快捷键绑定挪到剩余模板的逻辑也保留。</div>
+</div>
+</body>
+</html>

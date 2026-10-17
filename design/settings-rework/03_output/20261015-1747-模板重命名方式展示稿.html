@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模板重命名方式展示稿</title>
+<style>
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #fafafa;
+  --border-color: #e5e5e5;
+  --border-color-light: #f0f0f0;
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #999999;
+  --accent: #007aff;
+  --accent-bg: rgba(0,122,255,0.1);
+  --input-bg: #ffffff;
+  --input-border: #d2d2d7;
+  --menu-bg: #ffffff;
+  --menu-shadow: 0 8px 26px rgba(0,0,0,.16);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: #e8e8ed; color: var(--text-primary);
+  padding: 28px 24px 60px;
+}
+.wrap { max-width: 1020px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 600; margin-bottom: 10px; }
+.lead { font-size: 13px; color: #4a4a4f; line-height: 1.75; margin-bottom: 8px; }
+h2 { font-size: 15px; font-weight: 600; margin: 34px 0 6px; }
+.sub { font-size: 12px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 14px; }
+
+.screen {
+  background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-radius: 12px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.08);
+  display: flex; min-height: 300px;
+}
+.sidebar { width: 158px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); padding: 14px 0; flex-shrink: 0; }
+.sidebar-item { padding: 8px 16px; margin: 0 8px; border-radius: 6px; font-size: 13px; }
+.sidebar-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.sidebar-group { font-size: 10px; color: #c7c7cc; letter-spacing: 1.5px; padding: 4px 16px; margin: 12px 8px 4px; }
+.content { flex: 1; padding: 20px 22px; min-width: 0; position: relative; }
+.content-title { font-size: 17px; font-weight: 600; margin-bottom: 2px; }
+
+.tool-row { display: flex; align-items: center; gap: 6px; margin: 18px 0 12px; }
+.spacer { flex: 1; }
+
+.name-select {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 10px 6px 12px; min-width: 168px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.name-select.hover { background: var(--bg-secondary); border-color: var(--border-color); }
+.name-select .caret { margin-left: auto; color: var(--text-secondary); font-size: 10px; }
+.name-select.focus { background: var(--input-bg); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+
+.icon-btn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 6px; background: transparent;
+  color: var(--text-secondary); font-size: 13px; line-height: 1;
+}
+.icon-btn.hover { background: var(--bg-secondary); border-color: var(--border-color); color: var(--text-primary); }
+.icon-btn.danger.hover { color: #d70015; }
+
+.menu {
+  position: absolute; width: 200px; background: var(--menu-bg);
+  border: 1px solid var(--border-color); border-radius: 8px;
+  box-shadow: var(--menu-shadow); padding: 5px; z-index: 5;
+}
+.menu-item { padding: 7px 10px; border-radius: 5px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.menu-item.sel { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.menu-item .check { margin-left: auto; font-size: 11px; }
+.menu-sep { height: 1px; background: var(--border-color-light); margin: 5px 4px; }
+.menu-add { color: var(--accent); font-weight: 500; }
+.menu-tip { font-size: 10px; color: var(--text-tertiary); padding: 4px 10px 2px; }
+
+.name-input {
+  padding: 6px 12px; border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--input-bg); font-size: 14px; font-weight: 600;
+  color: var(--text-primary); width: 178px; font-family: inherit;
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.editor {
+  border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);
+  min-height: 132px; padding: 14px 16px;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  color: var(--text-secondary); line-height: 1.8;
+}
+.editor-head { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.editor-path { flex: 1; font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn { padding: 6px 12px; border: 1px solid var(--input-border); border-radius: 6px; background: var(--input-bg); font-size: 13px; color: var(--text-primary); font-family: inherit; }
+
+.key {
+  display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+  background: #fff; border: 1px solid var(--border-color); border-bottom-width: 2px;
+  border-radius: 4px; padding: 1px 6px; color: var(--text-primary);
+}
+
+table { width: 100%; border-collapse: collapse; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; font-size: 12.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border-color-light); vertical-align: top; line-height: 1.65; }
+th { background: var(--bg-secondary); font-weight: 600; font-size: 12px; }
+tr:last-child td { border-bottom: none; }
+td.yes { color: #1f9d4d; font-weight: 500; }
+td.no { color: var(--text-tertiary); }
+.note { background: #fff8e6; border: 1px solid #f0dca8; border-radius: 8px; padding: 12px 16px; font-size: 12px; line-height: 1.75; color: #6b5620; margin-top: 16px; }
+.cap { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>模板重命名方式展示稿</h1>
+  <p class="lead">你说得对，单独一个「重命名」按钮还是多余。Mac 上的通行做法是<strong>名字本身就是可编辑文本</strong>：悬停出现铅笔图标，点一下原地变输入框，回车确认、Esc 取消，没有确定/取消按钮。Finder 改文件名、Chrome 书签管理器、Notion 页面标题都这样。</p>
+  <p class="lead">所以在这一版里，「重命名」按钮去掉，改成<strong>名字旁一个铅笔图标，点它就原地编辑</strong>。</p>
+
+  <h2>一、默认状态</h2>
+  <p class="sub">模板名显示为当前模板，鼠标移上去整块变浅底，右侧露出铅笔和垃圾桶两个小图标。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <span class="name-select">自动换行<span class="caret">▼</span></span>
+        <span class="spacer"></span>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>二、悬停模板名</h2>
+  <p class="sub">整块变浅底，右侧露出铅笔（重命名）和垃圾桶（删除）。内置模板不显示垃圾桶。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <span class="name-select hover">自动换行<span class="caret">▼</span></span>
+        <span class="icon-btn hover" title="重命名">✎</span>
+        <span class="icon-btn danger hover" title="删除">🗑</span>
+        <span class="spacer"></span>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>三、点铅笔后原地编辑</h2>
+  <p class="sub">名字原地变成输入框并全选文字，直接打字覆盖。<span class="key">回车</span>或点别处生效，<span class="key">Esc</span>取消并恢复原名，名称最长20个字。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <input class="name-input" value="自动换行">
+        <span class="spacer"></span>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>四、点开下拉</h2>
+  <p class="sub">「添加模板」在下拉最后一项，与模板名用分隔线隔开。这一版悬停项上不再放铅笔，重命名统一走名字旁的铅笔图标，少一处重复。</p>
+
+  <div class="screen">
+    <div class="sidebar">
+      <div class="sidebar-item">通用设置</div>
+      <div class="sidebar-item">模型管理</div>
+      <div class="sidebar-group">语音识别</div>
+      <div class="sidebar-item">语音识别设置</div>
+      <div class="sidebar-item">语音识别规则</div>
+      <div class="sidebar-item active">文本强化规则</div>
+      <div class="sidebar-group">图像识别</div>
+      <div class="sidebar-item">图像识别设置</div>
+      <div class="sidebar-item">图像识别提示词</div>
+    </div>
+    <div class="content">
+      <div class="content-title">文本强化规则</div>
+      <div class="tool-row">
+        <span class="name-select focus">自动换行<span class="caret">▲</span></span>
+        <span class="spacer"></span>
+      </div>
+      <div class="menu" style="top:80px;left:180px">
+        <div class="menu-item sel">自动换行<span class="check">✓</span></div>
+        <div class="menu-item">自动翻译</div>
+        <div class="menu-item">自动分段</div>
+        <div class="menu-sep"></div>
+        <div class="menu-item menu-add">＋ 添加模板</div>
+        <div class="menu-tip">新模板建好后名字会直接进入编辑状态</div>
+      </div>
+      <div class="editor">（提示词编辑区）</div>
+      <div class="editor-head">
+        <span class="editor-path">/Users/lishaojie/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span>
+        <span class="btn">选择文件</span>
+        <span class="btn">重置为内置</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>五、三种做法对比</h2>
+  <table>
+    <tr>
+      <th style="width:26%">做法</th>
+      <th style="width:37%">长什么样</th>
+      <th>问题</th>
+    </tr>
+    <tr>
+      <td>常驻输入框（现在）</td>
+      <td>下拉框 + 输入框并排，都占着位置</td>
+      <td class="no">两个控件长得像，看不出谁干什么；改名得先点进去才知道要改</td>
+    </tr>
+    <tr>
+      <td>重命名按钮</td>
+      <td>下拉框 + 「重命名」按钮，点了出输入框</td>
+      <td class="no">多一个按钮占位置，改名前先被按钮拦一下，多一次点击</td>
+    </tr>
+    <tr>
+      <td><strong>原地编辑（本稿）</strong></td>
+      <td>名字旁铅笔图标，点了名字原地变输入框</td>
+      <td class="yes">不占位置，一步进入编辑，Mac 用户熟悉</td>
+    </tr>
+  </table>
+
+  <div class="note">这次改的就是这一行：去掉常驻输入框和「重命名」按钮，改成悬停出铅笔图标、原地编辑；「添加模板」移进下拉。模板选择、提示词编辑、选择文件、重置为内置、删除时的快捷键重新绑定都不动。</div>
+</div>
+</body>
+</html>

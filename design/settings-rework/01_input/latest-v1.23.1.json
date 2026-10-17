@@ -1,0 +1,35 @@
+{
+  "version": "1.23.1",
+  "notes": "- \u6ce8\u5165\u5f00\u5173\u4e0e\u6587\u672c\u5f3a\u5316\u4e92\u65a5\uff0c\u8bc6\u522b\u9636\u6bb5\u53d6\u6d88\u5355\u884c\u8f93\u51fa",
+  "pub_date": "2026-10-15T08:40:00.722Z",
+  "platforms": {
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicHpWbkhOWlBydXFwc0c4R2lwSDlwMlVPRTJLSXpnODBabk8xWWloM2JvbUkwdzBQZzFEQ0FHWmhLSSs4Z1hSVUk5V2Qvakh3SzNkbmVHVHM0eG8xZHdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzMzM5CWZpbGU6QnllVHlwZS5hcHAudGFyLmd6Cmk5bGkzWkhaZ1VTM0dEYVpwL3RiVkdkM1BWVFJMc3I0d01nZEwvdE8yMFUzQjhHbDFsbUZtT2srelNSS0NxbkJjaW9XK2dOZG9hRmVid0VxNGhodkRnPT0K",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_x64.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicHpWbkhOWlBydXFwc0c4R2lwSDlwMlVPRTJLSXpnODBabk8xWWloM2JvbUkwdzBQZzFEQ0FHWmhLSSs4Z1hSVUk5V2Qvakh3SzNkbmVHVHM0eG8xZHdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzMzM5CWZpbGU6QnllVHlwZS5hcHAudGFyLmd6Cmk5bGkzWkhaZ1VTM0dEYVpwL3RiVkdkM1BWVFJMc3I0d01nZEwvdE8yMFUzQjhHbDFsbUZtT2srelNSS0NxbkJjaW9XK2dOZG9hRmVid0VxNGhodkRnPT0K",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_x64.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicDFNZ1Z2MlZ6Z01OS08wT1NiNEdPMjE2dUVWYkZGb1pFZkVsZE1VN01UR1FmZUlRWGtlYlBiUThlS0M1WFJ5RTVqcjh3VmMreFJjOTI4TkNBQmtLcXd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzNTk2CWZpbGU6QnllVHlwZS5hcHAudGFyLmd6Ck9UMHdRekxmT3VBWjdYYU5DM1UrVm1MVDRxUURseUs4amZST1pqQmpTbWdpQUpmZlF4YjJVek1oR1FpYUdWd3AxdmNDM254WlNJM1RyQ3crUEVmOUJnPT0K",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_aarch64.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicDFNZ1Z2MlZ6Z01OS08wT1NiNEdPMjE2dUVWYkZGb1pFZkVsZE1VN01UR1FmZUlRWGtlYlBiUThlS0M1WFJ5RTVqcjh3VmMreFJjOTI4TkNBQmtLcXd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzNTk2CWZpbGU6QnllVHlwZS5hcHAudGFyLmd6Ck9UMHdRekxmT3VBWjdYYU5DM1UrVm1MVDRxUURseUs4amZST1pqQmpTbWdpQUpmZlF4YjJVek1oR1FpYUdWd3AxdmNDM254WlNJM1RyQ3crUEVmOUJnPT0K",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_aarch64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicC9waklZS2sxTWEzTUs2K2V3TXhmQld3MG0yTHVjbFJDa01IZWJYbWxLV2N5OFVPWVgvVVU5cGo2ZndsR3FDWFFvTUJNLzRNcGhtT2o4ZXBRQmljNHdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzODQwCWZpbGU6QnllVHlwZV8xLjIzLjFfeDY0X2VuLVVTLm1zaS56aXAKWGpEeUFWNllqUHBPeFk1WEdiU2hSTFQ0dWJpNEo3Tnh4ZjQwb3loOHhjcThXdDlUY3N4MWwwbDRnZHBmV01XNUc0VnJXTkQ3OE9WSnJ6UWFIZTdURFE9PQo=",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_1.23.1_x64_en-US.msi.zip"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicDRsUWh1dzdYVlRvRVRReHh4Q09SeThIazFXcGZWb1Z0dXREb2NnRmJlTFRIeDJ4Y3BLYlUwK25lekRBU081eCthcUxTbENLL21LOW1PeVdYQ2dXMmc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzODQwCWZpbGU6QnllVHlwZV8xLjIzLjFfeDY0X2VuLVVTLm1zaQpRcmd1OTYvalZpVS80Q0JvNjZneENDOEs1MXZRSEZmZDcyM1NubUpYdU83MTN3V3VUVkhnazBPbmVuQ0hhdDQ2ODhzbXVrZlVxZ1VSeUR6aWc4ejlEUT09Cg==",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_1.23.1_x64_en-US.msi"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUWWw4TFM2RzNicDZhK00zQlIrYXhrTnNGaUFvQkVhUkd3QVc0SlFmSGJVcjRIVHJVc2FnOFpGeWVNOE5RUDBiaXRkamRTYjBabDh3VVVxUmdzRytsUnp5NStqTG1CN3dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMDUzODQwCWZpbGU6QnllVHlwZV8xLjIzLjFfeDY0LXNldHVwLmV4ZQpQaHB0dnJJNy83R0FuNEZxTUtTYWtHODNCVzBHUkVkeHl0NEVwMW9wdHVHY2ZFc1lXMnJTQjZkTUNHRDI1cndIVWZnZno1dzVOT3VkL0I1ZDdGdDNBUT09Cg==",
+      "url": "https://github.com/devonmochi/byetype/releases/download/v1.23.1/ByeType_1.23.1_x64-setup.exe"
+    }
+  }
+}

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByeType 设置界面展示稿 v4（原版布局+优化开关独立）</title>
+<style>
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #fafafa;
+  --border-color: #e5e5e5;
+  --border-color-light: #f0f0f0;
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #999999;
+  --text-disabled: #c7c7cc;
+  --accent: #007aff;
+  --accent-bg: rgba(0,122,255,0.1);
+  --input-bg: #ffffff;
+  --input-border: #d2d2d7;
+  --toggle-on: #34c759;
+  --group-bg: #f9f9f9;
+  --success-color: #2ecc71;
+  --border: #e5e5e5;
+}
+[data-theme="dark"] {
+  --bg-primary: #1c1c1e;
+  --bg-secondary: #2c2c2e;
+  --bg-tertiary: #3a3a3c;
+  --border-color: #3a3a3c;
+  --border-color-light: #333336;
+  --text-primary: #f5f5f7;
+  --text-secondary: #98989f;
+  --text-tertiary: #636366;
+  --text-disabled: #48484a;
+  --accent: #0a84ff;
+  --accent-bg: rgba(10,132,255,0.15);
+  --input-bg: #2c2c2e;
+  --input-border: #3a3a3c;
+  --toggle-on: #30d158;
+  --group-bg: #2c2c2e;
+  --success-color: #30d158;
+  --border: #3a3a3c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  background: #e8e8ed;
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.frame {
+  width: 100%; max-width: 1080px; height: 740px;
+  display: flex; background: var(--bg-primary);
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+
+/* ===== 原版 sidebar ===== */
+.sidebar {
+  width: 160px; background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  padding: 16px 0; flex-shrink: 0; overflow-y: auto;
+}
+.sidebar-item {
+  padding: 8px 16px; margin: 0 8px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; color: var(--text-primary); border: none; background: none;
+  width: calc(100% - 16px); text-align: left; font-family: inherit;
+  transition: background-color .15s, color .15s; position: relative;
+}
+.sidebar-item:hover { background: var(--bg-tertiary); }
+.sidebar-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.sidebar-group {
+  font-size: 10px; color: var(--text-disabled);
+  text-transform: uppercase; letter-spacing: 1.5px;
+  padding: 4px 16px; margin: 12px 8px 4px;
+}
+.sidebar-divider { height: 1px; background: var(--border-color); margin: 8px 16px; }
+
+/* ===== 原版 content ===== */
+.content { flex: 1; padding: 24px; overflow: auto; position: relative; display: flex; flex-direction: column; }
+.content-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0 0 20px; }
+.section-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  margin: 24px 0 8px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+
+.setting-group { background: var(--group-bg); border-radius: 10px; padding: 4px 0; margin-bottom: 20px; }
+.setting-group-title {
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
+}
+.setting-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 16px; padding: 12px 16px; min-height: 44px;
+}
+.setting-row:not(:last-child) { border-bottom: 1px solid var(--border-color-light); }
+.setting-row-main { min-width: 0; }
+.setting-row-label { font-size: 13px; color: var(--text-primary); font-weight: 400; }
+.setting-row-description { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+.toggle {
+  position: relative; width: 36px; height: 20px; border-radius: 10px;
+  background: var(--border-color); cursor: pointer; border: none; padding: 0;
+  transition: background-color .2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--toggle-on); }
+.toggle-knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; transition: transform .2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+.toggle.on .toggle-knob { transform: translateX(16px); }
+
+.input, .select {
+  padding: 6px 12px; border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--input-bg); color: var(--text-primary); font-size: 13px;
+  font-family: inherit; outline: none;
+}
+.input:focus, .select:focus { border-color: var(--accent); }
+.kbd {
+  display: inline-block; padding: 4px 10px;
+  background: var(--bg-tertiary); border: 1px solid var(--input-border);
+  border-radius: 6px; font-size: 12px; font-family: -apple-system, monospace;
+  color: var(--text-primary); cursor: pointer; min-width: 70px; text-align: center;
+}
+.appearance-options { display: flex; gap: 16px; }
+.appearance-option { text-align: center; cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; }
+.appearance-preview { width: 60px; height: 42px; border-radius: 8px; border: 2px solid transparent; margin-bottom: 6px; }
+.appearance-option.active .appearance-preview { border-color: var(--accent); }
+.appearance-label { font-size: 11px; color: var(--text-secondary); }
+.appearance-option.active .appearance-label { color: var(--accent); font-weight: 500; }
+
+.btn {
+  padding: 5px 10px; border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--input-bg); color: var(--text-primary); font-size: 12px;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: background-color .15s, border-color .15s;
+}
+.btn:hover { background: var(--bg-tertiary); border-color: var(--accent); }
+
+.saved-toast { color: var(--success-color); font-size: 13px; position: absolute; top: 24px; right: 24px; }
+
+/* prompt tabs（原版） */
+.prompt-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 0; flex-wrap: wrap; flex-shrink: 0; }
+.prompt-tab {
+  padding: 8px 16px; font-size: 13px; color: var(--text-secondary); cursor: pointer;
+  border: none; background: none; border-bottom: 2px solid transparent;
+  font-family: inherit;
+}
+.prompt-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.prompt-path-bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 0;
+  font-size: 12px; color: var(--text-secondary); min-height: 36px;
+}
+.prompt-path-bar .path-text {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: -apple-system, monospace; font-size: 11px; color: var(--text-tertiary); font-style: italic;
+}
+.prompt-editor-container {
+  min-height: 150px; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden;
+  background: var(--input-bg);
+}
+.cm-content {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.6;
+  padding: 10px 12px; color: var(--text-primary); white-space: pre-wrap;
+  min-height: 150px; max-height: 220px; overflow-y: auto;
+}
+.prompt-save-status { font-size: 11px; padding: 4px 0; text-align: right; min-height: 20px; color: var(--success-color); }
+
+/* 模板卡片（原版转写提示词页） */
+.tpl-card {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 10px;
+}
+.tpl-card-head {
+  display: flex; align-items: center; padding: 10px 14px; gap: 10px; cursor: pointer;
+  background: var(--bg-secondary); border-radius: 10px 10px 0 0;
+}
+.tpl-name-input {
+  flex: 1; border: transparent; background: transparent; font-size: 13px;
+  padding: 2px 4px; min-width: 0; color: var(--text-primary); font-family: inherit; outline: none;
+}
+.tpl-badge {
+  font-size: 10px; color: var(--text-secondary); background: var(--bg-tertiary);
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.tpl-card-body { border-top: 1px solid var(--border); padding: 12px 14px; display: none; }
+.tpl-card.open .tpl-card-body { display: block; }
+
+/* 模型管理（原版） */
+.models-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.models-section-title {
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 8px;
+}
+.model-card { background: var(--group-bg); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; }
+.model-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.model-card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.model-card-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.model-card-row label { font-size: 12px; color: var(--text-secondary); white-space: nowrap; min-width: 60px; }
+.provider-model-list { margin-top: 8px; border-top: 1px solid var(--border-color-light); }
+.provider-model-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; }
+.provider-model-item:not(:last-child) { border-bottom: 1px solid var(--border-color-light); }
+.provider-model-name { font-size: 12px; color: var(--text-primary); flex: 1; min-width: 0; }
+.model-caps { display: inline-flex; gap: 4px; margin-left: 6px; min-width: 100px; justify-content: flex-end; }
+.cap-tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 500; }
+.cap-audio { background: rgba(99,102,241,.12); color: rgb(99,102,241); }
+.cap-vision { background: rgba(234,179,8,.12); color: rgb(180,138,6); }
+.cap-text { background: rgba(34,197,94,.12); color: rgb(22,163,74); }
+.api-key-wrapper { position: relative; display: flex; align-items: center; flex: 1; max-width: 350px; }
+.api-key-wrapper .input { flex: 1; padding-right: 36px; }
+.api-key-toggle { position: absolute; right: 8px; background: none; border: none; cursor: pointer; color: var(--text-tertiary); }
+.add-model-btn {
+  width: 100%; padding: 10px; border-radius: 10px; border: 1px dashed var(--border-color);
+  background: none; color: var(--text-secondary); cursor: pointer; font-size: 13px;
+  font-family: inherit;
+}
+
+/* about */
+.about-header { display: flex; flex-direction: column; align-items: center; padding: 24px 0 20px; gap: 8px; }
+.about-app-icon {
+  width: 56px; height: 56px; border-radius: 12px;
+  background: linear-gradient(135deg, #FF8C42, #FF5E1A);
+  display: flex; align-items: center; justify-content: center;
+}
+.about-app-name { font-size: 16px; font-weight: 600; }
+.about-app-version { font-size: 12px; color: var(--text-secondary); }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.78); color: #fff; font-size: 12px;
+  padding: 8px 16px; border-radius: 8px; opacity: 0; pointer-events: none;
+  transition: opacity .25s; z-index: 99;
+}
+.toast.show { opacity: 1; }
+.page { display: none; }
+.page.active { display: block; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="content" id="content">
+    <span class="saved-toast" id="savedToast"></span>
+
+    <!-- ============ 通用设置（原版布局，仅快捷键风格下拉去掉「无」） ============ -->
+    <section class="page" data-page="general">
+      <h2 class="content-title">通用设置</h2>
+
+      <div class="setting-group" style="margin-bottom:8px"><div class="setting-group-title" style="padding:8px 16px 0">外观</div></div>
+      <div class="setting-group">
+        <div style="padding:12px 16px">
+          <div class="appearance-options">
+            <button class="appearance-option" onclick="setTheme('light',this)"><div class="appearance-preview" style="background:#fff;border:1px solid #d2d2d7"></div><div class="appearance-label">浅色</div></button>
+            <button class="appearance-option" onclick="setTheme('dark',this)"><div class="appearance-preview" style="background:#1c1c1e"></div><div class="appearance-label">深色</div></button>
+            <button class="appearance-option active" onclick="setTheme('system',this)"><div class="appearance-preview" style="background:linear-gradient(to right,#fff 50%,#1c1c1e 50%)"></div><div class="appearance-label">自动</div></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-group-title" style="padding:0 16px">语音输入</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">语音输入 1</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:var(--text-secondary)">输出风格</span>
+            <select class="select" style="min-width:100px"><option>自动换行</option><option>翻译</option><option>自定义</option></select>
+            <span class="kbd" onclick="recordKey(this)">F4</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">语音输入 2</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:var(--text-secondary)">输出风格</span>
+            <select class="select" style="min-width:100px"><option>翻译</option><option>自动换行</option><option>自定义</option></select>
+            <span class="kbd" onclick="recordKey(this)">F5</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">按住说话模式</div>
+            <div class="setting-row-description">开启后按住快捷键期间录音，松开立即识别</div>
+          </div>
+          <button class="toggle" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">覆盖剪贴板</div>
+            <div class="setting-row-description">开启后识别结果会写入剪贴板，覆盖你之前复制的内容</div>
+          </div>
+          <button class="toggle on" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+
+      <div class="setting-group-title" style="padding:0 16px">图像识别</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">截图取词</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:var(--text-secondary)">输出风格</span>
+            <select class="select" style="min-width:100px"><option>文字识别</option><option>翻译</option><option>自定义</option></select>
+            <span class="kbd" onclick="recordKey(this)">F6</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">截图翻译</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:var(--text-secondary)">输出风格</span>
+            <select class="select" style="min-width:100px"><option>翻译</option><option>文字识别</option></select>
+            <span class="kbd muted" onclick="recordKey(this)" style="color:var(--text-tertiary)">未设置</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-group-title" style="padding:0 16px">其他</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">最大录音时长</div>
+            <div class="setting-row-description">超时自动停止并处理，单位为秒</div>
+          </div>
+          <input type="number" class="input" value="180" style="width:80px;text-align:center">
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">开机自启</div>
+            <div class="setting-row-description">登录后自动启动 ByeType</div>
+          </div>
+          <button class="toggle on" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+
+      <div class="setting-group-title" style="padding:0 16px">麦克风</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">输入设备</div>
+            <div class="setting-row-description">选择用于语音输入的麦克风</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select class="select" style="max-width:200px"><option>系统默认</option><option>MacBook Pro麦克风</option></select>
+            <button class="btn">刷新</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-group-title" style="padding:0 16px">网络与性能</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">本机转写接口</div>
+            <div class="setting-row-description">允许本机程序通过HTTP提交音频，结果以纯文本返回</div>
+          </div>
+          <button class="toggle" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">本机接口端口</div>
+            <div class="setting-row-description">仅监听127.0.0.1，不接受局域网访问</div>
+          </div>
+          <input class="input" type="number" value="8765" style="width:100px">
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">转写超时时间</div></div>
+          <input class="input" type="number" value="10" style="width:100px">
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">文本优化超时时间</div></div>
+          <input class="input" type="number" value="10" style="width:100px">
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">最大重试次数</div></div>
+          <input class="input" type="number" value="3" style="width:100px">
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">最大并行任务数</div></div>
+          <input class="input" type="number" value="3" style="width:100px">
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">HTTP 代理</div>
+            <div class="setting-row-description">用于 Gemini 等需要代理的服务</div>
+          </div>
+          <button class="toggle on" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 转写设置（核心改动：文本优化独立开关） ============ -->
+    <section class="page" data-page="transcribe">
+      <h2 class="content-title">转写设置</h2>
+
+      <div class="setting-group-title" style="padding:0 16px">模型</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">转写模型</div></div>
+          <select class="select" style="width:260px">
+            <optgroup label="预置模型"><option>Google Gemini - gemini-3.8-flash</option><option>阿里云百炼 - qwen3.8-omni-flash</option></optgroup>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">启用思考</div>
+            <div class="setting-row-description">让模型在转写前先进行推理</div>
+          </div>
+          <button class="toggle" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+
+      <h3 class="section-title">文本优化模型</h3>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">启用文本优化</div>
+            <div class="setting-row-description">转写后按输出风格再加工一遍；关闭则直接输出转写结果</div>
+          </div>
+          <button class="toggle on" id="opt-toggle" onclick="toggleOpt(this)"><span class="toggle-knob"></span></button>
+        </div>
+        <div id="opt-rows">
+          <div class="setting-row">
+            <div class="setting-row-main">
+              <div class="setting-row-label">处理模型</div>
+              <div class="setting-row-description">转写后的文本优化处理使用此模型</div>
+            </div>
+            <select class="select" style="width:260px">
+              <optgroup label="预置模型"><option>DeepSeek - deepseek-flash</option><option>Google Gemini - gemini-3.8-flash</option></optgroup>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-main">
+              <div class="setting-row-label">启用思考</div>
+              <div class="setting-row-description">DeepSeek V4.1 Flash 默认开启思考,关闭可显著提速</div>
+            </div>
+            <button class="toggle on" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-main">
+              <div class="setting-row-label">Reasoning Effort</div>
+              <div class="setting-row-description">DeepSeek思考强度，low更快，max更深</div>
+            </div>
+            <select class="select" style="width:120px"><option>low</option><option>high</option><option>max</option></select>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="section-title">其他</h3>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">规则增强</div>
+            <div class="setting-row-description">文本优化时再次注入所有音频转写规则，适合音频转写能力较弱的模型</div>
+          </div>
+          <button class="toggle" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 转写提示词（原版） ============ -->
+    <section class="page" data-page="voice-prompts">
+      <h2 class="content-title">转写提示词</h2>
+      <div class="prompt-tabs">
+        <button class="prompt-tab active" onclick="ptab(this,'p-agent')">角色定义</button>
+        <button class="prompt-tab" onclick="ptab(this,'p-rules')">转录规则</button>
+        <button class="prompt-tab" onclick="ptab(this,'p-vocab')">专有词汇</button>
+      </div>
+      <div class="prompt-path-bar">
+        <span class="path-text">~/Library/Application Support/com.byetype.app/prompts/agent.md</span>
+        <button class="btn">选择文件</button>
+        <button class="btn">重置为内置</button>
+      </div>
+      <div class="prompt-editor-container"><div class="cm-content" contenteditable="true" id="p-agent">你是一台转录机器，只做一件事：把语音变成文字。
+
+## 核心任务
+唯一任务是将用户的语音输入转换为文本或进行翻译，不做任何其他解释或回应。</div></div>
+      <div class="prompt-editor-container" style="display:none" id="p-rules"><div class="cm-content" contenteditable="true"># 转录规则
+
+## 输出格式
+- 默认输出阿拉伯数字："第一步" → "第1步"
+- 时间、金钱、计量单位使用阿拉伯数字："九块五毛" → "9.5元"
+
+## 口语清理
+- 语气词直接省略："嗯，我知道了啊" → "我知道了"</div></div>
+      <div class="prompt-editor-container" style="display:none" id="p-vocab"><div class="cm-content" contenteditable="true"># 专有词汇表
+
+## 人名
+李少杰
+
+## 技术词汇
+ByeType、DeepSeek</div></div>
+      <div class="prompt-save-status">✓ 已保存</div>
+
+      <h2 class="content-title" style="margin-top:24px">文本优化提示词</h2>
+      <div class="tpl-card open">
+        <div class="tpl-card-head" onclick="this.parentElement.classList.toggle('open')">
+          <span style="font-size:12px;color:var(--text-secondary)">▼</span>
+          <input class="tpl-name-input" value="自动换行">
+          <span class="tpl-badge">内置</span>
+        </div>
+        <div class="tpl-card-body">
+          <div class="prompt-path-bar"><span class="path-text">~/Library/Application Support/com.byetype.app/prompts/text-optimize.md</span><button class="btn">重置为内置</button></div>
+          <div class="prompt-editor-container"><div class="cm-content" contenteditable="true">你是一个纯文本分段工具。把连续文本整理成便于阅读的自然段落。每段包含1至2句话。</div></div>
+        </div>
+      </div>
+      <div class="tpl-card">
+        <div class="tpl-card-head" onclick="this.parentElement.classList.toggle('open')">
+          <span style="font-size:12px;color:var(--text-secondary)">▶</span>
+          <input class="tpl-name-input" value="翻译">
+          <span class="tpl-badge">内置</span>
+        </div>
+        <div class="tpl-card-body"></div>
+      </div>
+      <button class="btn" style="width:100%;margin-top:8px">+ 添加模板</button>
+    </section>
+
+    <!-- ============ 图像识别设置（原版） ============ -->
+    <section class="page" data-page="extract">
+      <h2 class="content-title">图像识别设置</h2>
+      <div class="setting-group-title" style="padding:0 16px">模型</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">图像识别模型</div></div>
+          <select class="select" style="width:260px">
+            <optgroup label="预置模型"><option>Google Gemini - gemini-3.8-flash</option><option>阿里云百炼 - qwen3.8-omni-flash</option></optgroup>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 图像识别提示词（原版） ============ -->
+    <section class="page" data-page="extract-prompts">
+      <h2 class="content-title">图像识别提示词</h2>
+      <div class="tpl-card open">
+        <div class="tpl-card-head" onclick="this.parentElement.classList.toggle('open')">
+          <span style="font-size:12px;color:var(--text-secondary)">▼</span>
+          <input class="tpl-name-input" value="文字识别">
+          <span class="tpl-badge">内置</span>
+        </div>
+        <div class="tpl-card-body">
+          <div class="prompt-path-bar"><span class="path-text">text-extract.md</span><button class="btn">重置为内置</button></div>
+          <div class="prompt-editor-container"><div class="cm-content" contenteditable="true">你是精通 OCR 和信息架构的文本提取助手……</div></div>
+        </div>
+      </div>
+      <div class="tpl-card">
+        <div class="tpl-card-head" onclick="this.parentElement.classList.toggle('open')">
+          <span style="font-size:12px;color:var(--text-secondary)">▶</span>
+          <input class="tpl-name-input" value="翻译">
+          <span class="tpl-badge">内置</span>
+        </div>
+        <div class="tpl-card-body"></div>
+      </div>
+      <button class="btn" style="width:100%;margin-top:8px">+ 添加模板</button>
+    </section>
+
+    <!-- ============ 自动学习（原版） ============ -->
+    <section class="page" data-page="voice-learning">
+      <h2 class="content-title">自动学习</h2>
+      <div class="setting-group-title" style="padding:0 16px">模型</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">学习模型</div>
+            <div class="setting-row-description">用于对比原始转写与用户修改文本，并归纳纠错规则</div>
+          </div>
+          <select class="select" style="width:260px"><option>DeepSeek - deepseek-flash</option></select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-main">
+            <div class="setting-row-label">启用思考</div>
+            <div class="setting-row-description">让模型在归纳纠错规则前先进行推理</div>
+          </div>
+          <button class="toggle on" onclick="toggle(this)"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+      <h3 class="section-title">学习文档</h3>
+      <div class="prompt-tabs">
+        <button class="prompt-tab active">学习提示词</button>
+        <button class="prompt-tab">学习结果</button>
+      </div>
+      <div class="prompt-path-bar"><span class="path-text">voice-learning-prompt.md</span></div>
+      <div class="prompt-editor-container"><div class="cm-content" contenteditable="true">你负责判断用户对语音转写结果的修改是否包含值得长期学习的内容，并提取可复用的学习项。</div></div>
+    </section>
+
+    <!-- ============ 模型管理（原版） ============ -->
+    <section class="page" data-page="models">
+      <div class="models-header">
+        <h2 class="content-title" style="margin:0">模型管理</h2>
+        <button class="btn" onclick="toast('测试全部（展示稿为模拟）')">测试全部连通性</button>
+      </div>
+
+      <div class="models-section-title">预置模型</div>
+      <div class="model-card">
+        <div class="model-card-header"><span class="model-card-title">Google Gemini</span></div>
+        <div class="model-card-row">
+          <label>API Key</label>
+          <div class="api-key-wrapper">
+            <input class="input" type="password" value="AIzaSyD-xxxxxxxxxxxx">
+            <button class="api-key-toggle" onclick="togglePwd(this)">👁</button>
+          </div>
+        </div>
+        <div class="provider-model-list">
+          <div class="provider-model-item">
+            <span class="provider-model-name">gemini-3.8-flash</span>
+            <span class="model-caps"><span class="cap-tag cap-audio">音频</span><span class="cap-tag cap-vision">图像</span><span class="cap-tag cap-text">文本</span></span>
+            <button class="btn" style="font-size:11px" onclick="toast('连接正常 412ms（展示稿为模拟）')">测试</button>
+          </div>
+        </div>
+      </div>
+      <div class="model-card">
+        <div class="model-card-header"><span class="model-card-title">阿里云百炼</span></div>
+        <div class="model-card-row">
+          <label>API Key</label>
+          <div class="api-key-wrapper">
+            <input class="input" type="password" value="sk-xxxxxxxx">
+            <button class="api-key-toggle" onclick="togglePwd(this)">👁</button>
+          </div>
+        </div>
+        <div class="provider-model-list">
+          <div class="provider-model-item">
+            <span class="provider-model-name">qwen3.8-omni-flash</span>
+            <span class="model-caps"><span class="cap-tag cap-audio">音频</span><span class="cap-tag cap-vision">图像</span><span class="cap-tag cap-text">文本</span></span>
+            <button class="btn" style="font-size:11px" onclick="toast('连接正常 356ms（展示稿为模拟）')">测试</button>
+          </div>
+        </div>
+      </div>
+      <div class="model-card">
+        <div class="model-card-header"><span class="model-card-title">DeepSeek</span></div>
+        <div class="model-card-row">
+          <label>API Key</label>
+          <div class="api-key-wrapper"><input class="input" placeholder="sk-..."></div>
+        </div>
+        <div class="provider-model-list">
+          <div class="provider-model-item">
+            <span class="provider-model-name">deepseek-flash</span>
+            <span class="model-caps"><span class="cap-tag cap-vision">图像</span><span class="cap-tag cap-text">文本</span></span>
+            <button class="btn" style="font-size:11px" onclick="toast('密钥未填写（展示稿为模拟）')">测试</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="models-section-title" style="cursor:pointer">自定义模型 ▶</div>
+      <button class="add-model-btn">+ 添加自定义模型</button>
+    </section>
+
+    <!-- ============ 关于（原版） ============ -->
+    <section class="page" data-page="about">
+      <h2 class="content-title">关于</h2>
+      <div class="about-header">
+        <div class="about-app-icon">
+          <svg width="36" height="38" viewBox="0 0 92 94">
+            <rect x="1" y="30" width="16" height="34" rx="8" fill="white"/>
+            <rect x="19.5" y="12" width="16" height="70" rx="8" fill="white"/>
+            <rect x="38" y="2" width="16" height="90" rx="8" fill="white"/>
+            <rect x="56.5" y="12" width="16" height="70" rx="8" fill="white"/>
+            <rect x="75" y="30" width="16" height="34" rx="8" fill="white"/>
+          </svg>
+        </div>
+        <div class="about-app-name">ByeType</div>
+        <div class="about-app-version">版本 1.22.4</div>
+      </div>
+      <div style="display:flex;justify-content:center;margin-bottom:20px">
+        <button class="btn" style="background:var(--accent);color:#fff;border-color:var(--accent);padding:6px 16px;font-size:13px" onclick="toast('已是最新版本（展示稿为模拟）')">检查更新</button>
+      </div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-row-main"><div class="setting-row-label">当前版本</div></div>
+          <span style="font-size:13px;color:var(--text-secondary)">1.22.4</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 原版侧栏结构 =====
+const TABS = [
+  { type: 'tab', id: 'general', label: '通用设置' },
+  { type: 'tab', id: 'models', label: '模型管理' },
+  { type: 'group', label: '语音转写' },
+  { type: 'tab', id: 'transcribe', label: '转写设置' },
+  { type: 'tab', id: 'voice-prompts', label: '转写提示词' },
+  { type: 'group', label: '图像识别' },
+  { type: 'tab', id: 'extract', label: '图像识别设置' },
+  { type: 'tab', id: 'extract-prompts', label: '图像识别提示词' },
+  { type: 'group', label: '智能学习' },
+  { type: 'tab', id: 'voice-learning', label: '自动学习' },
+  { type: 'divider' },
+  { type: 'tab', id: 'about', label: '关于' },
+]
+const sidebar = document.getElementById('sidebar')
+TABS.forEach((item, i) => {
+  if (item.type === 'group') {
+    const el = document.createElement('div'); el.className = 'sidebar-group'; el.textContent = item.label
+    sidebar.appendChild(el); return
+  }
+  if (item.type === 'divider') {
+    const el = document.createElement('div'); el.className = 'sidebar-divider'
+    sidebar.appendChild(el); return
+  }
+  const el = document.createElement('button')
+  el.className = 'sidebar-item'; el.textContent = item.label; el.dataset.page = item.id
+  el.onclick = () => go(item.id)
+  sidebar.appendChild(el)
+})
+function go(id) {
+  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.toggle('active', b.dataset.page === id))
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === id))
+  document.getElementById('content').scrollTop = 0
+}
+go('general')
+
+function toggle(btn) { btn.classList.toggle('on'); saved() }
+function toggleOpt(btn) {
+  btn.classList.toggle('on')
+  document.getElementById('opt-rows').style.display = btn.classList.contains('on') ? '' : 'none'
+  saved()
+}
+function setTheme(mode, btn) {
+  document.querySelectorAll('.appearance-option').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  const dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+}
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark'
+
+function recordKey(kbd) {
+  kbd.style.background = '#fff3cd'; kbd.textContent = '按下新按键'
+  const old = 'F4'
+  const handler = e => {
+    e.preventDefault()
+    window.removeEventListener('keydown', handler, true)
+    kbd.style.background = ''
+    kbd.textContent = e.key === 'Escape' ? old : e.key.toUpperCase()
+    saved()
+  }
+  window.addEventListener('keydown', handler, true)
+}
+function togglePwd(eye) {
+  const input = eye.parentElement.querySelector('input')
+  input.type = input.type === 'password' ? 'text' : 'password'
+}
+function ptab(btn, id) {
+  btn.parentElement.querySelectorAll('.prompt-tab').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  ;['p-agent', 'p-rules', 'p-vocab'].forEach(x => document.getElementById(x).parentElement.style.display = x === id ? '' : 'none')
+}
+let savedTimer
+function saved() {
+  const el = document.getElementById('savedToast')
+  el.textContent = '✓ 已保存'
+  clearTimeout(savedTimer)
+  savedTimer = setTimeout(() => el.textContent = '', 1500)
+}
+let toastTimer
+function toast(msg) {
+  const el = document.getElementById('toast')
+  el.textContent = msg; el.classList.add('show')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800)
+}
+</script>
+</body>
+</html>
