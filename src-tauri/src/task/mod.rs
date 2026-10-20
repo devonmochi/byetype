@@ -334,22 +334,48 @@ pub fn retry_record(app: &AppHandle, record_id: u64) -> Result<(), String> {
     Ok(())
 }
 
+/// 复用的 HTTP 客户端缓存。代理配置不变时直接 clone 已有客户端，
+/// reqwest::Client 内部是 Arc，clone 开销很小，避免每次处理都重建连接池。
+struct CachedClient {
+    proxy_enabled: bool,
+    proxy_url: String,
+    client: reqwest::Client,
+}
+
+static CLIENT_CACHE: std::sync::LazyLock<std::sync::Mutex<Option<CachedClient>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
 pub(crate) fn build_client(
     proxy_enabled: bool,
     proxy_url: &str,
 ) -> Result<reqwest::Client, String> {
-    if !proxy_enabled || proxy_url.is_empty() {
+    let mut cache = CLIENT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(cached) = cache.as_ref() {
+        // 代理配置没变就复用，连接池不会重建
+        if cached.proxy_enabled == proxy_enabled && cached.proxy_url == proxy_url {
+            return Ok(cached.client.clone());
+        }
+    }
+
+    let client = if !proxy_enabled || proxy_url.is_empty() {
         reqwest::Client::builder()
             .build()
-            .map_err(|e| format!("Failed to build HTTP client: {}", e))
+            .map_err(|e| format!("Failed to build HTTP client: {}", e))?
     } else {
         let proxy = reqwest::Proxy::all(proxy_url)
             .map_err(|e| format!("Invalid proxy URL: {}", e))?;
         reqwest::Client::builder()
             .proxy(proxy)
             .build()
-            .map_err(|e| format!("Failed to build proxy client: {}", e))
-    }
+            .map_err(|e| format!("Failed to build proxy client: {}", e))?
+    };
+
+    *cache = Some(CachedClient {
+        proxy_enabled,
+        proxy_url: proxy_url.to_string(),
+        client: client.clone(),
+    });
+    Ok(client)
 }
 
 async fn run_pipeline(

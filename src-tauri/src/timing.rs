@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
@@ -41,7 +41,6 @@ pub struct TimingRecord {
 
 struct TimingState {
     path: PathBuf,
-    records: Vec<TimingRecord>,
     app: Option<AppHandle>,
 }
 
@@ -51,73 +50,94 @@ fn state() -> &'static Mutex<TimingState> {
     STATE.get_or_init(|| {
         Mutex::new(TimingState {
             path: PathBuf::new(),
-            records: Vec::new(),
             app: None,
         })
     })
 }
 
-/// 应用启动时调用：加载数据目录下的历史耗时记录。
+/// 应用启动时调用：只记录路径，历史记录按需从磁盘读取。
 pub fn init(data_dir: &std::path::Path, app: AppHandle) {
     let path = data_dir.join(TIMING_FILE);
     let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
-    st.path = path.clone();
+    st.path = path;
     st.app = Some(app);
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            match serde_json::from_str::<TimingRecord>(line) {
-                Ok(record) => st.records.push(record),
-                Err(e) => eprintln!("[Timing] 跳过无法解析的记录行: {}", e),
-            }
-        }
-    }
 }
 
 /// 记录一次成功的录音处理。写入失败只打日志，不影响主流程。
 pub fn record(entry: TimingRecord) {
-    let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
-
-    if !st.path.as_os_str().is_empty() {
-        match OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&st.path)
-            .and_then(|mut file| {
-                let line = serde_json::to_string(&entry).unwrap_or_default();
-                writeln!(file, "{}", line)
-            }) {
-            Ok(()) => {}
-            Err(e) => eprintln!("[Timing] 写入耗时记录失败: {}", e),
-        }
+    // 锁内写完文件再释放，保证多线程追加时不会写出半行记录
+    let st = state().lock().unwrap_or_else(|e| e.into_inner());
+    if st.path.as_os_str().is_empty() {
+        return;
     }
 
-    st.records.push(entry);
-    if let Some(app) = &st.app {
-        let _ = app.emit("timing-updated", ());
+    match OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&st.path)
+        .and_then(|mut file| {
+            let line = serde_json::to_string(&entry).unwrap_or_default();
+            writeln!(file, "{}", line)
+        }) {
+        Ok(()) => {
+            // 写成功才通知前端，payload 是这条新记录本身
+            if let Some(app) = &st.app {
+                let _ = app.emit("timing-updated", &entry);
+            }
+        }
+        Err(e) => eprintln!("[Timing] 写入耗时记录失败: {}", e),
     }
 }
 
-pub fn get_records() -> Vec<TimingRecord> {
-    state()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .records
-        .clone()
+/// 从磁盘按需读取耗时记录；since 为毫秒时间戳时只返回 ts >= since 的记录。
+pub fn get_records(since: Option<u64>) -> Vec<TimingRecord> {
+    // 锁内只 clone 路径，文件读取放到锁外
+    let path = {
+        let st = state().lock().unwrap_or_else(|e| e.into_inner());
+        st.path.clone()
+    };
+    if path.as_os_str().is_empty() {
+        return Vec::new();
+    }
+    let file = match std::fs::File::open(&path) {
+        Ok(file) => file,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut records = Vec::new();
+    for line in std::io::BufReader::new(file).lines() {
+        let line = match line {
+            Ok(line) => line,
+            Err(e) => {
+                eprintln!("[Timing] 读取耗时记录失败: {}", e);
+                break;
+            }
+        };
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<TimingRecord>(line) {
+            Ok(record) => {
+                if since.map_or(true, |since| record.ts >= since) {
+                    records.push(record);
+                }
+            }
+            Err(e) => eprintln!("[Timing] 跳过无法解析的记录行: {}", e),
+        }
+    }
+    records
 }
 
 pub fn clear() -> Result<(), String> {
-    let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
+    let st = state().lock().unwrap_or_else(|e| e.into_inner());
     if st.path.as_os_str().is_empty() {
         return Ok(());
     }
     std::fs::write(&st.path, "").map_err(|e| format!("清空耗时记录失败: {}", e))?;
-    st.records.clear();
     if let Some(app) = &st.app {
-        let _ = app.emit("timing-updated", ());
+        // payload 为 null，表示记录已被清空，前端需要重新拉取
+        let _ = app.emit("timing-updated", None::<TimingRecord>);
     }
     Ok(())
 }
