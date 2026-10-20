@@ -218,8 +218,8 @@ pub fn retry_record(
 // ==================== Usage ====================
 
 #[tauri::command]
-pub fn get_usage_records() -> Result<Vec<crate::usage::UsageRecord>, String> {
-    Ok(crate::usage::get_records())
+pub fn get_usage_records(since: Option<u64>) -> Result<Vec<crate::usage::UsageRecord>, String> {
+    Ok(crate::usage::get_records(since))
 }
 
 #[tauri::command]
@@ -230,8 +230,8 @@ pub fn clear_usage_records() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_timing_records() -> Result<Vec<crate::timing::TimingRecord>, String> {
-    Ok(crate::timing::get_records())
+pub fn get_timing_records(since: Option<u64>) -> Result<Vec<crate::timing::TimingRecord>, String> {
+    Ok(crate::timing::get_records(since))
 }
 
 #[tauri::command]

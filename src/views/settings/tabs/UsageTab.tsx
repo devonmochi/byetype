@@ -58,6 +58,22 @@ function startOfDay(ts: number): number {
   return d.getTime()
 }
 
+/** 各时间范围需要向磁盘读取的最早时间戳；null 表示全部。 */
+function sinceForRange(range: RangeId): number | null {
+  const todayStart = startOfDay(Date.now())
+  switch (range) {
+    case 'today':
+      return todayStart - DAY_MS
+    case '7d':
+      return todayStart - 13 * DAY_MS
+    case '30d':
+      return todayStart - 59 * DAY_MS
+    case 'all':
+    default:
+      return null
+  }
+}
+
 interface BucketLabel {
   label: string
   tipLabel: string
@@ -169,34 +185,50 @@ export function UsageTab() {
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chartWrapRef = useRef<HTMLDivElement>(null)
 
+  // 切换时间范围时按新范围重新读取
   useEffect(() => {
     let cancelled = false
+
+    // 只从当前范围（含对比周期）的起点开始读，不再把全部历史拉进内存
     const loadUsage = () => {
-      invoke<UsageRecord[]>('get_usage_records')
+      invoke<UsageRecord[]>('get_usage_records', { since: sinceForRange(range) })
         .then(r => { if (!cancelled) setRecords(r) })
         .catch(() => {})
     }
     const loadTiming = () => {
-      invoke<TimingRecord[]>('get_timing_records')
+      invoke<TimingRecord[]>('get_timing_records', { since: sinceForRange(range) })
         .then(r => { if (!cancelled) setTiming(r) })
         .catch(() => {})
     }
     loadUsage()
     loadTiming()
 
-    let unlistenUsage: (() => void) | null = null
-    let unlistenTiming: (() => void) | null = null
-    onEvent<null>('usage-updated', loadUsage)
-      .then(fn => { if (cancelled) fn(); else unlistenUsage = fn })
-    onEvent<null>('timing-updated', loadTiming)
-      .then(fn => { if (cancelled) fn(); else unlistenTiming = fn })
+    const unlisteners: (() => void)[] = []
+    const track = (p: Promise<() => void>) => {
+      p.then(fn => { if (cancelled) fn(); else unlisteners.push(fn) })
+    }
+
+    // payload 是新增的一条记录，直接追加；payload 为 null 表示已清空，重新拉一次
+    track(onEvent<UsageRecord | null>('usage-updated', rec => {
+      if (cancelled) return
+      if (rec) setRecords(prev => [...prev, rec])
+      else loadUsage()
+    }))
+    track(onEvent<TimingRecord | null>('timing-updated', rec => {
+      if (cancelled) return
+      if (rec) setTiming(prev => [...prev, rec])
+      else loadTiming()
+    }))
 
     return () => {
       cancelled = true
-      unlistenUsage?.()
-      unlistenTiming?.()
-      if (confirmTimer.current) clearTimeout(confirmTimer.current)
+      unlisteners.forEach(fn => fn())
     }
+  }, [range])
+
+  // 「清空记录」的二次确认计时器只在卸载时清理，不受范围切换影响
+  useEffect(() => () => {
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
   }, [])
 
   const handleClear = useCallback(async () => {
@@ -210,12 +242,9 @@ export function UsageTab() {
     setConfirming(false)
     try {
       await invoke('clear_usage_records')
-      const [u, t] = await Promise.all([
-        invoke<UsageRecord[]>('get_usage_records'),
-        invoke<TimingRecord[]>('get_timing_records'),
-      ])
-      setRecords(u)
-      setTiming(t)
+      // 后端清空后会广播 payload 为 null 的事件触发重拉，这里先把本地状态置空
+      setRecords([])
+      setTiming([])
     } catch (e) {
       console.error('clear usage failed:', e)
     }
@@ -459,7 +488,7 @@ export function UsageTab() {
           <h2 className="content-title">用量统计</h2>
           {viewSeg}
           {rangeTabs}
-          <div className="usage-empty">暂无用量记录，使用语音转写、图像识别或自动学习后自动累积</div>
+          <div className="usage-empty">当前时间范围内暂无用量记录</div>
         </div>
       )
     }
@@ -657,7 +686,7 @@ export function UsageTab() {
         <h2 className="content-title">用量统计</h2>
         {viewSeg}
         {rangeTabs}
-        <div className="usage-empty">暂无处理耗时记录，完成一次语音录音后自动累积</div>
+        <div className="usage-empty">当前时间范围内暂无耗时记录</div>
       </div>
     )
   }
