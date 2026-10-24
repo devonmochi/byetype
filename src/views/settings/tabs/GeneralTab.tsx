@@ -156,7 +156,7 @@ export function GeneralTab({ config, onSave }: Props) {
   const strengtheningEnabled = config.general.textStrengtheningEnabled !== false
   const voiceTemplates = config.voiceTemplates.templates ?? []
 
-  // 文本强化关闭时第二个语音快捷键不注册，也不该再挡住其他快捷键，
+  // 文本优化关闭时第二个语音快捷键不注册，也不该再挡住其他快捷键，
   // 与 Rust 侧 register 的冲突检测保持一致。
   const secondVoiceConflict = (): { key: string; label: string }[] =>
     strengtheningEnabled && config.general.shortcut2
@@ -296,8 +296,8 @@ export function GeneralTab({ config, onSave }: Props) {
         <SettingRow
           label={
             <span className="mode-label">
-              文本强化
-              <span className="strengthening-formula">（语音识别文本＋强化规则＝最终文本）</span>
+              文本优化
+              <span className="strengthening-formula">（识别文本＋规则＝最终文本）</span>
             </span>
           }
         >

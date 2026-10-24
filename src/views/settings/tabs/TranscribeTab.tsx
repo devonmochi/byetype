@@ -1,5 +1,5 @@
 import type { AppConfig, ThinkingConfig } from '../../../core/types'
-import { getAudioModels, getTextModels, findModel, supportsMinimalThinking } from '../../../core/models'
+import { getAudioModels, findModel, supportsMinimalThinking } from '../../../core/models'
 import { SettingGroup } from '../components/SettingGroup'
 import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
@@ -10,24 +10,17 @@ interface Props {
 }
 
 export function TranscribeTab({ config, onSave }: Props) {
-  const { transcribe, voiceTemplates } = config
+  const { transcribe } = config
   const strengtheningEnabled = config.general.textStrengtheningEnabled !== false
 
   const audioModels = getAudioModels(config)
-  const textModels = getTextModels(config)
   const transcribeModel = findModel(config, transcribe.modelId)
-  const voiceTemplatesModel = findModel(config, voiceTemplates.modelId)
   const isOpenRouter = (m: ReturnType<typeof findModel>) =>
     m?.protocol === 'openai-compat' && (m?.baseUrl?.includes('openrouter.ai') ?? false)
   const isTranscribeGemini = transcribeModel?.protocol === 'gemini' || isOpenRouter(transcribeModel)
   const isTranscribeQwen = transcribeModel?.protocol === 'qwen-omni'
-  const isVoiceTemplatesGemini = voiceTemplatesModel?.protocol === 'gemini' || isOpenRouter(voiceTemplatesModel)
   // Gemini 3.7 系列不支持 MINIMAL 思考档位，隐藏该选项并按 LOW 显示
   const transcribeSupportsMinimal = supportsMinimalThinking(transcribeModel?.model)
-  const voiceTemplatesSupportsMinimal = supportsMinimalThinking(voiceTemplatesModel?.model)
-  const isVoiceTemplatesDeepSeek =
-    voiceTemplatesModel?.protocol === 'openai-compat' &&
-    voiceTemplatesModel?.baseUrl?.includes('api.deepseek.com')
 
   const updateTranscribe = (changes: Partial<AppConfig['transcribe']>) => {
     onSave({ ...config, transcribe: { ...transcribe, ...changes } })
@@ -37,24 +30,13 @@ export function TranscribeTab({ config, onSave }: Props) {
     updateTranscribe({ thinking: { ...transcribe.thinking, ...changes } })
   }
 
-  const updateVoiceTemplates = (changes: Partial<AppConfig['voiceTemplates']>) => {
-    onSave({ ...config, voiceTemplates: { ...voiceTemplates, ...changes } })
-  }
-
-  const updateVoiceTemplatesThinking = (changes: Partial<ThinkingConfig>) => {
-    updateVoiceTemplates({ thinking: { ...voiceTemplates.thinking, ...changes } })
-  }
-
   const builtinAudio = audioModels.filter(m => m.builtin)
   const customAudio = audioModels.filter(m => !m.builtin)
-  const builtinText = textModels.filter(m => m.builtin)
-  const customText = textModels.filter(m => !m.builtin)
 
   return (
     <div>
       <h2 className="content-title">语音识别设置</h2>
 
-      {/* 区域一：语音识别模型 */}
       <SettingGroup title="语音识别模型">
         <SettingRow label="语音识别模型">
           <select
@@ -102,12 +84,12 @@ export function TranscribeTab({ config, onSave }: Props) {
           label={
             <span style={strengtheningEnabled ? { color: 'var(--text-secondary)' } : undefined}>
               规则增强
-              <span className="rule-direction">将文本规则注入语音规则</span>
+              <span className="rule-direction">将文本优化规则注入语音规则</span>
             </span>
           }
           description={
             strengtheningEnabled
-              ? '文本强化会把同一条规则跑第二遍，需先关闭文本强化才能注入'
+              ? '文本优化会把同一条规则跑第二遍，需先关闭文本优化才能注入'
               : '识别阶段直接按所选风格的规则输出，一轮完成'
           }
         >
@@ -118,96 +100,6 @@ export function TranscribeTab({ config, onSave }: Props) {
           />
         </SettingRow>
       </SettingGroup>
-
-      {/* 区域二：文本强化模型（全局强化关闭时整组隐藏） */}
-      {strengtheningEnabled && (
-        <>
-          <h3 className="section-title">文本强化模型</h3>
-
-          <SettingGroup title="模型">
-            <SettingRow label="处理模型" description="按输出风格处理识别文本的模型">
-              <select
-                className="select"
-                value={voiceTemplates.modelId}
-                onChange={e => updateVoiceTemplates({ modelId: e.target.value })}
-                style={{ width: 260 }}
-              >
-                <optgroup label="预置模型">
-                  {builtinText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
-                </optgroup>
-                {customText.length > 0 && (
-                  <optgroup label="自定义模型">
-                    {customText.map(m => <option key={m.id} value={m.id}>{m.provider} - {m.model}</option>)}
-                  </optgroup>
-                )}
-              </select>
-            </SettingRow>
-            {isVoiceTemplatesGemini && (
-              <>
-                <SettingRow label="启用思考" description="让模型在处理前先进行推理">
-                  <Toggle
-                    checked={voiceTemplates.thinking.enabled}
-                    onChange={checked => updateVoiceTemplatesThinking({ enabled: checked })}
-                  />
-                </SettingRow>
-                {voiceTemplates.thinking.enabled && (
-                  <SettingRow label="Thinking Level" description="思考深度级别">
-                    <select
-                      className="select"
-                      value={voiceTemplatesSupportsMinimal || voiceTemplates.thinking.level !== 'MINIMAL' ? voiceTemplates.thinking.level : 'LOW'}
-                      onChange={e => updateVoiceTemplatesThinking({ level: e.target.value as ThinkingConfig['level'] })}
-                      style={{ width: 120 }}
-                    >
-                      {voiceTemplatesSupportsMinimal && <option value="MINIMAL">MINIMAL</option>}
-                      <option value="LOW">LOW</option>
-                      <option value="MEDIUM">MEDIUM</option>
-                      <option value="HIGH">HIGH</option>
-                    </select>
-                  </SettingRow>
-                )}
-              </>
-            )}
-            {isVoiceTemplatesDeepSeek && (
-              <>
-                <SettingRow label="启用思考" description="DeepSeek V4.1 Flash 默认开启思考,关闭可显著提速">
-                  <Toggle
-                    checked={voiceTemplates.thinking.enabled}
-                    onChange={checked => updateVoiceTemplatesThinking({ enabled: checked })}
-                  />
-                </SettingRow>
-                {voiceTemplates.thinking.enabled && (
-                  <SettingRow label="Reasoning Effort" description="DeepSeek思考强度，low更快，max更深">
-                    <select
-                      className="select"
-                      value={voiceTemplates.deepseekReasoningEffort ?? 'high'}
-                      onChange={e => updateVoiceTemplates({ deepseekReasoningEffort: e.target.value as 'low' | 'high' | 'max' })}
-                      style={{ width: 120 }}
-                    >
-                      <option value="low">low</option>
-                      <option value="high">high</option>
-                      <option value="max">max</option>
-                    </select>
-                  </SettingRow>
-                )}
-              </>
-            )}
-            <SettingRow
-              label={
-                <span>
-                  规则增强
-                  <span className="rule-direction">将语音规则注入文本规则</span>
-                </span>
-              }
-            >
-              <Toggle
-                checked={voiceTemplates.reuseTranscribeReferences ?? false}
-                onChange={checked => updateVoiceTemplates({ reuseTranscribeReferences: checked })}
-              />
-            </SettingRow>
-          </SettingGroup>
-        </>
-      )}
-
     </div>
   )
 }

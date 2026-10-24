@@ -861,12 +861,24 @@
   height: 16px;
 }
 
-/* === 文本强化 === */
-/* 强化入口用蓝色区分 */
+/* === 文本优化 === */
+/* 文本优化入口用蓝色区分，竖条内缩在圆角按钮里 */
 .sidebar-item-accent {
-  border-left: 2px solid var(--accent);
-  padding-left: 14px;
+  position: relative;
+  padding-left: 16px;
   color: var(--accent);
+}
+
+.sidebar-item-accent:not(.active)::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 15px;
+  border-radius: 1px;
+  background: var(--accent);
 }
 
 .mode-label {
@@ -889,7 +901,7 @@
   color: var(--text-secondary);
 }
 
-/* 开启时两个语音入口缩进到文本强化开关下方 */
+/* 开启时两个语音入口缩进到文本优化开关下方 */
 .strengthened-voice-inputs {
   margin-left: 32px;
   margin-bottom: 4px;
