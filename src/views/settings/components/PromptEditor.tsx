@@ -11,10 +11,8 @@ import {
   createUserPromptFile,
   readPromptFile,
   writePromptFile,
-  selectFile,
   onEvent,
 } from '../../../lib/tauri-api'
-import { ask } from '@tauri-apps/plugin-dialog'
 
 export interface PromptFileEntry {
   key: string
@@ -354,28 +352,6 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true, edi
     setActiveFile(key)
   }
 
-  const handleBrowse = async () => {
-    if (!activePrompt?.configPath) return
-    const filePath = await selectFile()
-    if (filePath) {
-      await flushSave()
-      const newConfig = setConfigValue(configRef.current, activePrompt.configPath, filePath)
-      onSave(newConfig)
-      await loadFile(activePrompt)
-    }
-  }
-
-  const handleResetToBuiltin = async () => {
-    if (!activePrompt?.configPath || !activePrompt.builtinFilename) return
-    const yes = await ask('确定要重置为内置提示词吗？当前的修改将被覆盖。', { title: 'ByeType', kind: 'warning' })
-    if (!yes) return
-    await flushSave()
-    const builtinPath = await copyBuiltinPrompt(activePrompt.builtinFilename, true)
-    const newConfig = setConfigValue(configRef.current, activePrompt.configPath, builtinPath)
-    onSave(newConfig)
-    await loadFile(activePrompt)
-  }
-
   if (promptFiles.length === 0) return null
 
   const isFixedHeight = typeof editorHeight === 'number'
@@ -401,20 +377,6 @@ export function PromptEditor({ config, onSave, promptFiles, showTabs = true, edi
           ))}
         </div>
       )}
-
-      <div className="prompt-path-bar">
-        <span className="path-text">
-          {resolvedPath}
-        </span>
-        {!activePrompt?.resolvePath && !activePrompt?.loadContent && (
-          <>
-            <button className="file-picker-btn" onClick={handleBrowse}>选择文件</button>
-            {activePrompt?.builtinFilename && (
-              <button className="file-picker-btn" onClick={handleResetToBuiltin}>重置为内置</button>
-            )}
-          </>
-        )}
-      </div>
 
       <div className="prompt-editor-container" ref={editorRef}
         style={

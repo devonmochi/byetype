@@ -30,7 +30,7 @@ const TABS: TabItem[] = [
   { type: 'tab', id: 'strengthening-prompts', label: '文本强化规则', strengtheningOnly: true },
   { type: 'group', label: '图像识别' },
   { type: 'tab', id: 'extract', label: '图像识别设置' },
-  { type: 'tab', id: 'extract-prompts', label: '图像识别提示词' },
+  { type: 'tab', id: 'extract-prompts', label: '图像识别规则' },
   { type: 'group', label: '智能学习' },
   { type: 'tab', id: 'voice-learning', label: '自动学习' },
   { type: 'divider' },

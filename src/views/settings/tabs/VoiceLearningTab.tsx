@@ -2,7 +2,6 @@ import type { AppConfig } from '../../../core/types'
 import { findModel, getTextModels, supportsMinimalThinking } from '../../../core/models'
 import {
   getVoiceLearningDocument,
-  getVoiceLearningPromptPath,
   saveVoiceLearningDocument,
 } from '../../../lib/tauri-api'
 import { PromptEditor, type PromptFileEntry } from '../components/PromptEditor'
@@ -11,11 +10,6 @@ import { SettingRow } from '../components/SettingRow'
 import { Toggle } from '../components/Toggle'
 
 const LEARNING_FILES: PromptFileEntry[] = [
-  {
-    key: 'voice-learning-prompt',
-    label: '学习提示词',
-    resolvePath: getVoiceLearningPromptPath,
-  },
   {
     key: 'voice-learning-result',
     label: '学习结果',
@@ -132,7 +126,7 @@ export function VoiceLearningTab({ config, onSave }: Props) {
         )}
       </SettingGroup>
 
-      <h3 className="section-title">学习文档</h3>
+      <h3 className="section-title">学习结果</h3>
       <PromptEditor config={config} onSave={onSave} promptFiles={LEARNING_FILES} editorHeight={320} />
     </div>
   )
