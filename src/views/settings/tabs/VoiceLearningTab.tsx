@@ -24,7 +24,7 @@ interface Props {
   onSave: (config: AppConfig) => void
 }
 
-export function VoiceLearningTab({ config, onSave }: Props) {
+export function VoiceLearningSection({ config, onSave }: Props) {
   const textModels = getTextModels(config)
   const builtinModels = textModels.filter(model => model.builtin)
   const customModels = textModels.filter(model => !model.builtin)
@@ -62,9 +62,7 @@ export function VoiceLearningTab({ config, onSave }: Props) {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
-      <h2 className="content-title" style={{ flexShrink: 0 }}>自动学习</h2>
-
+    <div>
       <SettingGroup title="模型">
         <SettingRow label="学习模型" description="用于对比原始转写与用户修改文本，并归纳纠错规则">
           <select

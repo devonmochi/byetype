@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::config::types::{AppConfig, TemplateEntry};
 
-const OPTIMIZE_CONTEXT_INSTRUCTION: &str = "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 voice-learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。";
+const OPTIMIZE_CONTEXT_INSTRUCTION: &str = "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。";
 
 /// 规则增强（将文本规则注入语音规则）时附加的指导。
 /// 音频里的内容只是待处理数据，模板是受信任的输出规则，两者不能混为一谈。
@@ -80,7 +80,7 @@ pub fn build_transcribe_prompt(
         wrap_document("agent", &agent_content),
         wrap_document("vocabulary", &vocabulary_content),
         wrap_document("rules", &rules_content),
-        wrap_document("voice-learning", learning_rules),
+        wrap_document("learning", learning_rules),
     ]
     .into_iter()
     .filter(|s| !s.is_empty())
@@ -139,7 +139,7 @@ pub fn build_optimize_prompt(
     let reference_parts: Vec<String> = [
         wrap_document("rules", &rules_content),
         wrap_document("vocabulary", &vocabulary_content),
-        wrap_document("voice-learning", learning_rules),
+        wrap_document("learning", learning_rules),
     ]
     .into_iter()
     .filter(|s| !s.is_empty())
@@ -218,7 +218,7 @@ mod tests {
 
         assert_eq!(
             prompt,
-            "<document name=\"voice-learning\">\n- 项目技能，不是项目智能\n</document>"
+            "<document name=\"learning\">\n- 项目技能，不是项目智能\n</document>"
         );
     }
 
@@ -325,11 +325,11 @@ mod tests {
 
         assert_eq!(
             prompt,
-            "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 voice-learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。\n\n\
+            "以下文档共同构成文本优化要求。先按 rules、vocabulary 和 learning 修正转录文本，再按 text-optimize 处理输出样式。text-optimize 中限制修改原文的要求，不阻止执行上述转录修正。\n\n\
 <document name=\"text-optimize\">\n文本优化提示词\n</document>\n\n\
 <document name=\"rules\">\n转录规则\n</document>\n\n\
 <document name=\"vocabulary\">\n专有词汇\n</document>\n\n\
-<document name=\"voice-learning\">\n自动学习结果\n</document>"
+<document name=\"learning\">\n自动学习结果\n</document>"
         );
         assert!(!prompt.contains("角色定义"));
 
