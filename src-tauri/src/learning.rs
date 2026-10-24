@@ -5,7 +5,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-const DOCUMENT_HEADER: &str = "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n";
+/// 旧版本自动写在学习文档开头的标题，仅用于识别并清理老文件。
+const LEGACY_DOCUMENT_HEADER: &str =
+    "# 语音纠正学习\n\n以下规则由自动学习生成，供后续语音转写参考。\n\n";
 const DEFAULT_LEARNING_PROMPT: &str = include_str!("../prompts/voice-learning-prompt.md");
 const LAST_DEFAULT_LEARNING_PROMPT: &str =
     include_str!("../prompts/legacy/voice-learning-prompt-1.16.1.md");
@@ -113,7 +115,11 @@ impl VoiceLearningManager {
 
     fn ensure_document_unlocked(&self) -> Result<PathBuf, String> {
         if self.rules_path.exists() {
-            read_document(&self.rules_path)?;
+            let content = read_document(&self.rules_path)?;
+            // 老版本的文件开头带标题，读到后去掉并写回；没有标题时不写，避免每次启动都改文件。
+            if let Some(body) = strip_legacy_header(&content) {
+                write_document(&self.rules_path, body)?;
+            }
             return Ok(self.rules_path.clone());
         }
 
@@ -122,8 +128,7 @@ impl VoiceLearningManager {
             .parent()
             .ok_or_else(|| "学习文档路径无效".to_string())?;
         fs::create_dir_all(parent).map_err(|error| format!("创建学习目录失败: {error}"))?;
-        fs::write(&self.rules_path, DOCUMENT_HEADER)
-            .map_err(|error| format!("创建学习文档失败: {error}"))?;
+        fs::write(&self.rules_path, "").map_err(|error| format!("创建学习文档失败: {error}"))?;
         Ok(self.rules_path.clone())
     }
 
@@ -278,7 +283,8 @@ pub fn apply_analysis(path: &Path, analysis: LearningAnalysis) -> Result<Learnin
 
 fn apply_generated_text(path: &Path, generated: &str) -> Result<LearningOutcome, String> {
     let existing = read_document(path)?;
-    let existing_rules = parse_rules(&existing);
+    let existing = strip_legacy_header(&existing).unwrap_or(&existing);
+    let existing_rules = parse_rules(existing);
     let mut additions = Vec::new();
 
     for item in parse_generated_items(generated)? {
@@ -292,7 +298,7 @@ fn apply_generated_text(path: &Path, generated: &str) -> Result<LearningOutcome,
         return Ok(LearningOutcome::NoChange);
     }
 
-    write_document(path, &append_learning_items(&existing, &additions))?;
+    write_document(path, &append_learning_items(existing, &additions))?;
     Ok(LearningOutcome::Updated {
         added: additions.len(),
         removed: 0,
@@ -342,13 +348,13 @@ fn parse_generated_items(generated: &str) -> Result<Vec<LearningItem>, String> {
     Ok(items)
 }
 
+fn strip_legacy_header(content: &str) -> Option<&str> {
+    content.strip_prefix(LEGACY_DOCUMENT_HEADER)
+}
+
 fn append_learning_items(content: &str, additions: &[String]) -> String {
-    let mut output = if content.is_empty() {
-        DOCUMENT_HEADER.to_string()
-    } else {
-        content.to_string()
-    };
-    if !output.ends_with('\n') {
+    let mut output = content.to_string();
+    if !output.is_empty() && !output.ends_with('\n') {
         output.push('\n');
     }
     for item in additions {
@@ -394,9 +400,7 @@ fn update_rule_lines(content: &str, old_rules: &[String], new_rules: &[String]) 
         .iter()
         .filter(|rule| !present.contains(rule))
         .collect();
-    if output.is_empty() && !missing.is_empty() {
-        output.push_str(DOCUMENT_HEADER);
-    } else if !missing.is_empty() && !output.ends_with('\n') {
+    if !missing.is_empty() && !output.is_empty() && !output.ends_with('\n') {
         output.push('\n');
     }
     for rule in missing {
@@ -760,11 +764,8 @@ mod tests {
         let path = test_file("voice-learning.md");
         fs::create_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be created");
-        fs::write(
-            &path,
-            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n",
-        )
-        .expect("fixture should be written");
+        fs::write(&path, "- 项目智能，应为项目技能\n- 保持API大写\n")
+            .expect("fixture should be written");
 
         let outcome = apply_analysis(
             &path,
@@ -788,7 +789,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(&path).expect("learning document should exist"),
-            "# 语音纠正学习\n\n以下规则由自动学习生成。\n\n- 项目智能，应为项目技能\n- 保持API大写\n- 项目技能，不是项目智能\n- 保持API大写\n"
+            "- 项目智能，应为项目技能\n- 保持API大写\n- 项目技能，不是项目智能\n- 保持API大写\n"
         );
 
         fs::remove_dir_all(path.parent().expect("test path should have parent"))
@@ -849,7 +850,89 @@ mod tests {
 
         assert_eq!(
             fs::read_to_string(&document_path).expect("learning document should be readable"),
-            DOCUMENT_HEADER
+            ""
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn reading_legacy_document_removes_old_header() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        fs::create_dir_all(
+            manager
+                .rules_path
+                .parent()
+                .expect("document should have parent"),
+        )
+        .expect("document directory should be created");
+        fs::write(
+            &manager.rules_path,
+            format!("{LEGACY_DOCUMENT_HEADER}- 项目技能，不是项目智能\n"),
+        )
+        .expect("legacy document should be written");
+
+        let document = manager.document().expect("legacy document should load");
+
+        assert_eq!(document.content, "- 项目技能，不是项目智能\n");
+        assert_eq!(
+            fs::read_to_string(&manager.rules_path).expect("learning document should be readable"),
+            "- 项目技能，不是项目智能\n"
+        );
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn reading_legacy_document_with_only_header_leaves_it_empty() {
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        fs::create_dir_all(
+            manager
+                .rules_path
+                .parent()
+                .expect("document should have parent"),
+        )
+        .expect("document directory should be created");
+        fs::write(&manager.rules_path, LEGACY_DOCUMENT_HEADER)
+            .expect("legacy document should be written");
+
+        let document = manager.document().expect("legacy document should load");
+
+        assert!(document.content.is_empty());
+        assert!(fs::read_to_string(&manager.rules_path)
+            .expect("learning document should be readable")
+            .is_empty());
+        fs::remove_dir_all(data_dir).expect("test directory should be removed");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reading_clean_document_does_not_rewrite_it() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = test_file("placeholder");
+        let data_dir = path.parent().expect("test path should have parent");
+        let manager = VoiceLearningManager::new(data_dir);
+        fs::create_dir_all(
+            manager
+                .rules_path
+                .parent()
+                .expect("document should have parent"),
+        )
+        .expect("document directory should be created");
+        fs::write(&manager.rules_path, "- 已有规则\n").expect("fixture should be written");
+        // 目录只读后任何写盘都会失败，读取成功即说明没有多余写入。
+        fs::set_permissions(data_dir, fs::Permissions::from_mode(0o555))
+            .expect("test directory should be read-only");
+
+        let document = manager.document();
+        let _ = fs::set_permissions(data_dir, fs::Permissions::from_mode(0o755));
+
+        assert_eq!(
+            document.expect("clean document should load").content,
+            "- 已有规则\n"
         );
         fs::remove_dir_all(data_dir).expect("test directory should be removed");
     }
@@ -974,8 +1057,7 @@ mod tests {
         let path = test_file("voice-learning.md");
         fs::create_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be created");
-        fs::write(&path, format!("{DOCUMENT_HEADER}- 词汇：ByeType\n"))
-            .expect("fixture should be written");
+        fs::write(&path, "- 词汇：ByeType\n").expect("fixture should be written");
 
         let outcome = apply_generated_text(
             &path,
@@ -1116,8 +1198,7 @@ mod tests {
         let path = test_file("voice-learning.md");
         fs::create_dir_all(path.parent().expect("test path should have parent"))
             .expect("test directory should be created");
-        fs::write(&path, format!("{DOCUMENT_HEADER}- 李氏，不是李四\n"))
-            .expect("fixture should be written");
+        fs::write(&path, "- 李氏，不是李四\n").expect("fixture should be written");
 
         apply_analysis(
             &path,
