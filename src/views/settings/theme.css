@@ -862,14 +862,13 @@
 }
 
 /* === 文本优化 === */
-/* 文本优化入口用蓝色区分，竖条内缩在圆角按钮里 */
+/* 文本优化入口只在左侧加一条内缩竖条，文字颜色与其他项一致 */
 .sidebar-item-accent {
   position: relative;
   padding-left: 16px;
-  color: var(--accent);
 }
 
-.sidebar-item-accent:not(.active)::before {
+.sidebar-item-accent::before {
   content: '';
   position: absolute;
   left: 5px;
