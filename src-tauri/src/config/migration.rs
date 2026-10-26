@@ -264,7 +264,8 @@ fn model_name_to_builtin_id(model_name: &str) -> String {
 /// - builtin-deepseek-chat / builtin-deepseek-v4-flash / builtin-deepseek-v4-pro
 ///   → builtin-deepseek-flash(官方只保留 deepseek-flash 一个 ID,V4 系列已下线)
 /// - builtin-qwen-omni-plus / builtin-qwen-omni-flash → builtin-qwen3.8-omni-flash
-/// - builtin-mimo-v2-omni   → builtin-mimo-v2.5
+/// - builtin-mimo-v2-omni / builtin-mimo-v2.5 → builtin-mimo-v2.6-flash
+///   (小米 V2.5 于 2026-10-21 下线,调用返回 400 Unsupported model,两个旧 ID 统一升级到 V2.6 Flash)
 /// - builtin-gemini-3-flash → builtin-gemini-3.8-flash (Gemini 3.8 Flash 取代 3 Flash)
 /// - builtin-or-gemini-3-flash → builtin-or-gemini-3.8-flash
 /// - builtin-gemini-3.1-flash-lite → builtin-gemini-3.8-flash (3.1 下架)
@@ -278,7 +279,8 @@ fn migrate_legacy_model_ids(raw: &mut Value) -> bool {
         ("builtin-deepseek-v4-pro", "builtin-deepseek-flash"),
         ("builtin-qwen-omni-plus", "builtin-qwen3.8-omni-flash"),
         ("builtin-qwen-omni-flash", "builtin-qwen3.8-omni-flash"),
-        ("builtin-mimo-v2-omni", "builtin-mimo-v2.5"),
+        ("builtin-mimo-v2-omni", "builtin-mimo-v2.6-flash"),
+        ("builtin-mimo-v2.5", "builtin-mimo-v2.6-flash"),
         ("builtin-gemini-3-flash", "builtin-gemini-3.8-flash"),
         ("builtin-or-gemini-3-flash", "builtin-or-gemini-3.8-flash"),
         ("builtin-gemini-3.1-flash-lite", "builtin-gemini-3.8-flash"),
@@ -327,7 +329,7 @@ mod tests {
     fn migrates_transcribe_mimo_omni() {
         let mut raw = json!({ "transcribe": { "modelId": "builtin-mimo-v2-omni" } });
         assert!(migrate_legacy_model_ids(&mut raw));
-        assert_eq!(raw["transcribe"]["modelId"], "builtin-mimo-v2.5");
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-mimo-v2.6-flash");
     }
 
     #[test]
@@ -352,7 +354,18 @@ mod tests {
     fn migrates_voice_templates_mimo_omni() {
         let mut raw = json!({ "voiceTemplates": { "modelId": "builtin-mimo-v2-omni" } });
         assert!(migrate_legacy_model_ids(&mut raw));
-        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-mimo-v2.5");
+        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-mimo-v2.6-flash");
+    }
+
+    #[test]
+    fn migrates_retired_mimo_v2_5_to_v2_6() {
+        let mut raw = json!({
+            "transcribe": { "modelId": "builtin-mimo-v2.5" },
+            "voiceTemplates": { "modelId": "builtin-mimo-v2.5" },
+        });
+        assert!(migrate_legacy_model_ids(&mut raw));
+        assert_eq!(raw["transcribe"]["modelId"], "builtin-mimo-v2.6-flash");
+        assert_eq!(raw["voiceTemplates"]["modelId"], "builtin-mimo-v2.6-flash");
     }
 
     #[test]
@@ -411,12 +424,12 @@ mod tests {
     fn adds_voice_learning_with_existing_text_model() {
         let mut raw = json!({
             "transcribe": { "modelId": "builtin-gemini-3.8-flash" },
-            "voiceTemplates": { "modelId": "builtin-mimo-v2.5" }
+            "voiceTemplates": { "modelId": "builtin-mimo-v2.6-flash" }
         });
 
         assert!(migrate_if_needed(&mut raw));
         // voiceLearning 取 voiceTemplates 的模型,而不是 transcribe 的
-        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-mimo-v2.5");
+        assert_eq!(raw["voiceLearning"]["modelId"], "builtin-mimo-v2.6-flash");
         assert_eq!(raw["voiceLearning"]["thinking"]["enabled"], false);
     }
 
