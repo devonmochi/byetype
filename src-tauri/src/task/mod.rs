@@ -890,11 +890,25 @@ async fn capture_screenshot(app: &AppHandle, task_id: u32) -> Option<String> {
     }
 }
 
+/// screencapture 位于 /usr/sbin,而应用进程的 PATH 不一定含 /usr/sbin
+/// (从终端启动或启动环境被改写时会缺),所以按绝对路径逐个探测,不依赖 PATH。
+#[cfg(target_os = "macos")]
+fn screencapture_binary() -> &'static std::path::Path {
+    const CANDIDATES: &[&str] = &["/usr/sbin/screencapture", "/usr/bin/screencapture"];
+    for candidate in CANDIDATES {
+        let path = std::path::Path::new(candidate);
+        if path.exists() {
+            return path;
+        }
+    }
+    std::path::Path::new("/usr/sbin/screencapture")
+}
+
 #[cfg(target_os = "macos")]
 async fn capture_screenshot_macos(app: &AppHandle, task_id: u32) -> Option<String> {
     let tmp_path = std::env::temp_dir().join(format!("byetype_capture_{}.png", task_id));
 
-    let capture_result = tokio::process::Command::new("screencapture")
+    let capture_result = tokio::process::Command::new(screencapture_binary())
         .arg("-i")
         .arg(tmp_path.as_os_str())
         .output()
