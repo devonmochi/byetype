@@ -23,7 +23,7 @@ ByeType免费开源，使用你自己的API Key。支持macOS、Windows，以及
 
 | | ByeType | 系统自带语音输入 | Whisper 类本地方案 |
 |---|---|---|---|
-| 安装体积 | **约8MB** | 系统内置 | 1~6GB（模型文件） |
+| 安装体积 | **约10MB** | 系统内置 | 1至6GB（模型文件） |
 | 定制方式 | **编辑Markdown提示词** | 不支持 | 只能添加热词 |
 | 人名与术语 | **转写时按提示词校正** | 不支持 | 需要LLM再次处理 |
 | 格式化 | **数字、符号、大小写、自动换行** | 无 | 需要LLM再次处理 |
@@ -164,60 +164,7 @@ some-audio-command | curl -fsS -X POST \
 
 ### 备份与恢复
 
-「设置→备份与恢复」可以把API Key、提示词、学习结果和快捷键备份到S3兼容存储，换电脑或重装系统后可以恢复。
-
-## ❓ 常见问题
-
-<details>
-<summary><b>macOS 权限相关：没有声音、按 F4 没反应、文字没自动粘贴</b></summary>
-
-这三类问题都是权限没开或没生效，在「系统设置 → 隐私与安全性」里检查：
-
-- 没有声音 / 录音失败：麦克风权限
-- 按 F4 没有反应：辅助功能权限
-- 文本没有自动粘贴到输入框：辅助功能权限。文本仍会复制到剪贴板，可以手动 Cmd+V 粘贴
-
-改完权限重启一次 ByeType。
-</details>
-
-<details>
-<summary><b>macOS 提示「无法验证开发者」</b></summary>
-
-前往「系统设置 → 隐私与安全性」，找到 ByeType 的提示信息，点击「仍要打开」。
-</details>
-
-<details>
-<summary><b>按 F6 后没有识别结果</b></summary>
-
-- 检查「设置 → 图像识别设置」里选的模型是否支持截图取字，见上文「支持的模型」
-- 框选时按 Esc 会取消这次截图，不会产生结果
-- 确认 API Key 有效、网络可达
-</details>
-
-<details>
-<summary><b>转写结果为空</b></summary>
-
-- 检查 API Key 是否正确填写
-- 检查网络连接是否正常
-- 如果使用 Gemini 模型，确认能访问 Google 服务（或已配置代理）
-</details>
-
-<details>
-<summary><b>转写速度慢</b></summary>
-
-- 关闭思考（设置 → 转写设置 → 启用思考 → 关闭）
-- 切换更轻量的模型，比如 OpenRouter 的 `google/gemini-3.5-flash-lite`
-- 检查网络延迟
-</details>
-
-<details>
-<summary><b>国内网络无法使用 Gemini 模型</b></summary>
-
-两种方案：
-
-1. 在「设置 → 语音转写」中选择Qwen 3.8 Omni Flash等国内直连模型，无需代理
-2. 在「设置 → 通用设置 → 网络与性能 → HTTP 代理地址」中配置代理后使用 Gemini
-</details>
+「设置→备份与恢复」可以把API Key、提示词、学习结果和快捷键备份到S3兼容存储或本地zip文件，换电脑或重装系统后可以恢复。
 
 ## 🏗️ 技术栈
 
@@ -227,7 +174,7 @@ some-audio-command | curl -fsS -X POST \
 | 前端 | [React](https://react.dev/) 19 + TypeScript + [Vite](https://vite.dev/) |
 | 后端 | Rust（cpal 音频采集、flacenc 编码） |
 | 编辑器 | [CodeMirror](https://codemirror.net/) 6 |
-| AI | Google Gemini API、阿里云百炼 DashScope API、OpenAI 兼容 API |
+| AI | Google Gemini API、阿里云百炼 DashScope API、小米 MiMo API、OpenAI 兼容 API |
 
 ## 📄 许可证
 
