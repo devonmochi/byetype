@@ -124,8 +124,24 @@ jobs:
         shell: bash
         run: |
           TAG="$GITHUB_REF_NAME"
-          # Download the latest.json just uploaded by tauri-action
-          gh release download "$TAG" --pattern 'latest.json' --output latest.json --clobber
+          # tauri-action 已把清单写在工作区根目录，直接取本地文件。
+          # 原来走 gh release download 会和另外两个平台的
+          # 「删旧 latest.json、传新 latest.json」撞在一起，
+          # 删完还没传的空档里下载就会报 no assets match the file pattern。
+          if [[ ! -f latest.json ]]; then
+            echo "本地没有 latest.json，改为从 release 重试下载"
+            for i in 1 2 3 4 5; do
+              if gh release download "$TAG" --pattern 'latest.json' --output latest.json --clobber 2>/dev/null; then
+                break
+              fi
+              echo "第 $i 次下载失败，10 秒后重试"
+              sleep 10
+            done
+          fi
+          if [[ ! -f latest.json ]]; then
+            echo "拿不到 latest.json，放弃本平台清单" >&2
+            exit 1
+          fi
           # Determine a platform-specific suffix
           if [[ "${{ matrix.args }}" == *"aarch64"* ]]; then
             SUFFIX="macos-aarch64"
@@ -146,6 +162,8 @@ jobs:
 
   merge-updater-json:
     needs: release
+    # 某个平台失败时也照常合并，用剩下的平台清单覆盖，避免整条发版流程卡在最后一步
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -167,7 +185,7 @@ jobs:
 
           parts = sorted(glob.glob("updater-parts/latest-*.json"))
           if not parts:
-              print("ERROR: no latest-*.json found", file=sys.stderr)
+              print("没有任何平台清单，跳过合并", file=sys.stderr)
               sys.exit(1)
 
           merged = None
@@ -179,7 +197,7 @@ jobs:
               else:
                   merged["platforms"].update(data["platforms"])
 
-          print(f"Merged platforms: {list(merged['platforms'].keys())}")
+          print(f"Merged platforms: {sorted(merged['platforms'].keys())}")
           with open("latest.json", "w") as f:
               json.dump(merged, f, indent=2)
           PYEOF
