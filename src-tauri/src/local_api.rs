@@ -264,7 +264,7 @@ fn text_response(status: StatusCode, body: impl Into<String>) -> Response {
 }
 
 fn resolve_template(config: &AppConfig, requested: Option<&str>) -> Result<Option<String>, String> {
-    // raw 只识别不注入；普通请求（显式模板或默认绑定）始终带上所选模板，
+    // raw 只识别不优化；普通请求（显式模板或默认绑定）始终带上所选模板，
     // 全局强化开关只在 execute_pipeline 决定是否运行第二阶段。
     match requested {
         Some("raw") => Ok(None),

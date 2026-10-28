@@ -75,8 +75,6 @@ export interface TranscribeConfig {
   modelId: string
   thinking: ThinkingConfig
   prompts: { agent: string; rules: string; vocabulary: string }
-  /** 规则增强：将文本优化规则注入语音规则。识别阶段直接拼接所选文本优化规则，强模型一次处理完 */
-  injectTextRules?: boolean
 }
 
 export interface VoiceLearningConfig {
@@ -97,8 +95,6 @@ export interface VoiceTemplatesConfig {
   templates: TemplateEntry[]
   /** DeepSeek 专用 reasoning_effort,取值 'low' | 'high' | 'max'。仅在选中 DeepSeek 模型且 thinking.enabled=true 时生效 */
   deepseekReasoningEffort?: 'low' | 'high' | 'max'
-  /** 优化阶段是否再带一遍转写参考（专有词汇/转写规则/学习结果）做二次纠错。弱模型建议开启，强模型默认关闭 */
-  reuseTranscribeReferences?: boolean
 }
 
 export interface ExtractConfig {

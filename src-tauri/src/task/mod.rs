@@ -155,8 +155,7 @@ struct PipelineFailure {
 }
 
 /// 第二阶段（文本强化模型）要用的模板；返回 None 表示跳过第二阶段。
-/// 只由全局开关决定：关闭时不调用第二个模型。「规则增强」是否在第一阶段注入
-/// 由 inject_text_rules 单独控制，不改变这里的判断。
+/// 只由全局开关决定：关闭时不调用第二个模型。
 fn second_stage_template(
     strengthening_enabled: bool,
     triggered_template: Option<&str>,
@@ -499,13 +498,6 @@ async fn execute_pipeline(
         },
     )?;
 
-    // 两个开关互相独立：全局开关只决定第二阶段是否运行；
-    // 规则增强只决定第一阶段是否带上当前模板的强化规则。
-    let injected_text_rules = crate::ai::prompt::resolve_text_rule_injection(
-        &config,
-        &prompts_dir,
-        template_id.as_deref(),
-    );
     let second_stage = second_stage_template(
         config.general.text_strengthening_enabled,
         template_id.as_deref(),
@@ -520,7 +512,6 @@ async fn execute_pipeline(
         let config = config.clone();
         let prompts_dir = prompts_dir.clone();
         let learning_rules = learning_rules.clone();
-        let injected_text_rules = injected_text_rules.clone();
         tokio::select! {
             result = ai::retry::with_retry(
                 || {
@@ -529,7 +520,6 @@ async fn execute_pipeline(
                     let config = config.clone();
                     let prompts_dir = prompts_dir.clone();
                     let learning_rules = learning_rules.clone();
-                    let injected_text_rules = injected_text_rules.clone();
                     async move {
                         ai::transcribe(
                             &client,
@@ -537,7 +527,6 @@ async fn execute_pipeline(
                             &config,
                             &prompts_dir,
                             &learning_rules,
-                            injected_text_rules.as_deref(),
                         )
                         .await
                     }
@@ -580,7 +569,6 @@ async fn execute_pipeline(
         let text = transcribe.text.clone();
         let config = config.clone();
         let prompts_dir = prompts_dir.clone();
-        let learning_rules = learning_rules.clone();
         tokio::select! {
             result = ai::retry::with_retry(
                 || {
@@ -589,7 +577,6 @@ async fn execute_pipeline(
                     let config = config.clone();
                     let prompts_dir = prompts_dir.clone();
                     let template_id = template_id.clone();
-                    let learning_rules = learning_rules.clone();
                     async move {
                         ai::optimize(
                             &client,
@@ -597,7 +584,6 @@ async fn execute_pipeline(
                             &config,
                             &prompts_dir,
                             &template_id,
-                            &learning_rules,
                         )
                         .await
                     }
