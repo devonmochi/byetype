@@ -201,11 +201,6 @@ pub struct TranscribeConfig {
     pub model_id: String,
     pub thinking: ThinkingConfig,
     pub prompts: PromptsConfig,
-    /// 规则增强（将文本规则注入语音规则）：把所选文本强化规则拼进识别阶段的提示词，
-    /// 由强语音模型一次处理完成。只影响第一阶段是否注入规则，
-    /// 第二阶段是否运行由 general.textStrengtheningEnabled 单独决定。
-    #[serde(default)]
-    pub inject_text_rules: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,10 +243,6 @@ pub struct VoiceTemplatesConfig {
     /// 仅在 model_id 指向 DeepSeek 且 thinking.enabled=true 时生效。
     #[serde(default)]
     pub deepseek_reasoning_effort: Option<String>,
-    /// 优化阶段是否再带一遍转写参考(规则/专有词汇/自动学习结果)做二次纠错。
-    /// 适合转写纠错较弱的模型;强模型转写阶段已纠对,关闭可省 token 并避免过度改写。
-    #[serde(default)]
-    pub reuse_transcribe_references: bool,
 }
 
 fn default_voice_templates() -> Vec<TemplateEntry> {
@@ -390,7 +381,6 @@ impl Default for AppConfig {
                     rules: String::new(),
                     vocabulary: String::new(),
                 },
-                inject_text_rules: false,
             },
             voice_learning: VoiceLearningConfig::default(),
             voice_templates: VoiceTemplatesConfig {
@@ -401,7 +391,6 @@ impl Default for AppConfig {
                 },
                 templates: default_voice_templates(),
                 deepseek_reasoning_effort: None,
-                reuse_transcribe_references: false,
             },
             extract: ExtractConfig::default(),
             advanced: AdvancedConfig {

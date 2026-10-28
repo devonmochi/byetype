@@ -142,8 +142,7 @@ fn migrate_text_strengthening_switch(raw: &mut Value) -> bool {
     };
 
     // 主快捷键绑定：为空或指向已不存在的模板时回填，避免界面显示第 1 项、
-    // 后端却仍按旧无效值执行；关闭时也要留一个有效主模板，
-    // 规则增强在第一阶段才有规则来源。
+    // 后端却仍按旧无效值执行；关闭时也留一个有效主模板，重新打开后立刻可用。
     let main = usable_template(&template_ids, "voice-optimize", general.get("shortcutTemplate"));
     changed |= set_if_changed(general, "shortcutTemplate", main);
     // 第二个入口只在开启时注册，关闭时不动它。
@@ -472,7 +471,7 @@ mod tests {
 
         assert!(migrate_if_needed(&mut raw));
         assert_eq!(raw["general"]["textStrengtheningEnabled"], false);
-        // 关闭时也要回填有效主模板，规则增强在第一阶段才有规则来源
+        // 关闭时也要回填有效主模板，重新打开后立刻可用
         assert_eq!(raw["general"]["shortcutTemplate"], "voice-optimize");
     }
 

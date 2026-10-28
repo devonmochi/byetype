@@ -106,19 +106,6 @@ export function TextOptimizeTab({ config, onSave }: Props) {
             )}
           </>
         )}
-        <SettingRow
-          label={
-            <span>
-              规则增强
-              <span className="rule-direction">将语音规则注入文本优化规则</span>
-            </span>
-          }
-        >
-          <Toggle
-            checked={voiceTemplates.reuseTranscribeReferences ?? false}
-            onChange={checked => updateVoiceTemplates({ reuseTranscribeReferences: checked })}
-          />
-        </SettingRow>
       </SettingGroup>
 
       <div className="setting-group-title">规则</div>

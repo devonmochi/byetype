@@ -11,7 +11,6 @@ interface Props {
 
 export function TranscribeTab({ config, onSave }: Props) {
   const { transcribe } = config
-  const strengtheningEnabled = config.general.textStrengtheningEnabled !== false
 
   const audioModels = getAudioModels(config)
   const transcribeModel = findModel(config, transcribe.modelId)
@@ -80,25 +79,6 @@ export function TranscribeTab({ config, onSave }: Props) {
             )}
           </>
         )}
-        <SettingRow
-          label={
-            <span style={strengtheningEnabled ? { color: 'var(--text-secondary)' } : undefined}>
-              规则增强
-              <span className="rule-direction">将文本优化规则注入语音规则</span>
-            </span>
-          }
-          description={
-            strengtheningEnabled
-              ? '文本优化会把同一条规则跑第二遍，需先关闭文本优化才能注入'
-              : '识别阶段直接按所选风格的规则输出，一轮完成'
-          }
-        >
-          <Toggle
-            checked={(transcribe.injectTextRules ?? false) && !strengtheningEnabled}
-            disabled={strengtheningEnabled}
-            onChange={checked => updateTranscribe({ injectTextRules: checked })}
-          />
-        </SettingRow>
       </SettingGroup>
     </div>
   )
