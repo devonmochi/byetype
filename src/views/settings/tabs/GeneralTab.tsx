@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { AppConfig, AudioDevice, LocalApiStatus, ThemeMode } from '../../../core/types'
 import {
   getLaunchAtLogin,
@@ -22,7 +22,7 @@ const IMAGE_LABEL_2 = '图片识别2'
 const IS_MACOS = navigator.platform.toUpperCase().includes('MAC')
 
 function formatShortcutDisplay(combo: string): string {
-  if (!IS_MACOS) return combo
+  if (!IS_MACOS) return combo === 'AltRight' ? '右 Alt' : combo
   return combo
     .replace(/Command/g, '\u2318')
     .replace(/Shift/g, '\u21E7')
@@ -34,15 +34,17 @@ interface ShortcutInputProps {
   value: string
   recording: boolean
   onRecordingChange: (recording: boolean) => void
-  onKeyDown: (e: React.KeyboardEvent) => void
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
+  onKeyUp: (e: React.KeyboardEvent<HTMLInputElement>) => void
 }
 
-function ShortcutInput({ label, value, recording, onRecordingChange, onKeyDown }: ShortcutInputProps) {
+function ShortcutInput({ label, value, recording, onRecordingChange, onKeyDown, onKeyUp }: ShortcutInputProps) {
   return (
     <input
       className={`kbd${recording ? ' recording' : ''}`}
       value={formatShortcutDisplay(value)}
       onKeyDown={recording ? onKeyDown : undefined}
+      onKeyUp={recording ? onKeyUp : undefined}
       onFocus={() => onRecordingChange(true)}
       onBlur={() => onRecordingChange(false)}
       readOnly
@@ -163,20 +165,50 @@ export function GeneralTab({ config, onSave }: Props) {
       ? [{ key: config.general.shortcut2, label: VOICE_LABEL_2 }]
       : []
 
+  const rightAltField = useRef<string | null>(null)
+
   function createKeyHandler(
+    field: string,
     setRec: (v: boolean) => void,
     onCapture: (combo: string) => void,
     others: { key: string; label: string }[],
   ) {
-    return (e: React.KeyboardEvent) => {
+    const commit = (combo: string, input: HTMLInputElement) => {
+      const conflict = combo && others.find(o => o.key === combo)
+      if (conflict) {
+        setConflictMsg(`\u4E0E${conflict.label}\u51B2\u7A81`)
+        setTimeout(() => setConflictMsg(''), 3000)
+        setRec(false)
+        input.blur()
+        return
+      }
+
+      onCapture(combo)
+      setRec(false)
+      input.blur()
+    }
+
+    const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       e.preventDefault()
       if (e.key === 'Escape') {
+        rightAltField.current = null
         setRec(false)
+        e.currentTarget.blur()
         return
       }
       if (e.key === 'Tab') return
-      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return
+      if (e.key === 'Backspace') {
+        rightAltField.current = null
+        commit('', e.currentTarget)
+        return
+      }
+      if (!IS_MACOS && e.code === 'AltRight') {
+        rightAltField.current = field
+        return
+      }
+      if (['Control', 'Alt', 'Shift', 'Meta', 'AltGraph'].includes(e.key)) return
 
+      rightAltField.current = null
       const key = e.key === ' ' ? 'Space' : e.key
       const parts: string[] = []
       if (e.ctrlKey) parts.push('Ctrl')
@@ -184,22 +216,21 @@ export function GeneralTab({ config, onSave }: Props) {
       if (e.shiftKey) parts.push('Shift')
       if (e.metaKey) parts.push(IS_MACOS ? 'Command' : 'Win')
       parts.push(key)
-      const combo = parts.join('+')
-
-      const conflict = others.find(o => o.key === combo)
-      if (conflict) {
-        setConflictMsg(`\u4E0E${conflict.label}\u51B2\u7A81`)
-        setTimeout(() => setConflictMsg(''), 3000)
-        setRec(false)
-        return
-      }
-
-      onCapture(combo)
-      setRec(false)
+      commit(parts.join('+'), e.currentTarget)
     }
+
+    const onKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (IS_MACOS || e.code !== 'AltRight' || rightAltField.current !== field) return
+      e.preventDefault()
+      rightAltField.current = null
+      commit('AltRight', e.currentTarget)
+    }
+
+    return { onKeyDown, onKeyUp }
   }
 
-  const handleKeyDown = createKeyHandler(
+  const { onKeyDown: handleKeyDown, onKeyUp: handleKeyUp } = createKeyHandler(
+    'shortcut',
     setRecording,
     (combo) => update({ shortcut: combo }),
     [
@@ -209,7 +240,8 @@ export function GeneralTab({ config, onSave }: Props) {
     ],
   )
 
-  const handleKeyDown2 = createKeyHandler(
+  const { onKeyDown: handleKeyDown2, onKeyUp: handleKeyUp2 } = createKeyHandler(
+    'shortcut2',
     setRecording2,
     (combo) => update({ shortcut2: combo }),
     [
@@ -219,7 +251,8 @@ export function GeneralTab({ config, onSave }: Props) {
     ],
   )
 
-  const handleExtractKeyDown = createKeyHandler(
+  const { onKeyDown: handleExtractKeyDown, onKeyUp: handleExtractKeyUp } = createKeyHandler(
+    'extractShortcut',
     setRecordingExtract,
     (combo) => update({ extractShortcut: combo }),
     [
@@ -229,7 +262,8 @@ export function GeneralTab({ config, onSave }: Props) {
     ],
   )
 
-  const handleExtractKeyDown2 = createKeyHandler(
+  const { onKeyDown: handleExtractKeyDown2, onKeyUp: handleExtractKeyUp2 } = createKeyHandler(
+    'extractShortcut2',
     setRecordingExtract2,
     (combo) => update({ extractShortcut2: combo }),
     [
@@ -290,6 +324,7 @@ export function GeneralTab({ config, onSave }: Props) {
               recording={recording}
               onRecordingChange={setRecording}
               onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUp}
             />
           </SettingRow>
         )}
@@ -318,6 +353,7 @@ export function GeneralTab({ config, onSave }: Props) {
                   recording={recording}
                   onRecordingChange={setRecording}
                   onKeyDown={handleKeyDown}
+                  onKeyUp={handleKeyUp}
                 />
               </div>
             </SettingRow>
@@ -334,6 +370,7 @@ export function GeneralTab({ config, onSave }: Props) {
                   recording={recording2}
                   onRecordingChange={setRecording2}
                   onKeyDown={handleKeyDown2}
+                  onKeyUp={handleKeyUp2}
                 />
               </div>
             </SettingRow>
@@ -370,6 +407,7 @@ export function GeneralTab({ config, onSave }: Props) {
               recording={recordingExtract}
               onRecordingChange={setRecordingExtract}
               onKeyDown={handleExtractKeyDown}
+              onKeyUp={handleExtractKeyUp}
             />
           </div>
         </SettingRow>
@@ -386,6 +424,7 @@ export function GeneralTab({ config, onSave }: Props) {
               recording={recordingExtract2}
               onRecordingChange={setRecordingExtract2}
               onKeyDown={handleExtractKeyDown2}
+              onKeyUp={handleExtractKeyUp2}
             />
           </div>
         </SettingRow>

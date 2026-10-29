@@ -7,6 +7,14 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use crate::audio::recorder::AudioRecorder;
 use crate::config::ConfigManager;
 
+#[cfg(target_os = "windows")]
+mod native;
+
+#[cfg(target_os = "windows")]
+static ALT_RIGHT_BACKEND: Mutex<Option<native::NativeBackend>> = Mutex::new(None);
+
+const ALT_RIGHT: &str = "AltRight";
+
 /// PTT 模式下，按住时间小于此阈值视为误触，丢弃录音。
 const PTT_MIN_DURATION_MS: u64 = 300;
 
@@ -16,21 +24,19 @@ const READY_POLL_INTERVAL_MS: u64 = 20;
 const READY_POLL_TICKS: u32 = 150;
 
 /// Register all 4 global shortcuts (2 voice + 2 image), each bound to its own template_id.
-pub fn register(
-    app: &AppHandle,
-    recorder: Arc<AudioRecorder>,
-) -> Result<(), String> {
+pub fn register(app: &AppHandle, recorder: Arc<AudioRecorder>) -> Result<(), String> {
     let cfg = app.state::<ConfigManager>().get();
-    // Image shortcut 1 falls back to "F6" when empty (see register_image_shortcut
-    // below). Apply the same fallback here so conflict detection sees the actual
-    // key that will be registered — otherwise an empty extract_shortcut would
-    // bypass the uniqueness check and silently collide with another "F6" shortcut.
-    let ek1 = if cfg.general.extract_shortcut.is_empty() { "F6".to_string() } else { cfg.general.extract_shortcut.clone() };
+    // 空值表示停用，不再给图片识别 1 偷偷补回 F6。
+    let ek1 = cfg.general.extract_shortcut.clone();
     // 文本强化关闭时第二个语音快捷键不注册，也不参与冲突检测，
     // 避免它继续被触发或在未注册的情况下挡住保存。
     let second_voice_enabled =
         cfg.general.text_strengthening_enabled && !cfg.general.shortcut2.is_empty();
-    let mut keys = vec![cfg.general.shortcut.clone(), ek1.clone(), cfg.general.extract_shortcut2.clone()];
+    let mut keys = vec![
+        cfg.general.shortcut.clone(),
+        ek1.clone(),
+        cfg.general.extract_shortcut2.clone(),
+    ];
     if second_voice_enabled {
         keys.push(cfg.general.shortcut2.clone());
     }
@@ -44,24 +50,173 @@ pub fn register(
         }
     }
 
-    app.global_shortcut().unregister_all()
+    #[cfg(target_os = "windows")]
+    stop_alt_right();
+    app.global_shortcut()
+        .unregister_all()
         .map_err(|e| format!("Failed to unregister shortcuts: {}", e))?;
 
+    #[cfg(target_os = "windows")]
+    let mut alt_right_needed = false;
+
     // Voice shortcut 1
-    if !cfg.general.shortcut.is_empty() {
-        register_voice_shortcut(app, &cfg.general.shortcut, cfg.general.shortcut_template.clone(), recorder.clone())?;
+    if cfg.general.shortcut == ALT_RIGHT {
+        #[cfg(target_os = "windows")]
+        {
+            alt_right_needed = true;
+        }
+        #[cfg(not(target_os = "windows"))]
+        eprintln!("右 Alt 快捷键仅支持 Windows");
+    } else if !cfg.general.shortcut.is_empty() {
+        register_voice_shortcut(
+            app,
+            &cfg.general.shortcut,
+            cfg.general.shortcut_template.clone(),
+            recorder.clone(),
+        )?;
     }
     // Voice shortcut 2 (仅文本强化开启时注册)
     if second_voice_enabled {
-        register_voice_shortcut(app, &cfg.general.shortcut2, cfg.general.shortcut2_template.clone(), recorder.clone())?;
+        if cfg.general.shortcut2 == ALT_RIGHT {
+            #[cfg(target_os = "windows")]
+            {
+                alt_right_needed = true;
+            }
+            #[cfg(not(target_os = "windows"))]
+            eprintln!("右 Alt 快捷键仅支持 Windows");
+        } else {
+            register_voice_shortcut(
+                app,
+                &cfg.general.shortcut2,
+                cfg.general.shortcut2_template.clone(),
+                recorder.clone(),
+            )?;
+        }
     }
-    // Image shortcut 1 (ek1 with fallback already computed above for conflict detection)
-    register_image_shortcut(app, &ek1, cfg.general.extract_shortcut_template.clone())?;
+    // Image shortcut 1：为空时不注册，保持停用状态。
+    if ek1 == ALT_RIGHT {
+        #[cfg(target_os = "windows")]
+        {
+            alt_right_needed = true;
+        }
+        #[cfg(not(target_os = "windows"))]
+        eprintln!("右 Alt 快捷键仅支持 Windows");
+    } else if !ek1.is_empty() {
+        register_image_shortcut(app, &ek1, cfg.general.extract_shortcut_template.clone())?;
+    }
     // Image shortcut 2
-    if !cfg.general.extract_shortcut2.is_empty() {
-        register_image_shortcut(app, &cfg.general.extract_shortcut2, cfg.general.extract_shortcut2_template.clone())?;
+    if cfg.general.extract_shortcut2 == ALT_RIGHT {
+        #[cfg(target_os = "windows")]
+        {
+            alt_right_needed = true;
+        }
+        #[cfg(not(target_os = "windows"))]
+        eprintln!("右 Alt 快捷键仅支持 Windows");
+    } else if !cfg.general.extract_shortcut2.is_empty() {
+        register_image_shortcut(
+            app,
+            &cfg.general.extract_shortcut2,
+            cfg.general.extract_shortcut2_template.clone(),
+        )?;
     }
 
+    #[cfg(target_os = "windows")]
+    if alt_right_needed {
+        start_alt_right(app, recorder)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn stop_alt_right() {
+    let backend = ALT_RIGHT_BACKEND
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take();
+    drop(backend);
+}
+
+/// 原生监听只负责把右 Alt 的按下/松开送到工作线程，避免在系统键盘钩子里
+/// 执行录音、网络请求等耗时逻辑。配置在事件发生时读取，与现有快捷键行为一致。
+#[cfg(target_os = "windows")]
+fn start_alt_right(app: &AppHandle, recorder: Arc<AudioRecorder>) -> Result<(), String> {
+    let (event_tx, event_rx) = std::sync::mpsc::channel::<bool>();
+    let worker_app = app.clone();
+    let current_task_id: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+    let recording_gen: Arc<AtomicU32> = Arc::new(AtomicU32::new(0));
+
+    std::thread::Builder::new()
+        .name("byetype-altright-events".to_string())
+        .spawn(move || {
+            let mut is_down = false;
+            while let Ok(pressed) = event_rx.recv() {
+                // Windows 会在按住键时重复发送按下事件，只响应真实的状态变化。
+                if pressed == is_down {
+                    continue;
+                }
+                is_down = pressed;
+
+                let config = worker_app.state::<ConfigManager>().get();
+                let general = &config.general;
+                let voice_template = if general.shortcut == ALT_RIGHT {
+                    Some(general.shortcut_template.clone())
+                } else if general.text_strengthening_enabled && general.shortcut2 == ALT_RIGHT {
+                    Some(general.shortcut2_template.clone())
+                } else {
+                    None
+                };
+
+                if let Some(template) = voice_template {
+                    let state = if pressed {
+                        ShortcutState::Pressed
+                    } else {
+                        ShortcutState::Released
+                    };
+                    if general.ptt_mode {
+                        handle_ptt_event(
+                            &worker_app,
+                            state,
+                            &recorder,
+                            &current_task_id,
+                            &recording_gen,
+                            &template,
+                        );
+                    } else {
+                        handle_toggle_event(
+                            &worker_app,
+                            state,
+                            &recorder,
+                            &current_task_id,
+                            &recording_gen,
+                            &template,
+                        );
+                    }
+                    continue;
+                }
+
+                if !pressed {
+                    continue;
+                }
+                let image_template = if general.extract_shortcut == ALT_RIGHT {
+                    Some(general.extract_shortcut_template.clone())
+                } else if general.extract_shortcut2 == ALT_RIGHT {
+                    Some(general.extract_shortcut2_template.clone())
+                } else {
+                    None
+                };
+                if let Some(template) = image_template {
+                    crate::task::start_extraction(&worker_app, template);
+                }
+            }
+        })
+        .map_err(|e| format!("无法创建右 Alt 事件线程: {e}"))?;
+
+    let sink: native::EventSink = Arc::new(move |pressed| {
+        let _ = event_tx.send(pressed);
+    });
+    let backend = native::NativeBackend::start(sink)?;
+    *ALT_RIGHT_BACKEND.lock().unwrap_or_else(|e| e.into_inner()) = Some(backend);
     Ok(())
 }
 
