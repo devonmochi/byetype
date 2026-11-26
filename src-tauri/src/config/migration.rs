@@ -151,10 +151,14 @@ fn migrate_builtin_voice_clear_template(raw: &mut Value) -> bool {
 }
 
 /// 迁移全局「文本强化」开关：
-/// 旧版用「输出风格选无」表示关闭，没有独立开关。已有 shortcutTemplate 为空的配置
-/// 视为关闭；模板本身保留在 voiceTemplates 里，不当作丢失。
-/// 开关字段只在缺失时推断，已存在时保留用户选择；绑定自愈每次启动都做，
-/// 否则早期版本写下的空模板或已删除模板会一直留着。
+/// 旧版用「输出风格选无」表示关闭，没有独立开关。开关字段只在缺失时推断，
+/// 已存在时保留用户选择。
+/// 模板绑定的修复规则：
+/// - 绑定字段缺失时回填默认模板；
+/// - 绑定非空但指向已不存在的模板时自愈到可用模板；
+/// - 开关字段已存在时，绑定为空串表示用户明确选择了「无」，必须原样保留，
+///   否则用户重启后被重置回默认模板；
+/// - 旧配置（开关字段缺失）的空绑定按旧语义回填，重新打开开关后立刻可用。
 /// 只有确实改动过才返回 true，避免每次启动都回写 config.json。
 fn migrate_text_strengthening_switch(raw: &mut Value) -> bool {
     let template_ids = available_voice_template_ids(raw);
@@ -164,6 +168,11 @@ fn migrate_text_strengthening_switch(raw: &mut Value) -> bool {
     }
     let mut changed = false;
 
+    // 开关字段缺失说明是旧版配置升级，此时空模板按旧语义等于「关闭」。
+    let legacy_upgrade = general
+        .get("textStrengtheningEnabled")
+        .and_then(Value::as_bool)
+        .is_none();
     let enabled = match general
         .get("textStrengtheningEnabled")
         .and_then(Value::as_bool)
@@ -182,16 +191,40 @@ fn migrate_text_strengthening_switch(raw: &mut Value) -> bool {
         }
     };
 
-    // 主快捷键绑定：为空或指向已不存在的模板时回填，避免界面显示第 1 项、
-    // 后端却仍按旧无效值执行；关闭时也留一个有效主模板，重新打开后立刻可用。
-    let main = usable_template(&template_ids, "voice-optimize", general.get("shortcutTemplate"));
-    changed |= set_if_changed(general, "shortcutTemplate", main);
+    changed |= repair_template_binding(general, "shortcutTemplate", "voice-optimize", &template_ids, legacy_upgrade);
     // 第二个入口只在开启时注册，关闭时不动它。
     if enabled {
-        let second = usable_template(&template_ids, "voice-translate", general.get("shortcut2Template"));
-        changed |= set_if_changed(general, "shortcut2Template", second);
+        changed |= repair_template_binding(general, "shortcut2Template", "voice-translate", &template_ids, legacy_upgrade);
     }
     changed
+}
+
+/// 修复一个模板绑定，返回是否改动。
+/// 空串只在旧配置升级时回填；开关字段已存在时「空」是用户选的有效值。
+fn repair_template_binding(
+    general: &mut Value,
+    key: &str,
+    preferred: &str,
+    template_ids: &[String],
+    legacy_upgrade: bool,
+) -> bool {
+    let current = general.get(key).cloned();
+    let next = match current.as_ref() {
+        // 非空绑定：有效则保留，指向已删除模板时自愈。
+        Some(Value::String(value)) if !value.is_empty() => {
+            usable_template(template_ids, preferred, current.as_ref())
+        }
+        // 空绑定：开关字段已存在时是用户明确选的「无」，不能覆盖。
+        Some(Value::String(_)) => {
+            if !legacy_upgrade {
+                return false;
+            }
+            usable_template(template_ids, preferred, None)
+        }
+        // 整个键缺失或类型不对：回填默认模板。
+        _ => usable_template(template_ids, preferred, None),
+    };
+    set_if_changed(general, key, next)
 }
 
 fn set_if_changed(general: &mut Value, key: &str, value: String) -> bool {
@@ -629,14 +662,136 @@ mod tests {
     }
 
     #[test]
-    fn existing_switch_still_heals_empty_binding() {
+    fn existing_switch_keeps_explicit_none_on_main_binding() {
         let mut raw = json!({
-            "general": { "shortcutTemplate": "", "textStrengtheningEnabled": true }
+            "general": {
+                "shortcutTemplate": "",
+                "shortcut2Template": "voice-translate",
+                "textStrengtheningEnabled": true,
+            },
+            "voiceTemplates": {
+                "templates": [
+                    { "id": "voice-optimize", "name": "自动换行", "prompt": "" },
+                    { "id": "voice-translate", "name": "翻译", "prompt": "" },
+                ]
+            }
         });
 
-        // 开关字段已存在，主绑定为空时也要补回，否则界面第 1 项与后端运行值不一致
+        // 开关字段已存在时，主绑定为空是用户明确选的「无」，重启后必须保留
+        assert!(!migrate_text_strengthening_switch(&mut raw));
+        assert_eq!(raw["general"]["shortcutTemplate"], "");
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], true);
+        // 第二次执行仍然什么都不改
+        assert!(!migrate_text_strengthening_switch(&mut raw));
+        assert_eq!(raw["general"]["shortcutTemplate"], "");
+    }
+
+    #[test]
+    fn restart_keeps_first_binding_none_and_second_template() {
+        let mut raw = json!({
+            "general": {
+                "shortcutTemplate": "",
+                "shortcut2Template": "voice-clear",
+                "textStrengtheningEnabled": true,
+            },
+            "voiceTemplates": {
+                "templates": [
+                    { "id": "voice-optimize", "name": "自动换行", "prompt": "" },
+                    { "id": "voice-clear", "name": "清晰表达", "prompt": "" },
+                ]
+            },
+            "voiceLearning": {
+                "modelId": "builtin-deepseek-flash",
+                "thinking": { "enabled": false, "level": "LOW" }
+            }
+        });
+
+        // 语音输入 1 选「无」、语音输入 2 选「清晰表达」，重启迁移应原样保留
+        assert!(!migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["shortcutTemplate"], "");
+        assert_eq!(raw["general"]["shortcut2Template"], "voice-clear");
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], true);
+        // 幂等：再跑一次仍无变化
+        assert!(!migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["shortcutTemplate"], "");
+        assert_eq!(raw["general"]["shortcut2Template"], "voice-clear");
+    }
+
+    #[test]
+    fn restart_keeps_first_template_and_second_binding_none() {
+        let mut raw = json!({
+            "general": {
+                "shortcutTemplate": "voice-clear",
+                "shortcut2Template": "",
+                "textStrengtheningEnabled": true,
+            },
+            "voiceTemplates": {
+                "templates": [
+                    { "id": "voice-optimize", "name": "自动换行", "prompt": "" },
+                    { "id": "voice-clear", "name": "清晰表达", "prompt": "" },
+                    { "id": "voice-translate", "name": "翻译", "prompt": "" },
+                ]
+            },
+            "voiceLearning": {
+                "modelId": "builtin-deepseek-flash",
+                "thinking": { "enabled": false, "level": "LOW" }
+            }
+        });
+
+        // 语音输入 1 选「清晰表达」、语音输入 2 选「无」，重启迁移应原样保留
+        assert!(!migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["shortcutTemplate"], "voice-clear");
+        assert_eq!(raw["general"]["shortcut2Template"], "");
+        assert!(!migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["shortcut2Template"], "");
+    }
+
+    #[test]
+    fn both_bindings_none_survive_restart() {
+        let mut raw = json!({
+            "general": {
+                "shortcutTemplate": "",
+                "shortcut2Template": "",
+                "textStrengtheningEnabled": true,
+            },
+            "voiceTemplates": {
+                "templates": [
+                    { "id": "voice-optimize", "name": "自动换行", "prompt": "" },
+                    { "id": "voice-clear", "name": "清晰表达", "prompt": "" },
+                ]
+            },
+            "voiceLearning": {
+                "modelId": "builtin-deepseek-flash",
+                "thinking": { "enabled": false, "level": "LOW" }
+            }
+        });
+
+        // 两个入口都选「无」时同样保留，不因为开关开启就回填
+        assert!(!migrate_if_needed(&mut raw));
+        assert_eq!(raw["general"]["shortcutTemplate"], "");
+        assert_eq!(raw["general"]["shortcut2Template"], "");
+        assert_eq!(raw["general"]["textStrengtheningEnabled"], true);
+    }
+
+    #[test]
+    fn existing_switch_heals_deleted_main_binding_but_keeps_none() {
+        let mut raw = json!({
+            "general": {
+                "shortcutTemplate": "voice-deleted",
+                "shortcut2Template": "",
+                "textStrengtheningEnabled": true,
+            },
+            "voiceTemplates": {
+                "templates": [
+                    { "id": "voice-optimize", "name": "自动换行", "prompt": "" },
+                ]
+            }
+        });
+
+        // 非空但指向已删除模板时自愈，空的第二个绑定保持「无」
         assert!(migrate_text_strengthening_switch(&mut raw));
         assert_eq!(raw["general"]["shortcutTemplate"], "voice-optimize");
+        assert_eq!(raw["general"]["shortcut2Template"], "");
     }
 
     #[test]

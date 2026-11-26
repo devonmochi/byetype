@@ -324,6 +324,20 @@ mod tests {
     }
 
     #[test]
+    fn empty_main_binding_skips_optimization_for_default_request() {
+        let mut config = AppConfig::default();
+        config.general.shortcut_template = String::new();
+
+        // 主绑定选「无」时，未指定模板的请求只跑第一阶段
+        assert_eq!(resolve_template(&config, None), Ok(None));
+        // 显式指定模板仍然生效
+        assert_eq!(
+            resolve_template(&config, Some("voice-clear")),
+            Ok(Some("voice-clear".to_string()))
+        );
+    }
+
+    #[test]
     fn strengthening_off_keeps_normal_request_templates() {
         let mut config = AppConfig::default();
         config.general.text_strengthening_enabled = false;
