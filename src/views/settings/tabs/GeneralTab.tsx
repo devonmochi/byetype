@@ -59,9 +59,11 @@ interface TemplateSelectProps {
   value: string
   templates: { id: string; name: string }[]
   onChange: (templateId: string) => void
+  /** 允许选择「无」：空值表示该入口只识别、不跑第二阶段优化 */
+  allowNone?: boolean
 }
 
-function TemplateSelect({ value, templates, onChange }: TemplateSelectProps) {
+function TemplateSelect({ value, templates, onChange, allowNone = false }: TemplateSelectProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>输出风格</span>
@@ -71,6 +73,7 @@ function TemplateSelect({ value, templates, onChange }: TemplateSelectProps) {
         onChange={e => onChange(e.target.value)}
         style={{ minWidth: 100 }}
       >
+        {allowNone && <option value="">无</option>}
         {templates.map(t => (
           <option key={t.id} value={t.id}>{t.name}</option>
         ))}
@@ -273,19 +276,11 @@ export function GeneralTab({ config, onSave }: Props) {
     ],
   )
 
-  // 开关只切换 enabled，不改任何模板选择与快捷键；
-  // 旧配置里「输出风格选无」存的是空模板，打开时补一个可用默认项。
+  // 开关只切换 enabled，不改任何模板选择与快捷键。
+  // 语音输入 1/2 都可选「无」，空模板是用户的有效选择，打开开关时原样保留，
+  // 否则用户选过的「无」会被强行覆盖回默认模板。
   const setStrengthening = (enabled: boolean) => {
-    if (!enabled) {
-      update({ textStrengtheningEnabled: false })
-      return
-    }
-    update({
-      textStrengtheningEnabled: true,
-      shortcutTemplate: config.general.shortcutTemplate || voiceTemplates[0]?.id || '',
-      shortcut2Template:
-        config.general.shortcut2Template || voiceTemplates[1]?.id || voiceTemplates[0]?.id || '',
-    })
+    update({ textStrengtheningEnabled: enabled })
   }
 
   const themes: { value: ThemeMode; label: string; style: React.CSSProperties }[] = [
@@ -346,6 +341,7 @@ export function GeneralTab({ config, onSave }: Props) {
                   value={config.general.shortcutTemplate}
                   templates={voiceTemplates}
                   onChange={templateId => update({ shortcutTemplate: templateId })}
+                  allowNone
                 />
                 <ShortcutInput
                   label={VOICE_LABEL_1}
@@ -363,6 +359,7 @@ export function GeneralTab({ config, onSave }: Props) {
                   value={config.general.shortcut2Template}
                   templates={voiceTemplates}
                   onChange={templateId => update({ shortcut2Template: templateId })}
+                  allowNone
                 />
                 <ShortcutInput
                   label={VOICE_LABEL_2}

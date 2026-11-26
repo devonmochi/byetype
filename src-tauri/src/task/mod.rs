@@ -1102,4 +1102,28 @@ mod tests {
         assert_eq!(second_stage_template(true, None), None);
         assert_eq!(second_stage_template(true, Some("")), None);
     }
+
+    #[test]
+    fn second_stage_follows_each_voice_binding() {
+        // 语音输入 1 选「无」、语音输入 2 选「清晰表达」：
+        // 1 号入口只跑第一阶段，2 号入口跑第一阶段＋清晰表达，互不影响。
+        assert_eq!(second_stage_template(true, Some("")), None);
+        assert_eq!(
+            second_stage_template(true, Some("voice-clear")),
+            Some("voice-clear".to_string())
+        );
+    }
+
+    #[test]
+    fn second_stage_skips_first_binding_only() {
+        // 语音输入 1 选模板、语音输入 2 选「无」：2 号入口跳过第二阶段。
+        assert_eq!(
+            second_stage_template(true, Some("voice-clear")),
+            Some("voice-clear".to_string())
+        );
+        assert_eq!(second_stage_template(true, Some("")), None);
+        // 全局开关关闭时两个入口都跳过
+        assert_eq!(second_stage_template(false, Some("")), None);
+        assert_eq!(second_stage_template(false, Some("voice-clear")), None);
+    }
 }
