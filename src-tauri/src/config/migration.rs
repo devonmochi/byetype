@@ -106,7 +106,48 @@ pub fn migrate_if_needed(raw: &mut Value) -> bool {
         migrated = true;
     }
 
+    if migrate_builtin_voice_clear_template(raw) {
+        migrated = true;
+    }
+
     migrated
+}
+
+/// 为已有配置补齐新增的内置模板「清晰表达」(voice-clear)。
+/// 内置模板在界面不可删除，因此缺少时插入到 voice-optimize 之后（或列表末尾）；
+/// 已存在时不改动，保证幂等。
+fn migrate_builtin_voice_clear_template(raw: &mut Value) -> bool {
+    let Some(templates) = raw
+        .get_mut("voiceTemplates")
+        .and_then(|section| section.get_mut("templates"))
+        .and_then(Value::as_array_mut)
+    else {
+        return false;
+    };
+
+    if templates
+        .iter()
+        .any(|t| t.get("id").and_then(Value::as_str) == Some("voice-clear"))
+    {
+        return false;
+    }
+
+    let entry = serde_json::json!({
+        "id": "voice-clear",
+        "name": "清晰表达",
+        "prompt": "",
+    });
+
+    if let Some(pos) = templates
+        .iter()
+        .position(|t| t.get("id").and_then(Value::as_str) == Some("voice-optimize"))
+    {
+        templates.insert(pos + 1, entry);
+    } else {
+        templates.push(entry);
+    }
+
+    true
 }
 
 /// 迁移全局「文本强化」开关：
@@ -207,6 +248,7 @@ fn migrate_optimize_to_voice_templates(raw: &mut Value) {
     // Build voice templates list
     let templates = serde_json::json!([
         { "id": "voice-optimize", "name": "自动换行", "prompt": custom_prompt },
+        { "id": "voice-clear", "name": "清晰表达", "prompt": "" },
         { "id": "voice-translate", "name": "翻译", "prompt": "" },
         { "id": "voice-custom", "name": "自定义", "prompt": "" },
     ]);
@@ -617,5 +659,38 @@ mod tests {
         assert!(migrate_if_needed(&mut raw));
         assert_eq!(raw["general"]["textStrengtheningEnabled"], false);
         assert_eq!(raw["general"]["shortcut2Template"], "");
+    }
+
+    #[test]
+    fn migration_inserts_builtin_voice_clear_after_voice_optimize_and_is_idempotent() {
+        let mut raw = json!({
+            "general": {
+                "shortcutTemplate": "voice-optimize",
+                "shortcut2Template": "voice-translate",
+                "textStrengtheningEnabled": true
+            },
+            "voiceTemplates": {
+                "modelId": "builtin-deepseek-flash",
+                "templates": [
+                    { "id": "voice-optimize", "name": "自动换行", "prompt": "" },
+                    { "id": "voice-translate", "name": "翻译", "prompt": "" },
+                    { "id": "voice-custom", "name": "自定义", "prompt": "" }
+                ]
+            },
+            "voiceLearning": {
+                "modelId": "builtin-deepseek-flash",
+                "thinking": { "enabled": false, "level": "LOW" }
+            }
+        });
+
+        assert!(migrate_if_needed(&mut raw));
+        let templates = raw["voiceTemplates"]["templates"].as_array().unwrap();
+        assert_eq!(templates.len(), 4);
+        assert_eq!(templates[0]["id"], "voice-optimize");
+        assert_eq!(templates[1]["id"], "voice-clear");
+        assert_eq!(templates[1]["name"], "清晰表达");
+        assert_eq!(templates[2]["id"], "voice-translate");
+        // 第二次执行应幂等无变化
+        assert!(!migrate_if_needed(&mut raw));
     }
 }

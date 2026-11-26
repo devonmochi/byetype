@@ -98,6 +98,7 @@ pub fn build_extract_prompt(config: &AppConfig, prompts_dir: &Path, template_id:
 fn builtin_prompt_filename(template_id: &str) -> Option<&str> {
     match template_id {
         "voice-optimize" => Some("text-optimize.md"),
+        "voice-clear" => Some("voice-clear.md"),
         "voice-translate" => Some("voice-translate.md"),
         "image-extract" => Some("text-extract.md"),
         "image-translate" => Some("image-translate.md"),
@@ -202,6 +203,21 @@ mod tests {
         assert!(!prompt.contains("转录规则"));
         assert!(!prompt.contains("专有词汇"));
         assert!(!prompt.contains("角色定义"));
+
+        std::fs::remove_dir_all(prompts_dir).unwrap();
+    }
+
+    #[test]
+    fn optimize_prompt_resolves_builtin_voice_clear_template() {
+        let prompts_dir = test_prompts_dir("voice-clear");
+        std::fs::write(prompts_dir.join("voice-clear.md"), "清晰表达规则").unwrap();
+
+        let prompt = build_optimize_prompt(&AppConfig::default(), &prompts_dir, "voice-clear");
+
+        assert_eq!(
+            prompt,
+            "<document name=\"text-optimize\">\n清晰表达规则\n</document>"
+        );
 
         std::fs::remove_dir_all(prompts_dir).unwrap();
     }

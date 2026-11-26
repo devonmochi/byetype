@@ -6,12 +6,16 @@ import { createUserPromptFile } from '../../../lib/tauri-api'
 type TemplateKind = 'voice' | 'image'
 
 const BUILTIN_IDS: Record<TemplateKind, string[]> = {
-  voice: ['voice-optimize', 'voice-translate', 'voice-custom'],
+  voice: ['voice-optimize', 'voice-clear', 'voice-translate', 'voice-custom'],
   image: ['image-extract', 'image-translate', 'image-custom'],
 }
 
 const BUILTIN_FILENAMES: Record<TemplateKind, Record<string, string>> = {
-  voice: { 'voice-optimize': 'text-optimize.md', 'voice-translate': 'voice-translate.md' },
+  voice: {
+    'voice-optimize': 'text-optimize.md',
+    'voice-clear': 'voice-clear.md',
+    'voice-translate': 'voice-translate.md',
+  },
   image: { 'image-extract': 'text-extract.md', 'image-translate': 'image-translate.md' },
 }
 

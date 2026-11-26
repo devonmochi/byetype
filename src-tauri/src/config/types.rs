@@ -248,6 +248,7 @@ pub struct VoiceTemplatesConfig {
 fn default_voice_templates() -> Vec<TemplateEntry> {
     vec![
         TemplateEntry { id: "voice-optimize".to_string(), name: "自动换行".to_string(), prompt: String::new() },
+        TemplateEntry { id: "voice-clear".to_string(), name: "清晰表达".to_string(), prompt: String::new() },
         TemplateEntry { id: "voice-translate".to_string(), name: "翻译".to_string(), prompt: String::new() },
         TemplateEntry { id: "voice-custom".to_string(), name: "自定义".to_string(), prompt: String::new() },
     ]
